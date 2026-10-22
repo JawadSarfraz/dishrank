@@ -6,11 +6,13 @@ Triage: one pass by Claude on 2026-10-22, no sub-agents. Every finding is marked
 
 | Mark | Findings |
 |---|---|
-| Blocker for Phases 0–2 | 15 in 8 groups |
+| Blocker for Phases 0–2 | 15 in 8 groups, all fixed on 2026-10-22 |
 | Later | 111 |
 | Drop | 62 (54 resolved, 8 not worth acting on) |
 
 ## Blockers for Phases 0–2
+
+All eight are fixed. The owner set up the laptop (Node 24, pnpm 12.14, PostgreSQL 17 on port 5433); groups 2–8 were applied to the docs in the commit "docs: phase 0-2 blocker fixes", with the owner's additions recorded under Decided in `docs/OPEN-QUESTIONS.md`.
 
 1. **Dev environment cannot run Phase 0** (OP-05)
    - Problem: The laptop runs Node 20.19.4, below Vitest 5's engines; pnpm fails on a corrupt corepack cache; Homebrew PostgreSQL is 14.15 and must match the Supabase major.

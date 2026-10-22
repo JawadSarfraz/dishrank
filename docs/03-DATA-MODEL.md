@@ -163,6 +163,7 @@ enum ReviewItemType {
   SUSPICIOUS_RATINGS
   OWNER_CLAIM
   DUPLICATE_RESTAURANT
+  PLACE_REFRESH_FAILED
 }
 enum ReviewItemStatus {
   OPEN
@@ -289,20 +290,23 @@ model Restaurant {
   cityId          String
   areaId          String?
   address         String?
-  lat             Float?
+  lat             Float?            // from Places; NULL when a refresh failed (docs/07 §5)
   lng             Float?
   phone           String?
   priceBand       Int?              // 1..4
   googlePlaceId   String?           @unique
-  googleSyncedAt  DateTime?         // lat/lng refreshed from Places within 30 days
+  googleSyncedAt  DateTime?         // time of the Google call behind lat/lng (CSV fetchedAt or refresh); NULL with a googlePlaceId = due
   status          RestaurantStatus  @default(ACTIVE)
   searchText      String            @default("") // name + aliases, lowercased, for pg_trgm
   claimedByUserId String?
   claimedAt       DateTime?
+  mergedIntoId    String?           // set with status DUPLICATE; its URLs redirect permanently to this restaurant
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   city        City        @relation(fields: [cityId], references: [id])
+  mergedInto  Restaurant? @relation("merge", fields: [mergedIntoId], references: [id])
+  mergedFrom  Restaurant[] @relation("merge")
   area        Area?       @relation(fields: [areaId], references: [id])
   claimedBy   User?       @relation(fields: [claimedByUserId], references: [id])
   dishes      RestaurantDish[]
@@ -574,6 +578,8 @@ CREATE INDEX IF NOT EXISTS dish_alias_trgm ON "DishAlias" USING gin ("alias" gin
 4. Owner cannot rate dishes of a restaurant they claimed (`claimedByUserId == userId` → reject).
 5. `User.trustScore` ∈ [0.3, 1.5].
 6. A `Restaurant` with `status != ACTIVE` never appears in rankings or search.
+6a. `Restaurant.mergedIntoId` is set if and only if `status = DUPLICATE`; a merged restaurant has no `googlePlaceId`.
+6b. Google `lat/lng` are kept under 30 days old: `googleSyncedAt` is the time of the Google call, and a failed refresh sets `lat/lng` to NULL (docs/07 §5).
 7. `User.isPanel = true` implies `trustScore = 1.3`; only admins change `isPanel`.
 
 ## Seed files

@@ -4,8 +4,11 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 
 ## Security
 - [ ] Every server action calls `requireUser()` or `requireRole()` before touching data
-- [ ] Every `/api/v1` handler does the same; `/api/cron/*` verifies `CRON_SECRET`
-- [ ] `owner/` and `admin/` layouts check role server-side; no role from client input
+- [ ] Every `/api/v1` handler does the same
+- [ ] `/api/cron/*` fail closed: 500 when `CRON_SECRET` is unset or empty, 401 on mismatch, constant-time compare
+- [ ] `owner/` and `admin/` layouts **and every page under them** call `requirePageRole()`; signed-out → sign-in redirect, wrong role → Forbidden page with no data fetched; no role from client input
+- [ ] Admin/owner services take the current user and call `requireRole()` themselves (a page without a check still gets FORBIDDEN)
+- [ ] `src/env.ts` validates every required env var; a production start with one missing fails
 - [ ] All inputs parsed with Zod; string lengths bounded (comment ≤ 280, names ≤ 120)
 - [ ] Storage paths validated (prefix + owner); uploads only through Supabase signed upload URLs from `/api/v1/uploads/sign` (fixed 2 h validity, one path each); dish photos public under random cuid names, menus in the private bucket; max 5 MB; JPEG/WebP only
 - [ ] Client-side resize re-encodes every photo, so EXIF/GPS metadata never reaches storage (check one uploaded file with `exiftool`)
@@ -17,6 +20,8 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 
 ## Data policy
 - [ ] Only `googlePlaceId` and `lat/lng` (refreshed ≤ 30 days) persisted from Google; names/addresses pass through the admin Confirm form
+- [ ] `googleSyncedAt` is the time of the Google call (CSV `fetchedAt` or refresh), never the import time; CSV rows older than 30 days cannot be imported
+- [ ] refresh-places runs daily; `NOT_FOUND` or a failure at 28+ days sets `lat/lng` to NULL and opens a `PLACE_REFRESH_FAILED` review item (test by backdating a row)
 - [ ] No scraping code anywhere (grep for `cheerio`, `puppeteer`, `playwright` outside tests, `foodpanda`)
 - [ ] Google attribution shown where Google data is displayed (admin import only)
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
@@ -43,7 +48,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Unique title/description per ranking page; canonical; OG image
 - [ ] JSON-LD ItemList (ranking) and Restaurant (restaurant page) validate
 - [ ] `sitemap.xml` and `robots.txt` present; non-public routes disallowed
-- [ ] URLs stable: `/[city]/best-[dish]`, `/[city]/r/[slug]`
+- [ ] URLs stable: `/[city]/best-[dish]`, `/[city]/r/[slug]`; a merged restaurant's URL redirects permanently to the surviving one
 
 ## Accessibility / mobile
 - [ ] Usable at 360 px width; tap targets ≥ 44 px on the score input

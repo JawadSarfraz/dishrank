@@ -55,11 +55,11 @@ pnpm rankings:recompute                                       # full recompute (
 3. **Rankings use only our own ratings.** No imported scores from anywhere.
 4. **Thin data never ranks.** Eligibility rules in `docs/04-RANKING.md` are enforced in the query, not just in the UI.
 5. **No free-text dish creation by users.** Users pick from `dishes`. Unknown names become a `ReviewItem` for admin.
-6. **Server-side authorization.** Admin/owner routes check role in the route-group layout **and** in every server action / route handler. Never trust a client-provided role.
+6. **Server-side authorization.** Admin/owner routes check the role in the route-group layout, **at the top of every admin/owner page** (`requirePageRole()`: signed-out → sign-in redirect, wrong role → Forbidden page), **and** in every server action / route handler (`requireRole()`). Admin/owner services take the current user and call `requireRole()` themselves, so a page that forgets its check still cannot read admin data. Never trust a client-provided role.
 7. **Every write path**: Zod validation + rate limit (`src/server/rate-limit.ts`) + audit-friendly logging.
 8. **Mobile-first and light.** Public pages are ISR (revalidate 3600s), usable at 360px width on 3G: minimal client JS, lazy images, no heavy chart libs on public pages.
 9. **No factual claims about hygiene, adulteration, or health anywhere in UI copy.** Ratings are opinions. Comments are moderated; the dispute page is linked in the footer.
-10. **Secrets** only via env vars; `.env.example` lists every variable with a comment.
+10. **Secrets** only via env vars; `.env.example` lists every variable with a comment. `src/env.ts` validates them with Zod; a production server fails at startup when a required one is missing or malformed. Cron endpoints refuse every request when `CRON_SECRET` is missing.
 
 ## Conventions
 

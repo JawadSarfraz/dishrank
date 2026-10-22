@@ -41,16 +41,19 @@ Scope:
 - Next.js 16 (stable) App Router, TypeScript strict, pnpm, Tailwind, shadcn/ui (init with button, input, card, dialog, badge, table, tabs, toast), ESLint + Prettier, Vitest (with a passing sample test), Playwright (one smoke test that loads /).
 - Prisma ORM 7, latest stable 7.x (prisma, @prisma/client, @prisma/adapter-pg all ^7; npm `latest` for prisma is the 8.0 RC, so never install unpinned). Generator and datasource exactly as docs/03. prisma.config.ts at the root: `import "dotenv/config"` (Prisma 7 does not load .env itself), schema path, migrations path + seed command, datasource.url = env("DIRECT_URL"). src/server/db.ts: PrismaClient singleton from src/generated/prisma built with `new PrismaPg({ connectionString: process.env.DATABASE_URL })`. DATABASE_URL (pooled) and DIRECT_URL (migrations) in .env.example with comments as in docs/10.
 - Better Auth (better-auth ^1.7) with Google sign-in (socialProviders.google), `prismaAdapter(prisma, { provider: "postgresql" })`, database sessions with the cookie cache off, `advanced.database.generateId = false` (ids come from the Prisma defaults), `user.additionalFields.role = { type: "string", input: false, defaultValue: "USER" }`, and the `nextCookies()` plugin. Route handler src/app/api/auth/[...all]/route.ts = `toNextJsHandler(auth)`. A `databaseHooks.user.create.before` hook gives ADMIN_EMAIL role ADMIN on first sign-in. Auth models in prisma/schema.prisma (User with role enum, Session, Account, Verification) exactly as in docs/03 (only the auth part for now; the rest comes in Phase 1).
-- src/server/auth.ts exporting auth (the Better Auth instance), requireUser(), requireRole(role). requireUser() reads `auth.api.getSession({ headers: await headers() })` and throws AppError UNAUTHENTICATED (401) without a session; requireRole() throws FORBIDDEN (403) unless the session user's role is allowed. src/app/admin/layout.tsx and src/app/owner/layout.tsx must call requireRole on the server and render 403 for the wrong role.
+- src/server/auth.ts exporting auth (the Better Auth instance), requireUser(), requireRole(role). requireUser() reads `auth.api.getSession({ headers: await headers() })` and throws AppError UNAUTHENTICATED (401) without a session; requireRole() throws FORBIDDEN (403) unless the session user's role is allowed. requirePageRole(role) for layouts and pages: signed-out → redirect('/sign-in?callbackUrl=<path>'); wrong role → returns null and the page or layout renders the Forbidden component (HTTP 200, noindex) without fetching data. src/app/admin/layout.tsx, src/app/owner/layout.tsx and every page under them call requirePageRole; admin/owner services take the current user as their first argument and call requireRole themselves. Do not use next/navigation forbidden() (still experimental). A minimal /sign-in page with the Google button.
+- src/env.ts: Zod schema for every server env var (DATABASE_URL, DIRECT_URL, BETTER_AUTH_SECRET ≥ 32 chars, BETTER_AUTH_URL, GOOGLE_CLIENT_ID/SECRET, CRON_SECRET, …; optional ones marked optional); src/instrumentation.ts imports it in register() so a production start with a missing or malformed required variable throws; in development it logs the problems. Server code reads env, not process.env.
 - Directory structure exactly as docs/02 §Directory structure (create empty index files where needed with a one-line comment).
-- vercel.json with the three crons from docs/06 (times in UTC) pointing to /api/cron/* stubs that check Authorization: Bearer CRON_SECRET and return { ok: true, stub: true }.
+- vercel.json with the two scheduled crons from docs/10 (recompute-rankings and refresh-places, daily, times in UTC). Stubs for /api/cron/recompute-rankings, /api/cron/refresh-places and /api/cron/mark-stale (manual only) share a requireCronSecret() guard: 500 CRON_SECRET_MISSING when CRON_SECRET is unset or empty, 401 on mismatch, crypto.timingSafeEqual on equal-length buffers; then return { ok: true, stub: true }.
 - README.md: add a local setup section (Homebrew PostgreSQL with the same major version as the Supabase projects, plus pg_trgm and unaccent; the preview Supabase project for storage; Google OAuth credentials; env vars) and the commands from CLAUDE.md. Keep the existing kit sections.
 - GitHub Actions workflow on pull_request and push to main: Node from .nvmrc, pnpm install, a postgres service container (same major version as the Supabase projects; the image ships pg_trgm and unaccent), prisma migrate deploy, lint, typecheck, test.
 - Minimal home page with the product name and a "Sign in with Google" button; signed-in users see their email and a sign-out button.
 
 Acceptance (verify and report each):
 - pnpm lint, pnpm typecheck, pnpm test, pnpm build all pass.
-- /admin returns 403 for a USER; after I set my role to ADMIN in the DB it renders.
+- Signed out, /admin redirects to /sign-in with a callbackUrl. Signed in as USER, /admin and every admin page show the Forbidden page and fetch no admin data; an admin service called with a USER actor throws FORBIDDEN. After I set my role to ADMIN in the DB, /admin renders.
+- Each cron stub answers 500 when CRON_SECRET is unset and 401 with a wrong or empty token; the right token returns { ok: true, stub: true }.
+- `pnpm build && pnpm start` with a required env var removed fails at startup with a message naming the variable.
 - .env.example documents every env var used anywhere in the code.
 
 Commit as: chore: scaffold next app, auth, prisma, ci
@@ -86,18 +89,21 @@ Commit as: feat(data): schema, seed and dish matching
 ```
 Implement Phase 2 from docs/08 following docs/07 §1 and §2 and CLAUDE.md rules 1–2 (no scraping; persist only googlePlaceId + lat/lng from Google).
 
-1. src/server/places/textSearch.ts and placeDetails.ts using fetch against Places API (New) with X-Goog-FieldMask exactly as docs/07. Env GOOGLE_PLACES_API_KEY. Retry 429/5xx with backoff. Unit-test the request builder (no network).
-2. scripts/seed-places.ts (run with tsx): args --city --dish [--areas]; writes tmp/candidates-<city>-<dish>-<yyyy-mm-dd>.csv; prints per-area counts and estimated billable calls. tmp/ is gitignored.
-3. src/server/services/restaurant.service.ts + repositories: create, update, setStatus, merge(intoId) (moves RestaurantDish and Rating rows, re-aggregates, marks DUPLICATE), search(city, q) via trigram + ILIKE fallback, slug generation with area suffix and uniqueness.
-4. /admin/import: upload CSV → preview with dedupe (by googlePlaceId, then trigram ≥ 0.6 on name within area) → per-row Create (prefilled form; admin must click Confirm) / Link / Skip → creates RestaurantDish CANDIDATE source GOOGLE_SEARCH confidence 0.4 for the CSV's dishSlug. Show "Data from Google" attribution with the Google logo on this admin page only.
-5. /admin/restaurants: paginated list with search, edit form, status change, merge dialog.
+1. src/server/places/textSearch.ts and placeDetails.ts using fetch against Places API (New) with request bodies and X-Goog-FieldMask exactly as docs/07 §1 and §5 (center uses latitude/longitude; the Text Search mask includes nextPageToken; Place Details mask is `location`). NOT_FOUND from Place Details is a distinct result, not a thrown error. Env GOOGLE_PLACES_API_KEY. Retry 429/5xx with backoff. Unit-test the request builder (no network).
+2. scripts/seed-places.ts (run with tsx): args --city --dish [--areas]; writes tmp/candidates-<city>-<dish>-<yyyy-mm-dd>.csv with a fetchedAt column (UTC time of the Google response for that row); prints per-area counts and estimated billable calls. tmp/ is gitignored.
+3. src/server/services/restaurant.service.ts + repositories: create, update, setStatus, merge(sourceId, targetId) exactly as docs/07 §2 "Merging duplicate restaurants" (one transaction, mergedIntoId, googlePlaceId moved after clearing the source, recompute after commit), search(city, q) via trigram + ILIKE fallback, slug generation with area suffix and uniqueness.
+4. /admin/import: upload CSV → preview with dedupe (by googlePlaceId, then trigram ≥ 0.6 on name within area) → rows with fetchedAt missing or older than 30 days are rejected → per-row Create (form prefilled with name, area, address; admin types phone and priceBand and must click Confirm) / Link / Skip → sets googleSyncedAt = fetchedAt (never the import time) → creates RestaurantDish CANDIDATE source GOOGLE_SEARCH confidence 0.4 for the CSV's dishSlug. Show "Data from Google" attribution with the Google logo on this admin page only.
+5. /admin/restaurants: paginated list with search, edit form, status change, merge dialog. A merged restaurant's page /[city]/r/[slug] redirects permanently to the surviving restaurant (permanentRedirect, HTTP 308; the JSON endpoint answers 301).
 6. GET /api/v1/restaurants/search and GET /api/v1/restaurants/:slug (dishes list will be empty-ish for now).
-7. /api/cron/refresh-places: for restaurants with googlePlaceId and googleSyncedAt older than 25 days, call placeDetails (location only), update lat/lng/googleSyncedAt, write JobRun.
+7. /api/cron/refresh-places (daily): exactly as docs/07 §5 "Places coordinate refresh": catch-up nulling past 29 days, rows with googleSyncedAt NULL or older than 25 days, NOT_FOUND or a failure at 28+ days → lat/lng NULL + PLACE_REFRESH_FAILED review item, 250 s time budget, JobRun.summary with call counts.
 
 Acceptance:
 - pnpm seed:places -- --city=islamabad --dish=chicken-karahi produces a CSV (I will supply the API key).
 - Importing it creates restaurants with areas; duplicates are flagged; search "but karahi" finds "Butt Karahi".
 - No Google displayName/address is written to the DB without passing through the Confirm form.
+- Imported restaurants have googleSyncedAt equal to the CSV fetchedAt; a CSV row older than 30 days cannot be imported.
+- Merging two restaurants that share a dish and a rater succeeds, keeps one rating per user (the older one in RatingHistory), and the old restaurant URL redirects to the survivor.
+- refresh-places with a stubbed NOT_FOUND nulls lat/lng and opens one PLACE_REFRESH_FAILED review item.
 
 Commit as: feat(restaurants): places seeding, admin import, restaurant admin
 ```
@@ -143,7 +149,7 @@ Implement Phase 4 from docs/08 using docs/04 (query, eligibility, recomputeAll) 
    - / and /[city]: city picker, launch dish grid with eligible counts, "Rate a dish" CTA.
    - Static pages: /how-rankings-work (plain-language version of docs/04 + trust rules from docs/01), /dispute (form → ReviewItem FLAG with reason OTHER + email to ADMIN_EMAIL env), /about, /privacy, /terms (placeholders I will edit).
 3. SEO: generateMetadata per page (title "Best Chicken Karahi in Islamabad (2026) — DishRank", description with counts), canonical URLs, OpenGraph image route (simple dynamic OG image with dish + city + top 3), JSON-LD ItemList of Restaurant items on ranking pages, Restaurant schema on restaurant pages, sitemap.ts (all city×launch-dish pages + restaurant pages), robots.ts.
-4. RankingService.recomputeAll() per docs/04 steps 1–7; wire /api/cron/recompute-rankings and scripts/recompute-rankings.ts; /api/cron/mark-stale. JobRun logging. Admin button on /admin/rankings to run it and view last 10 JobRuns. "Launch city" action on /admin sets City.launchedAt = now() once, behind a confirm dialog (launch day only).
+4. RankingService.recomputeAll() per docs/04 steps 1–7; wire /api/cron/recompute-rankings and scripts/recompute-rankings.ts; /api/cron/mark-stale stays a manual endpoint (not scheduled). JobRun logging. Admin button on /admin/rankings to run it and view last 10 JobRuns. "Launch city" action on /admin sets City.launchedAt = now() once, behind a confirm dialog (launch day only).
 5. Revalidation: after rating writes revalidatePath for the exact ranking page (one cached page per city × dish; filters run in the browser, so there is one path), restaurant page, and /[city].
 6. Performance: no client components on ranking pages except FilterBar and share button; images via next/image with sizes; Lighthouse mobile performance ≥ 90 on a seeded page.
 
@@ -206,7 +212,7 @@ Commit as: feat(owner): claims, owner dashboard, hardening and analytics
 ```
 Act as a reviewer who has not seen this code before. Read CLAUDE.md and docs/11-REVIEW-CHECKLIST.md. Then inspect the repo and answer, with file:line references:
 
-1. Which server actions or /api/v1 handlers can be called without the right role? List any missing requireUser/requireRole or Zod parse.
+1. Which server actions, /api/v1 handlers, admin/owner pages or admin/owner services can run without the right role? List any missing requireUser/requireRole/requirePageRole, any admin service that does not take and check the current user, any cron handler that does not fail closed, and any missing Zod parse.
 2. Where does the code persist Google Places fields other than place ID and lat/lng? (Grep the places module and import UI.)
 3. Can any user create a Dish row outside the admin resolve flow?
 4. Can an RD get a rank number while below thresholds? Trace getRanking and the page.

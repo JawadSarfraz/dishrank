@@ -14,7 +14,9 @@
 ## Environment variables (`.env.example`)
 
 ```
-# Database (Supabase; local dev uses Homebrew PostgreSQL: postgresql://localhost:5432/dishrank for both URLs)
+# Database (Supabase). Local dev (Homebrew PostgreSQL 17 on port 5433) uses the same value for both:
+#   DATABASE_URL=postgresql://jawad@localhost:5433/dishrank
+#   DIRECT_URL=postgresql://jawad@localhost:5433/dishrank
 DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true   # runtime: Supavisor transaction mode, used by @prisma/adapter-pg (pool size is set in src/server/db.ts; connection_limit is ignored by the driver adapter)
 DIRECT_URL=postgresql://...pooler.supabase.com:5432/postgres                     # Prisma CLI (migrate, seed) via prisma.config.ts: Supavisor session mode, because the free-plan direct host is IPv6-only and Vercel builds are IPv4
 
@@ -30,7 +32,7 @@ SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
 SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
 SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
 
-# Google Places (seeding + monthly location refresh only)
+# Google Places (seeding + daily location refresh of rows older than 25 days only)
 GOOGLE_PLACES_API_KEY=
 
 # Anthropic
@@ -60,12 +62,11 @@ NODE_ENV=development
 {
   "crons": [
     { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" },
-    { "path": "/api/cron/mark-stale",         "schedule": "30 21 * * *" },
-    { "path": "/api/cron/refresh-places",     "schedule": "0 22 1 * *" }
+    { "path": "/api/cron/refresh-places",     "schedule": "0 22 * * *" }
   ]
 }
 ```
-(UTC. 21:00 UTC = 02:00 PKT.) Vercel sends the request with `Authorization: Bearer $CRON_SECRET` when the env var is set.
+(UTC. 21:00 UTC = 02:00 PKT.) Vercel sends the request with `Authorization: Bearer $CRON_SECRET` when the env var is set, and the endpoints refuse every request when it is not. `mark-stale` is not scheduled because recompute already marks stale rows; call it by hand if needed. Vercel runs cron jobs only for production deployments.
 
 ## Release steps
 
@@ -86,7 +87,7 @@ NODE_ENV=development
 |---|---|
 | Vercel Hobby → Pro at monetisation | $0 → $20 |
 | Supabase Free → Pro before launch | $0 → $25 |
-| Google Places (seed + monthly refresh) | $0 within free caps |
+| Google Places (seed + daily refresh of rows older than 25 days) | $0 within free caps |
 | Anthropic (≈300 menus + matcher calls) | $5–15 |
 | Domain | ~$1–2 |
 | **Total** | **$5–60** |

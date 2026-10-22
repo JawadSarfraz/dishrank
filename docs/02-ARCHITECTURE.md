@@ -23,7 +23,7 @@ flowchart LR
   App -->|OAuth sign-in| GAuth["Google OAuth"]
   App -->|seed candidates only| Places["Google Places API (New)"]
   App -->|menu photo to JSON, matcher fallback| LLM["Anthropic API"]
-  Cron["Vercel Cron"] -->|nightly recompute, monthly refresh| App
+  Cron["Vercel Cron"] -->|nightly recompute, daily Places refresh| App
 ```
 
 ## Containers
@@ -164,7 +164,7 @@ flowchart LR
   GH -->|preview per PR| VP["Vercel Preview"]
   GH -->|main| VProd["Vercel Production<br/>dishrank.pk"]
   VProd --> SB[("Supabase project (ap-south-1)<br/>Postgres + Storage")]
-  VProd --> Cron["Vercel Cron<br/>02:00 PKT recompute<br/>monthly place refresh"]
+  VProd --> Cron["Vercel Cron<br/>02:00 PKT recompute<br/>daily Places refresh"]
   VProd --> Ant["Anthropic API"]
   VProd --> GP["Google Places API"]
   VProd --> GO["Google OAuth"]
@@ -203,12 +203,13 @@ dishrank/
 │   │   │   └── sitemap.ts  robots.ts
 │   │   ├── (app)/
 │   │   │   ├── rate/page.tsx                    # rating flow
-│   │   │   └── me/page.tsx
-│   │   ├── owner/  (layout.tsx with role guard)  claim/  restaurants/[id]/
-│   │   ├── admin/  (layout.tsx with role guard)  import/  review/  restaurants/  users/  rankings/
+│   │   │   ├── me/page.tsx
+│   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=)
+│   │   ├── owner/  (layout.tsx and every page call requirePageRole)  claim/  restaurants/[id]/
+│   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  restaurants/  users/  rankings/
 │   │   ├── api/
 │   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ flags/ uploads/ owner/ admin/
-│   │   │   ├── cron/ recompute-rankings/ refresh-places/ mark-stale/
+│   │   │   ├── cron/ recompute-rankings/ refresh-places/ mark-stale/   # mark-stale: manual only
 │   │   │   └── auth/[...all]/           # Better Auth handler: toNextJsHandler(auth)
 │   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme tokens (Tailwind 4)
 │   ├── components/
@@ -216,7 +217,8 @@ dishrank/
 │   │   ├── ranking/       # RankingList, RankingRow, EligibilityNote, FilterBar
 │   │   ├── rating/        # RestaurantSearch, DishPicker, ScoreInput, PhotoUpload
 │   │   ├── restaurant/    # RestaurantHeader, DishScoreList
-│   │   └── layout/        # Nav, Footer, CityPicker
+│   │   ├── layout/        # Nav, Footer, CityPicker
+│   │   └── auth/          # Forbidden (shown to signed-in users without the role)
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
@@ -237,6 +239,8 @@ dishrank/
 │   │   └── validation/             # zod schemas shared by actions + API
 │   ├── lib/                        # slug.ts, geo.ts (haversine), dates.ts, cn.ts
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
+│   ├── env.ts                      # Zod-validated env; production fails fast at startup
+│   ├── instrumentation.ts          # register() imports env.ts
 │   └── types/
 ├── tests/
 │   ├── unit/   matching/ ranking/ slug/ normalize/
@@ -248,13 +252,14 @@ dishrank/
 
 | Concern | Decision |
 |---|---|
-| Auth | Better Auth (ADR-11): Google sign-in, Prisma adapter, database sessions. The session cookie cache stays off, so every check reads the session and `User.role` from the DB and role changes apply at once. `role` is a Better Auth additional field with `input: false`, so no client can set it. `requireUser()` / `requireRole(role)` in `src/server/auth.ts` wrap `auth.api.getSession({ headers })` and are used in actions, handlers, and `owner/`, `admin/` layouts. |
+| Auth | Better Auth (ADR-11): Google sign-in, Prisma adapter, database sessions. The session cookie cache stays off, so every check reads the session and `User.role` from the DB and role changes apply at once. `role` is a Better Auth additional field with `input: false`, so no client can set it. `requireUser()` / `requireRole(role)` in `src/server/auth.ts` wrap `auth.api.getSession({ headers })` and throw `AppError` 401/403; actions and handlers call them first. Admin/owner services take the current user (`actor`) as their first argument and call `requireRole` themselves, so a page that forgets its check still cannot read admin data. Layouts and every page under `admin/` and `owner/` call `requirePageRole(role)`: signed-out visitors are redirected to `/sign-in?callbackUrl=…`; signed-in users without the role see the `Forbidden` component (HTTP 200, `noindex`) and no admin data is fetched. Next.js `forbidden()` is not used because it is still experimental (`authInterrupts`). |
 | Validation | Zod schemas in `src/server/validation`, shared by actions and API. |
 | Rate limiting | `rate_limit_buckets` table, sliding window per `(key, action)`. Limits in docs/06. |
 | Caching | Public pages `revalidate = 3600`; `revalidatePath` after rating write for the affected ranking + restaurant pages. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter, sort and distance in the browser and city-wide rank numbers. |
 | Geo | `lat/lng` columns; distance via haversine SQL expression; no PostGIS in v1 (ADR-5). |
 | Search | `pg_trgm` GIN indexes on `restaurants.name`, `restaurants.search_text` and `dish_alias.alias` (one row per dish spelling; matched one alias at a time, docs/05). |
-| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`; idempotent; log run in `job_runs`. |
+| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. Two scheduled crons: recompute (with stale marking) and the daily Places refresh. |
+| Env | `src/env.ts` parses `process.env` with Zod. `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
 | Observability | Vercel logs + optional Sentry (free tier). Every service logs `{ action, userId, entityId, durationMs }`. |
 | Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under random cuid file names; menu photos go to the private `menus` bucket. Uploads use Supabase signed upload URLs (fixed 2 h validity, one path each) issued only by `/api/v1/uploads/sign`; the DB stores the path, not a URL. |
 | i18n | English only; `lang="en"`; dish aliases carry Roman Urdu. |

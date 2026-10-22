@@ -9,12 +9,12 @@ Walking skeleton first: by the end of Phase 4 a stranger can open a ranking page
 Tasks
 - Node.js 24 LTS pinned (`.nvmrc`, `engines`), Next.js 16 + TS strict + Tailwind + shadcn/ui + ESLint/Prettier + Vitest + Playwright
 - Prisma 7 + Supabase connection: `prisma.config.ts` (direct URL for the CLI), `src/server/db.ts` (pooled URL through `@prisma/adapter-pg`)
-- Better Auth with Google, Prisma adapter, `requireUser()/requireRole()`, `/admin` and `/owner` layouts with role guard
-- `.env.example`, `vercel.json` (crons), `README.md` with setup steps
+- Better Auth with Google, Prisma adapter, `requireUser()/requireRole()/requirePageRole()`, `/admin` and `/owner` layouts and pages with role guards, Forbidden page, `/sign-in`
+- `src/env.ts` (Zod-validated env, fails fast in production), `.env.example`, `vercel.json` (two daily crons), cron stubs that fail closed, `README.md` with setup steps
 - CI: GitHub Action running lint, typecheck, unit tests on PR against a Postgres service container (local dev uses Homebrew PostgreSQL; no Docker)
 
 Acceptance
-- `pnpm dev` shows a home page; Google sign-in works locally; `/admin` 403s for USER role; CI green.
+- `pnpm dev` shows a home page; Google sign-in works locally; signed out, `/admin` redirects to sign-in; signed in as USER, `/admin` shows the Forbidden page and fetches no admin data; cron stubs answer 500 without `CRON_SECRET` and 401 with a wrong token; a production start with a missing required env var fails at startup; CI green.
 
 ## Phase 1 — Schema, seed, matching (6–8 h)
 
@@ -31,10 +31,11 @@ Acceptance
 ## Phase 2 — Restaurants: seeding script + admin import (6–8 h)
 
 Tasks
-- `src/server/places/textSearch.ts` (field mask, pagination, regionCode PK), `placeDetails.ts` (location only)
-- `scripts/seed-places.ts` → CSV in `tmp/`
-- `/admin/import`: CSV upload, dedupe preview, create/link/skip, RD CANDIDATE creation
-- `/admin/restaurants`: list/search/edit/merge/status
+- `src/server/places/textSearch.ts` (field mask incl. `nextPageToken`, pagination, regionCode PK), `placeDetails.ts` (location only)
+- `scripts/seed-places.ts` → CSV in `tmp/` with `fetchedAt`
+- `/admin/import`: CSV upload, 30-day age check, dedupe preview, create/link/skip, `googleSyncedAt = fetchedAt`, RD CANDIDATE creation
+- `/admin/restaurants`: list/search/edit/merge/status; merge per docs/07 §2 with redirect of merged URLs
+- `/api/cron/refresh-places`: daily refresh with failure handling per docs/07 §5
 - `RestaurantService`, `restaurant.repo.ts`, trigram search endpoint
 
 Acceptance

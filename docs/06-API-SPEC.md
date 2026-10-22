@@ -57,7 +57,7 @@ Sort `price` uses `price ASC NULLS LAST` among eligible only. `votes` = `distinc
 → `[{ id, slug, name, area, address }]` (max 8)
 
 ### `GET /api/v1/restaurants/:slug`
-→ `{ restaurant, dishes: [{ dish, restaurantDishId, score, votes, rankInCity, status, price, variantTags }], claimed: boolean }` (dishes ordered: eligible by score, then others by votes)
+→ `{ restaurant, dishes: [{ dish, restaurantDishId, score, votes, rankInCity, status, price, variantTags }], claimed: boolean }` (dishes ordered: eligible by score, then others by votes). A merged restaurant (`status DUPLICATE`) answers `301` with `Location` set to the surviving restaurant's endpoint.
 
 ### `GET /api/v1/users/:username` → public profile: ratingsCount, recent ratings (no email).
 
@@ -101,22 +101,22 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 - `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=`
 - `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue).
 - `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, phone?, priceBand? }`.
-- `PATCH /api/v1/admin/restaurants/:id` — edit, `status`, merge (`{ mergeIntoId }` moves RDs/ratings, marks DUPLICATE).
+- `PATCH /api/v1/admin/restaurants/:id` — edit, `status`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE).
 - `PATCH /api/v1/admin/restaurant-dishes/:id` — status / confidence / tags.
 - `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules).
 - `PATCH /api/v1/admin/ratings/:id` — `status: ACTIVE|HELD|HIDDEN`.
 - `POST /api/v1/admin/menu-uploads/:id/parse` — run vision + matching now.
 - `POST /api/v1/admin/rankings/recompute` — `RankingService.recomputeAll()` (async, returns JobRun id).
 - `POST /api/v1/admin/cities/:slug/launch` — sets `City.launchedAt = now()` once (launch day); bootstrap mode applies while it is NULL and for 60 days after.
-- `POST /api/v1/admin/import/candidates` — multipart CSV from `scripts/seed-places.ts` → preview rows (dedupe by googlePlaceId/name+area) → admin confirms per row.
+- `POST /api/v1/admin/import/candidates` — multipart CSV from `scripts/seed-places.ts` → preview rows (dedupe by googlePlaceId/name+area; rows with `fetchedAt` missing or older than 30 days are rejected) → admin confirms per row; Create/Link sets `googleSyncedAt = fetchedAt`.
 
 ## Cron (Bearer CRON_SECRET)
 
-- `GET /api/cron/recompute-rankings` — daily 02:00 PKT (`0 21 * * *` UTC).
-- `GET /api/cron/refresh-places` — monthly: for restaurants with `googlePlaceId` and `googleSyncedAt` older than 25 days, fetch Place Details (field mask `location` only) and update `lat/lng/googleSyncedAt`.
-- `GET /api/cron/mark-stale` — daily, part of recompute (kept separate for manual runs).
+- `GET /api/cron/recompute-rankings` — daily 02:00 PKT (`0 21 * * *` UTC); includes stale marking (docs/04 step 5).
+- `GET /api/cron/refresh-places` — daily (`0 22 * * *` UTC): restaurants with a `googlePlaceId` whose `googleSyncedAt` is NULL or older than 25 days get Place Details (field mask `location`); failures follow docs/07 §5.
+- `GET /api/cron/mark-stale` — not scheduled; for manual runs only (recompute already does it).
 
-All cron handlers: idempotent, write `JobRun`, return `{ ok, summary }`.
+All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` when `CRON_SECRET` is unset or empty, `401` when the bearer token does not match. Compare with `crypto.timingSafeEqual` on equal-length buffers (length mismatch → 401). Handlers are idempotent, write `JobRun` (including external API call counts) and return `{ ok, summary }`.
 
 ## Zod schemas (`src/server/validation/`)
 

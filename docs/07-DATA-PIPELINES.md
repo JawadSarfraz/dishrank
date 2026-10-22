@@ -17,25 +17,42 @@ How restaurants and (restaurant, dish) links get into the system. Four sources, 
 
 1. Load city + areas from DB.
 2. For each area: `POST https://places.googleapis.com/v1/places:searchText`
-   - body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant", locationBias: { circle: { center: {lat,lng}, radius: 2500 } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`
-   - header `X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.location,places.primaryType`
-   - follow `nextPageToken` up to 3 pages.
-3. Dedupe by `places.id`. Write `tmp/candidates-<city>-<dish>-<date>.csv` with columns: `googlePlaceId, displayName, formattedAddress, lat, lng, primaryType, queryArea, dishSlug`.
+   - body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant", locationBias: { circle: { center: { latitude: <area lat>, longitude: <area lng> }, radius: 2500.0 } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`
+   - header `X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,nextPageToken`. `nextPageToken` must be in the mask, otherwise the response carries no token and only page 1 comes back.
+   - next page: resend the same body plus `pageToken: "<nextPageToken>"`; stop after 3 pages (Text Search returns at most 60 results).
+   - `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. `radius` is in meters (0–50,000).
+   - billing: `places.id` and `nextPageToken` alone are Text Search Essentials (IDs Only); `displayName`, `formattedAddress`, `location` and `primaryType` make every call Text Search Pro.
+3. Dedupe by `places.id`. Write `tmp/candidates-<city>-<dish>-<date>.csv` with columns: `googlePlaceId, displayName, formattedAddress, lat, lng, primaryType, queryArea, dishSlug, fetchedAt`. `fetchedAt` is the UTC ISO time of the Google response that returned that row (per page, not the script start).
 4. Print a summary (areas × results, cost estimate). Never touch the DB.
 
 Budget: ~20 areas × ≤3 pages ≈ 60 calls per dish. 19 dishes ≈ 1,140 Text Search Pro calls — inside the 5,000/month free cap. Reuse the same restaurant across dishes: the import UI dedupes by place ID.
 
 **Policy notes (keep these in the import UI copy)**
-- We store `googlePlaceId` forever; `lat/lng` are refreshed monthly by `/api/cron/refresh-places` (Place Details, field mask `location`, Essentials tier, 10,000 free/month).
+- We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials tier, 10,000 free/month).
+- Request shapes and field masks were checked against the Places API (New) Text Search, Place Details and Place IDs docs on 2026-10-22 (pages last updated 2026-10-21).
 - The CSV is a scratch file. On import, the admin **types/confirms** the name and address (from the signboard, the restaurant's own page, or a visit). What we save is our record.
 - Where Google data is shown in the admin import UI, show the Google logo attribution.
 
 ## 2. Admin import (`/admin/import`)
 
-1. Upload CSV → preview table. For each row: match existing restaurant by `googlePlaceId`, else by trigram on name within the same area (similarity ≥ 0.6) → mark "possible duplicate".
-2. Admin actions per row: **Create** (opens prefilled form: name, area, address, priceBand, phone; admin confirms) / **Link to existing** / **Skip**.
-3. On Create or Link: upsert `RestaurantDish(restaurant, dishSlug)` with `status CANDIDATE, source GOOGLE_SEARCH, confidence 0.4` unless a stronger row already exists.
+1. Upload CSV → preview table. Rows whose `fetchedAt` is missing, unparseable or older than 30 days are rejected: shown greyed out, not importable; re-run `pnpm seed:places` for fresh data. For each remaining row: match existing restaurant by `googlePlaceId`, else by trigram on name within the same area (similarity ≥ 0.6) → mark "possible duplicate".
+2. Admin actions per row: **Create** (opens a form prefilled with name, area and address from the CSV; the admin types priceBand and phone, which the field mask never fetches, and confirms) / **Link to existing** / **Skip**.
+3. On Create, or on Link to a restaurant without a `googlePlaceId`: save `googlePlaceId`, `lat/lng` from the CSV and `googleSyncedAt = fetchedAt` (the time of the Google call, never the import time). Linking to a restaurant that already has a different `googlePlaceId` changes nothing and marks the row "possible duplicate". Then upsert `RestaurantDish(restaurant, dishSlug)` with `status CANDIDATE, source GOOGLE_SEARCH, confidence 0.4` unless a stronger row already exists.
 4. Log counts; leave the CSV in `tmp/`.
+
+A restaurant with a `googlePlaceId` and no `googleSyncedAt` counts as due for the next refresh (§5).
+
+### Merging duplicate restaurants (`RestaurantService.merge(sourceId, targetId)`)
+
+Admin-only (`PATCH /api/v1/admin/restaurants/:id { mergeIntoId }` or the merge dialog). Everything runs in one database transaction; any failure rolls all of it back.
+
+1. Dishes: a source `RestaurantDish` whose dish the target lacks moves to the target. When both serve the dish, keep the stronger row (status order OWNER_VERIFIED > MENU_VERIFIED > USER_CONFIRMED > CANDIDATE > STALE > REMOVED; tie → more distinct raters), give it the lower non-null price and the union of `variantTags`, move the other row's ratings and flags onto it, then delete the other row.
+2. Ratings: one per user per kept row. When the same user rated both rows, keep the rating with the newer `updatedAt`; append the older rating (score, comment, createdAt) to the kept rating's `RatingHistory`, move the older rating's own history rows over, then delete the older `Rating`.
+3. Flags move to the kept row; a flag is dropped when the same user already flagged that row for the same reason.
+4. Menu uploads, owner claims and open review items of the source move to the target; a claim by a user who already claimed the target is dropped. If both restaurants are claimed by different owners, the merge stops with `MERGE_CONFLICTING_OWNERS`; if only the source is claimed, its owner moves to the target.
+5. Google place: clear `googlePlaceId` on the source first (the column is unique), then set it on the target if the target has none, together with the source's `lat/lng` and `googleSyncedAt`.
+6. Source: `status = DUPLICATE`, `mergedIntoId = target`. Its URLs redirect permanently to the surviving restaurant (docs/06), following `mergedIntoId` chains.
+7. After commit: `recomputeOne` for every kept row whose ratings changed, then `revalidatePath` for both restaurant pages and the affected ranking pages. Log one line with every moved, merged and dropped id.
 
 ## 3. Menu ingestion (photo → structured menu)
 
@@ -66,6 +83,21 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 
 ## 5. Freshness and hygiene jobs (nightly recompute, docs/04)
 
+### Places coordinate refresh (`/api/cron/refresh-places`, daily)
+
+CLAUDE.md rule 2 allows Google `lat/lng` for at most 30 days. The job runs daily, oldest rows first:
+
+1. Catch-up: any restaurant whose `googleSyncedAt` is older than 29 days (after missed runs) gets `lat/lng = NULL` and a `PLACE_REFRESH_FAILED` review item before anything else.
+2. Select restaurants with a `googlePlaceId` whose `googleSyncedAt` is NULL or older than 25 days.
+3. For each: `GET https://places.googleapis.com/v1/places/{googlePlaceId}` with header `X-Goog-FieldMask: location` (no `places.` prefix for Place Details; Essentials). Success → update `lat/lng`, `googleSyncedAt = now()`.
+4. `NOT_FOUND` means the place ID is obsolete: set `lat/lng = NULL` at once and open a `PLACE_REFRESH_FAILED` review item. Any other error (after retries with backoff): keep the coordinates and retry on the next run, unless `googleSyncedAt` is already 28 days old or more; then set `lat/lng = NULL` and open the review item. Coordinates therefore stay under 30 days old as long as the job runs once a day.
+5. One OPEN review item per restaurant; a later successful refresh resolves it automatically.
+6. Stop before the function time limit (250 s) and leave the rest for the next run. `JobRun.summary` records `{ selected, calls, ok, notFound, errors, nulled, reviewItems, skippedForTime }`.
+
+A restaurant with NULL `lat/lng` stays listed; it only loses the map link and distance.
+
+### Other nightly steps
+
 - Stale marking by status age.
 - `Rating` comments with phone/URL → hidden pending review (regex at write time; nightly sweep as backup).
 - Trust recompute.
@@ -82,7 +114,8 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 | `FLAG` | `{ restaurantDishId, reason, flagIds[] }` | uphold (NOT_SERVED ×3 upheld → RD REMOVED; RESTAURANT_CLOSED → Restaurant CLOSED) · dismiss |
 | `SUSPICIOUS_RATINGS` | `{ restaurantDishId, ratingIds[], reason }` | release (ratings ACTIVE) · hide (HIDDEN, lower trust) · ban users |
 | `OWNER_CLAIM` | `{ claimId, phone, proofNote }` | approve · reject |
-| `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A · keep both |
+| `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A (rules in §2) · keep both |
+| `PLACE_REFRESH_FAILED` | `{ restaurantId, googlePlaceId, error, googleSyncedAt }` | re-link (new `googlePlaceId` from a fresh seed CSV row; `lat/lng` and `googleSyncedAt = fetchedAt` from that row) · mark restaurant CLOSED · keep without coordinates (clears `googlePlaceId`) |
 
 Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed.
 
