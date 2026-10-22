@@ -1,0 +1,11 @@
+# The planning kit is hand-formatted; never reflow it.
+docs/
+seed/
+CLAUDE.md
+README.md
+AGENTS.md
+pnpm-lock.yaml
+src/generated/
+.next/
+playwright-report/
+test-results/
