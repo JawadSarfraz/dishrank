@@ -8,5 +8,7 @@ export default defineConfig({
   test: {
     include: ["tests/unit/**/*.test.ts"],
     environment: "node",
+    // Load .env for local runs; CI sets DATABASE_URL itself and dotenv never overrides it.
+    setupFiles: ["dotenv/config"],
   },
 });

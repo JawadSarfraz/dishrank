@@ -1,0 +1,89 @@
+// Phase 0: auth models only (docs/03 "Auth (Better Auth)"). The rest of docs/03 arrives in Phase 1.
+
+generator client {
+  provider = "prisma-client" // Prisma 7 generator (prisma-client-js is deprecated)
+  output   = "../src/generated/prisma" // required in Prisma 7; import PrismaClient from here
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 keeps connection URLs out of the schema:
+  // - CLI (migrate, db seed): prisma.config.ts → datasource.url = DIRECT_URL
+  // - runtime: src/server/db.ts → new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) })
+}
+
+enum Role {
+  USER
+  OWNER
+  ADMIN
+}
+
+// ---------- Auth (Better Auth) ----------
+// User, Session, Account and Verification carry Better Auth's core fields (prismaAdapter, provider "postgresql").
+// Better Auth runs with advanced.database.generateId = false, so ids come from these Prisma defaults.
+// `role` is declared to Better Auth as user.additionalFields.role { type: "string", input: false, defaultValue: "USER" }:
+// it is returned on the session user but can never be set by the client. The other app fields are invisible to Better Auth.
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String // required by Better Auth; Google always sends a name
+  image         String?
+  username      String?   @unique
+  role          Role      @default(USER)
+  trustScore    Float     @default(0.6) // 0.3 .. 1.5, see docs/04
+  isPanel       Boolean   @default(false) // admin-only (never Better Auth input); trust fixed at 1.3, panel limits in docs/04
+  ratingsCount  Int       @default(0)
+  photoRatings  Int       @default(0)
+  bannedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String // the provider's user id (Google "sub")
+  providerId            String // "google"
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String? // Better Auth core field; unused (Google sign-in only)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique // value of the session cookie
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
