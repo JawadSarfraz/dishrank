@@ -1,0 +1,37 @@
+{
+  "_comment": "Variant tags come from the words left over after a dish alias is matched (docs/05): a leftover word or phrase listed here becomes the tag named by its key. Words inside the matched alias are never tags. Meat words are not tags: they live in seed/meat-words.json. Size words are stripped before matching and NOT stored.",
+  "tags": {
+    "white": ["white", "safed"],
+    "boneless": ["boneless", "bone less"],
+    "desi": ["desi"],
+    "peshawari": ["peshawari", "peshawar"],
+    "lahori": ["lahori"],
+    "shinwari": ["shinwari"],
+    "namkeen": ["namkeen", "salted"],
+    "makhni": ["makhni", "makhani", "butter"],
+    "achari": ["achari"],
+    "green": ["green", "hara", "hari"],
+    "black-pepper": ["black pepper", "kali mirch"],
+    "dry": ["dry"],
+    "spicy": ["spicy", "extra spicy", "mirchi"],
+    "special": ["special", "signature", "chef special"],
+    "cheese": ["cheese", "cheesy", "cheezy"],
+    "bbq": ["bbq", "barbeque", "barbecue"],
+    "fajita": ["fajita"],
+    "tikka": ["tikka"],
+    "pepperoni": ["pepperoni"],
+    "crispy": ["crispy", "crunchy"],
+    "grilled": ["grilled"],
+    "smoked": ["smoked", "smokey", "smoky"],
+    "single": ["single"],
+    "double": ["double"],
+    "family": ["family"]
+  },
+  "size_words_strip_only": [
+    "half", "full", "quarter", "1 kg", "1kg", "kg", "half kg", "500 g", "500g", "250 g", "250g",
+    "small", "medium", "large", "regular", "jumbo", "mini", "xl", "x-large",
+    "per head", "per person", "deal", "combo", "platter", "serving", "portion", "pcs", "pc", "piece", "pieces",
+    "plate", "bowl", "cup", "glass", "jug", "rs", "rs.", "pkr", "/-",
+    "per kg", "per plate", "per piece", "dozen"
+  ]
+}

@@ -1,0 +1,11 @@
+flowchart LR
+  Diner((Diner)) -->|browse rankings, rate dishes| App["DishRank web app<br/>Next.js on Vercel"]
+  Panel((Tasting panel)) -->|seed ratings, menu photos| App
+  Owner((Restaurant owner)) -->|claim, fix menu, view report| App
+  Admin((Admin)) -->|imports, review queue, moderation| App
+  App --> DB[("PostgreSQL<br/>Supabase")]
+  App --> Store[("Object storage<br/>Supabase Storage")]
+  App -->|OAuth sign-in| GAuth["Google OAuth"]
+  App -->|seed candidates only| Places["Google Places API (New)"]
+  App -->|menu photo to JSON, matcher fallback| LLM["Anthropic API"]
+  Cron["Vercel Cron"] -->|nightly recompute, monthly refresh| App

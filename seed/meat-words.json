@@ -1,0 +1,13 @@
+{
+  "_comment": "Meat words are part of a dish's identity and are never variant tags (docs/05). The matcher uses them for the leftover-meat check (step 3), the meat-word retry (step 2) and the meat-word safety rule. A dish's meat is the meat named in its name (Namkeen Gosht -> mutton); a dish whose name names no meat (Pizza, Haleem) accepts any meat word.",
+  "meat": {
+    "chicken": ["chicken", "murgh", "murgha", "chiken", "chikan"],
+    "mutton": ["mutton", "gosht", "goat", "bakra", "lamb", "dumba"],
+    "beef": ["beef", "cow"],
+    "fish": ["fish", "machli"],
+    "prawn": ["prawn", "prawns", "jhinga", "shrimp"],
+    "veg": ["veg", "vegetable", "sabzi"],
+    "egg": ["egg", "anda"]
+  },
+  "needs_meat": ["karahi", "kadai", "kadhai", "karhai", "karai", "kerahi", "handi", "biryani", "biriyani", "mandi", "seekh", "qorma", "korma", "pulao", "pilau"]
+}

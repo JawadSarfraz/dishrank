@@ -1,0 +1,31 @@
+flowchart TB
+  subgraph Vercel["Vercel (region bom1)"]
+    subgraph Next["Next.js app"]
+      Pages["Public pages (RSC, ISR)<br/>/ /[city] /[city]/best-[dish] /[city]/r/[slug]"]
+      Rate["Rating flow (client form + server actions)"]
+      OwnerUI["Owner area (role OWNER)"]
+      AdminUI["Admin area (role ADMIN)"]
+      API["Route handlers /api/v1/*"]
+      CronEP["Cron endpoints /api/cron/* (CRON_SECRET)"]
+      Services["src/server/services<br/>ranking · matching · rating · restaurant · menu · claims · review"]
+      Repos["src/server/repositories (Prisma)"]
+      Ext["src/server/places · src/server/vision"]
+    end
+  end
+  subgraph Supabase
+    PG[("Postgres + pg_trgm")]
+    ST[("Storage: dish-photos (public), menus (private)")]
+  end
+  CLI["scripts/* (local CLI, tsx)"]
+  Pages --> Services
+  Rate --> Services
+  OwnerUI --> Services
+  AdminUI --> Services
+  API --> Services
+  CronEP --> Services
+  Services --> Repos --> PG
+  Services --> ST
+  Ext --> Google["Google Places API"]
+  Ext --> Anthropic["Anthropic API"]
+  Services --> Ext
+  CLI --> Services

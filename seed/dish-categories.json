@@ -1,0 +1,14 @@
+[
+  { "slug": "rice", "name": "Rice", "sortOrder": 10 },
+  { "slug": "karahi-handi", "name": "Karahi & Handi", "sortOrder": 20 },
+  { "slug": "slow-cooked", "name": "Nihari, Haleem & Paye", "sortOrder": 30 },
+  { "slug": "curries", "name": "Curries & Daal", "sortOrder": 40 },
+  { "slug": "bbq", "name": "BBQ & Grill", "sortOrder": 50 },
+  { "slug": "afghan-arabic", "name": "Afghani & Arabic", "sortOrder": 60 },
+  { "slug": "breakfast", "name": "Breakfast", "sortOrder": 70 },
+  { "slug": "fast-food", "name": "Burgers, Pizza & Fast Food", "sortOrder": 80 },
+  { "slug": "chinese", "name": "Chinese & Asian", "sortOrder": 90 },
+  { "slug": "street-food", "name": "Street Food", "sortOrder": 100 },
+  { "slug": "desserts", "name": "Desserts", "sortOrder": 110 },
+  { "slug": "drinks", "name": "Chai & Drinks", "sortOrder": 120 }
+]

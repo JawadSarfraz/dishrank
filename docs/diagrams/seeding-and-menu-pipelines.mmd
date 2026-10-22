@@ -1,0 +1,23 @@
+flowchart LR
+  subgraph Seed["Candidate seeding (never writes DB)"]
+    S["scripts/seed-places.ts<br/>--city --dish"] --> Q["Per area: Places Text Search<br/>'chicken karahi F-7 Islamabad'"]
+    Q --> CSV["tmp/candidates-*.csv"]
+    CSV --> Imp["/admin/import<br/>admin confirms name/address"]
+    Imp --> RD0["RestaurantDish CANDIDATE<br/>source GOOGLE_SEARCH conf 0.4"]
+  end
+  subgraph Menu["Menu ingestion"]
+    Up["Panel/owner uploads menu photo"] --> ST["Supabase Storage menus/"]
+    ST --> MU["MenuUpload PENDING"]
+    MU --> V["VisionService (Anthropic)<br/>image → JSON sections/items"]
+    V --> MI["MenuItem rows"]
+    MI --> M["MatchingService<br/>normalize → alias → trigram → LLM"]
+    M -->|conf ≥ 0.85| RDV["RestaurantDish MENU_VERIFIED"]
+    M -->|else| RQ["ReviewItem UNMATCHED_MENU_ITEM"]
+    RQ --> Adm["Admin resolves"] --> RDV
+  end
+  subgraph Users["User ratings"]
+    Rt["Rating submitted"] --> RDU["RestaurantDish CANDIDATE → USER_CONFIRMED<br/>at 3 distinct raters"]
+  end
+  RD0 --> Rank["RankingService<br/>eligible only when status confirmed/verified<br/>AND thresholds met"]
+  RDV --> Rank
+  RDU --> Rank

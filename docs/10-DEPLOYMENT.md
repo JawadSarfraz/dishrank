@@ -1,0 +1,92 @@
+# 10 — Deployment and environments
+
+## Accounts to create (all free tiers to start)
+
+| Service | Purpose | Notes |
+|---|---|---|
+| GitHub | repo + CI | private repo |
+| Vercel | hosting, crons, analytics | Hobby is for non-commercial use; move to Pro ($20/mo) the month you charge a restaurant. Hobby crons run at most once per day — our schedule fits. |
+| Supabase | Postgres + Storage | Two projects: preview and production (Free allows 2). Region: ap-south-1 (Mumbai) for lowest latency from Pakistan. Free project pauses after ~1 week of inactivity; the daily cron keeps it alive, but a paused DB on launch day is a risk — upgrade to Pro ($25/mo) before launch marketing. |
+| Google Cloud | Places API (New) key, OAuth client | Restrict the Places key by API + server IP/referrer; restrict OAuth to your domains. |
+| Anthropic Console | API key for vision + matcher | Set a monthly spend limit (e.g. $20). |
+| Domain | e.g. dishrank.pk / .com | Point to Vercel; set `NEXT_PUBLIC_SITE_URL`. |
+
+## Environment variables (`.env.example`)
+
+```
+# Database (Supabase; local dev uses Homebrew PostgreSQL: postgresql://localhost:5432/dishrank for both URLs)
+DATABASE_URL=postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true   # runtime: Supavisor transaction mode, used by @prisma/adapter-pg (pool size is set in src/server/db.ts; connection_limit is ignored by the driver adapter)
+DIRECT_URL=postgresql://...pooler.supabase.com:5432/postgres                     # Prisma CLI (migrate, seed) via prisma.config.ts: Supavisor session mode, because the free-plan direct host is IPv6-only and Vercel builds are IPv4
+
+# Better Auth
+BETTER_AUTH_SECRET=               # openssl rand -base64 32
+BETTER_AUTH_URL=http://localhost:3000   # public base URL of this deployment
+GOOGLE_CLIENT_ID=                 # Google OAuth client; redirect URI <BETTER_AUTH_URL>/api/auth/callback/google
+GOOGLE_CLIENT_SECRET=
+
+# Supabase Storage
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
+SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
+SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
+
+# Google Places (seeding + monthly location refresh only)
+GOOGLE_PLACES_API_KEY=
+
+# Anthropic
+ANTHROPIC_API_KEY=
+ANTHROPIC_VISION_MODEL=            # set to a current Claude model id
+ANTHROPIC_MATCH_MODEL=             # a small/fast Claude model id
+
+# App
+NEXT_PUBLIC_SITE_URL=https://dishrank.pk
+CRON_SECRET=                       # openssl rand -hex 32
+ADMIN_EMAIL=                       # first admin: a Better Auth user-create hook gives this email role ADMIN on first sign-in
+NODE_ENV=development
+```
+
+## Environments
+
+| Env | DB | Notes |
+|---|---|---|
+| local | Homebrew PostgreSQL, same major version as the Supabase projects, with `pg_trgm` and `unaccent`; storage uses the preview Supabase project | `pnpm db:migrate`, `pnpm db:seed`, `scripts/dev-fake-ratings.ts`; no Docker |
+| CI (GitHub Actions) | `postgres` service container, same major version (the image ships `pg_trgm` and `unaccent`) | `prisma migrate deploy`, then lint, typecheck, test |
+| preview (Vercel) | the preview Supabase project (also serves local storage) | Never point previews at prod data |
+| production | Supabase prod | Migrations run from CI/CD step `prisma migrate deploy` before build |
+
+## Crons (`vercel.json`)
+
+```json
+{
+  "crons": [
+    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/mark-stale",         "schedule": "30 21 * * *" },
+    { "path": "/api/cron/refresh-places",     "schedule": "0 22 1 * *" }
+  ]
+}
+```
+(UTC. 21:00 UTC = 02:00 PKT.) Vercel sends the request with `Authorization: Bearer $CRON_SECRET` when the env var is set.
+
+## Release steps
+
+1. PR → CI green → merge to `main`.
+2. Vercel build runs `prisma generate && prisma migrate deploy && next build` (set as the build command).
+3. Smoke test: `/`, one ranking page, `/rate` sign-in, `/admin` role check.
+4. Tag `vX.Y.Z`.
+
+## Backups and safety
+
+- Supabase daily backups (Pro) or weekly `pg_dump` via a GitHub Action to a private bucket (free tier).
+- Admin "merge" and "remove" actions are soft (status changes, history kept). Hard deletes only for GDPR-style user deletion requests.
+- Keep `tmp/` out of git; menu photos are in Storage, not the repo.
+
+## Cost estimate (first 6 months)
+
+| Item | Monthly |
+|---|---|
+| Vercel Hobby → Pro at monetisation | $0 → $20 |
+| Supabase Free → Pro before launch | $0 → $25 |
+| Google Places (seed + monthly refresh) | $0 within free caps |
+| Anthropic (≈300 menus + matcher calls) | $5–15 |
+| Domain | ~$1–2 |
+| **Total** | **$5–60** |

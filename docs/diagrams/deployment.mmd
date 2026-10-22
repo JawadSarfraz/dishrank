@@ -1,0 +1,9 @@
+flowchart LR
+  Dev["Developer laptop<br/>VS Code + Claude Code"] -->|git push| GH["GitHub repo + Actions CI"]
+  GH -->|preview per PR| VP["Vercel Preview"]
+  GH -->|main| VProd["Vercel Production<br/>dishrank.pk"]
+  VProd --> SB[("Supabase ap-south-1<br/>Postgres + Storage")]
+  VProd --> Cron["Vercel Cron<br/>02:00 PKT recompute<br/>monthly place refresh"]
+  VProd --> Ant["Anthropic API"]
+  VProd --> GP["Google Places API"]
+  VProd --> GO["Google OAuth"]

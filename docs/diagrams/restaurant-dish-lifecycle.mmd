@@ -1,0 +1,16 @@
+stateDiagram-v2
+  [*] --> CANDIDATE: Google seed / user adds dish
+  CANDIDATE --> USER_CONFIRMED: 3 distinct raters
+  CANDIDATE --> MENU_VERIFIED: menu item matched at conf 0.85 or more, or admin
+  USER_CONFIRMED --> MENU_VERIFIED: menu item matched
+  USER_CONFIRMED --> OWNER_VERIFIED: owner confirms
+  MENU_VERIFIED --> OWNER_VERIFIED: owner confirms
+  CANDIDATE --> STALE: 9 months, no rating/verification
+  USER_CONFIRMED --> STALE: 9 months, no rating/verification
+  MENU_VERIFIED --> STALE: 12 months, no rating/verification
+  OWNER_VERIFIED --> STALE: 12 months, no rating/verification
+  STALE --> USER_CONFIRMED: new rating
+  USER_CONFIRMED --> REMOVED: 3 upheld not-served flags
+  MENU_VERIFIED --> REMOVED: owner/admin removes
+  OWNER_VERIFIED --> REMOVED: owner/admin removes
+  REMOVED --> [*]

@@ -1,0 +1,21 @@
+sequenceDiagram
+  actor U as Diner
+  participant P as /rate page
+  participant A as action submitRating
+  participant RS as RatingService
+  participant RK as RankingService
+  participant R as Repositories
+  participant DB as Postgres
+  U->>P: search restaurant (trigram) → pick dish → score 1-10 (+photo)
+  P->>A: submitRating(payload)
+  A->>A: requireUser(), zod parse, rateLimit(user, "rating")
+  A->>RS: createOrReplace(userId, payload)
+  RS->>R: ensure RestaurantDish exists (create CANDIDATE if user added)
+  RS->>R: upsert Rating (unique restaurantDishId+userId), insert RatingHistory
+  RS->>RS: abuse checks (burst, owner-self-rating, new-account limits)
+  RS->>RK: recomputeOne(restaurantDishId)
+  RK->>DB: SELECT active ratings → compute W, R, score → UPDATE restaurant_dishes
+  RK->>R: maybe promote status CANDIDATE→USER_CONFIRMED (3 distinct raters)
+  A->>A: revalidatePath(ranking page, restaurant page)
+  A-->>P: { ok, score, eligible }
+  P-->>U: "Thanks — Butt Karahi is #3 for Chicken Karahi in F-7"
