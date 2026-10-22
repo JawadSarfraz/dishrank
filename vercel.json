@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/refresh-places", "schedule": "0 22 * * *" }
+  ]
+}

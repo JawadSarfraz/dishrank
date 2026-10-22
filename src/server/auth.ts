@@ -4,18 +4,19 @@ import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
+import { env } from "@/env";
 import { db } from "./db";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const googleClientId = env.GOOGLE_CLIENT_ID;
+const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
 
 /** Google sign-in is offered only when both credentials are set (src/env.ts requires them in production). */
 export const googleSignInEnabled = Boolean(googleClientId && googleClientSecret);
 
 export const auth = betterAuth({
-  baseURL: process.env.BETTER_AUTH_URL,
-  secret: process.env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  secret: env.BETTER_AUTH_SECRET,
   database: prismaAdapter(db, { provider: "postgresql" }),
   socialProviders:
     googleClientId && googleClientSecret
@@ -36,7 +37,7 @@ export const auth = betterAuth({
       create: {
         // The first admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
         before: async (user) => {
-          const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+          const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
           if (adminEmail && user.email.toLowerCase() === adminEmail) {
             return { data: { ...user, role: "ADMIN" } };
           }
