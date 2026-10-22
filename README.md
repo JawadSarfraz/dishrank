@@ -12,6 +12,62 @@ git init && git add . && git commit -m "docs: dishrank kit"
 
 Open the folder in VS Code and start Claude Code.
 
+## Local development
+
+Prerequisites: Node.js 24 (`.nvmrc`), pnpm 12.14 (pinned in `package.json`), and Homebrew PostgreSQL with
+the same major version as the Supabase projects (17), which ships `pg_trgm` and `unaccent`. No Docker.
+
+```bash
+nvm use                                   # Node 24 from .nvmrc
+corepack enable                           # pnpm version from package.json
+brew install postgresql@17
+# Only if another Postgres already uses port 5432:
+sed -i '' 's/^#port = 5432/port = 5433/' /opt/homebrew/var/postgresql@17/postgresql.conf
+brew services start postgresql@17
+/opt/homebrew/opt/postgresql@17/bin/createdb -p 5433 dishrank
+cp .env.example .env                      # then fill it in, see below
+pnpm install                              # also runs prisma generate
+pnpm db:migrate                           # applies prisma/migrations to the local database
+pnpm exec playwright install chromium     # once, for pnpm test:e2e
+pnpm dev                                  # http://localhost:3000
+```
+
+`.env` (gitignored; never commit it). `src/env.ts` validates it: development only logs problems, while a
+production `pnpm start` exits with code 1 and names every missing variable.
+
+| Variable | Local value |
+|---|---|
+| `DATABASE_URL`, `DIRECT_URL` | `postgresql://<your mac user>@localhost:5433/dishrank` (same value for both) |
+| `BETTER_AUTH_SECRET` | output of `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | `http://localhost:3000` |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application). Authorized JavaScript origin `http://localhost:3000`; authorized redirect URI `http://localhost:3000/api/auth/callback/google` |
+| `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
+| `CRON_SECRET` | output of `openssl rand -hex 32` |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (needed from Phase 3; local storage uses the preview project) |
+| `GOOGLE_PLACES_API_KEY`, `ANTHROPIC_*` | needed from Phases 1, 2 and 5 |
+
+Commands (same as `CLAUDE.md`):
+
+```
+pnpm dev              # local dev server
+pnpm build            # production build
+pnpm start            # production server (requires every required env var)
+pnpm lint             # eslint
+pnpm typecheck        # next typegen && tsc --noEmit
+pnpm test             # vitest (unit + DB tests; needs DATABASE_URL)
+pnpm test:e2e         # playwright, Chromium only
+pnpm format           # prettier (docs/ and seed/ are excluded)
+pnpm db:migrate       # prisma migrate dev
+pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
+pnpm db:studio        # prisma studio
+pnpm seed:places -- --city=islamabad --dish=chicken-karahi   # Phase 2
+pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
+pnpm rankings:recompute                                       # Phase 4
+```
+
+CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`: Node from `.nvmrc`, `pnpm install`,
+a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and test.
+
 ## 2. Read order (for you, 30 minutes)
 
 1. `CLAUDE.md` — rules Claude Code must follow
