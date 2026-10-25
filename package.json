@@ -21,7 +21,8 @@
     "db:studio": "prisma studio",
     "seed:places": "tsx scripts/seed-places.ts",
     "menu:parse": "tsx scripts/parse-menu.ts",
-    "rankings:recompute": "tsx scripts/recompute-rankings.ts"
+    "rankings:recompute": "tsx scripts/recompute-rankings.ts",
+    "research:overture": "tsx scripts/research/overture-coverage.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
@@ -40,6 +41,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@duckdb/node-api": "2.0.0-r.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.2",
