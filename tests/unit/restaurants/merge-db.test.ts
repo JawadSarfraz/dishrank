@@ -6,7 +6,8 @@ import { ADMIN, USER, daysAgo, makeDish, makeRating, makeRestaurant, makeUser } 
 
 /**
  * Source S and target T share chicken-karahi (S's row is stronger) and a rater (u1, who rated
- * both); S also serves mutton-karahi, T also serves haleem. S is claimed.
+ * both); S also serves mutton-karahi, T also serves haleem. S is claimed and was created from an
+ * Overture place (its id, location and candidate row); T has no location.
  */
 async function scenario() {
   const [u1, u2, u3, owner] = [
@@ -15,10 +16,13 @@ async function scenario() {
     await makeUser("u3"),
     await makeUser("owner"),
   ];
-  const target = await makeRestaurant("Fixture Karahi", { lat: 33.72, lng: 73.05 });
+  const target = await makeRestaurant("Fixture Karahi");
   const source = await makeRestaurant("Fixture Karahi Markaz", {
+    source: "OVERTURE",
+    overtureId: "08f-fixture-source",
     lat: 33.7212,
     lng: 73.0571,
+    locationSource: "OVERTURE",
     claimedByUserId: owner.id,
     claimedAt: daysAgo(2),
   });
@@ -71,6 +75,19 @@ async function scenario() {
   const closedItem = await db.reviewItem.create({
     data: { type: "FLAG", status: "RESOLVED", restaurantId: source.id, payload: {} },
   });
+  const candidate = await db.overtureCandidate.create({
+    data: {
+      overtureId: "08f-fixture-source",
+      release: "2026-10-21.0",
+      lastSeenRelease: "2026-10-21.0",
+      cityId: source.cityId,
+      name: "Fixture Karahi Markaz",
+      confidence: 0.8,
+      sources: ["meta"],
+      status: "CREATED",
+      restaurantId: source.id,
+    },
+  });
 
   return {
     users: { u1, u2, u3, owner },
@@ -82,6 +99,7 @@ async function scenario() {
     upload,
     claims: { ownerClaim, dupClaim },
     items: { openItem, closedItem },
+    candidate,
   };
 }
 
@@ -161,7 +179,7 @@ describe("RestaurantService.mergeRestaurants (docs/07 §2, test DB)", () => {
         .restaurantId,
     ).toBe(s.source.id);
 
-    // The owner moves; the source becomes a duplicate; each keeps its own location.
+    // Overture id, location and owner move; the source becomes a duplicate.
     const [source, target] = await Promise.all([
       db.restaurant.findUniqueOrThrow({ where: { id: s.source.id } }),
       db.restaurant.findUniqueOrThrow({ where: { id: s.target.id } }),
@@ -169,15 +187,25 @@ describe("RestaurantService.mergeRestaurants (docs/07 §2, test DB)", () => {
     expect(source).toMatchObject({
       status: "DUPLICATE",
       mergedIntoId: s.target.id,
-      lat: 33.7212,
-      lng: 73.0571,
+      overtureId: null,
       claimedByUserId: null,
     });
     expect(target).toMatchObject({
       status: "ACTIVE",
-      lat: 33.72,
-      lng: 73.05,
+      overtureId: "08f-fixture-source",
+      lat: 33.7212,
+      lng: 73.0571,
+      locationSource: "OVERTURE",
       claimedByUserId: s.users.owner.id,
+    });
+    expect(
+      (await db.overtureCandidate.findUniqueOrThrow({ where: { id: s.candidate.id } }))
+        .restaurantId,
+    ).toBe(s.target.id);
+    expect(result).toMatchObject({
+      overtureIdMoved: true,
+      locationMoved: true,
+      movedCandidates: 1,
     });
 
     // After commit: recompute the kept row whose ratings changed; the old slug redirects.
@@ -190,6 +218,33 @@ describe("RestaurantService.mergeRestaurants (docs/07 §2, test DB)", () => {
       slug: s.target.slug,
       citySlug: "islamabad",
     });
+  });
+
+  it("keeps the target's own Overture id and location", async () => {
+    const target = await makeRestaurant("Fixture Tikka", {
+      overtureId: "08f-fixture-target",
+      lat: 33.7,
+      lng: 73.05,
+      locationSource: "ADMIN",
+    });
+    const source = await makeRestaurant("Fixture Tikka Two", {
+      overtureId: "08f-fixture-two",
+      lat: 33.71,
+      lng: 73.06,
+      locationSource: "OVERTURE",
+    });
+    const result = await mergeRestaurants(ADMIN, source.id, target.id);
+    expect(result).toMatchObject({ overtureIdMoved: false, locationMoved: false });
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: target.id } })).toMatchObject({
+      overtureId: "08f-fixture-target",
+      lat: 33.7,
+      lng: 73.05,
+      locationSource: "ADMIN",
+    });
+    // The duplicate keeps its own Overture id, so a later sync still knows the place.
+    expect((await db.restaurant.findUniqueOrThrow({ where: { id: source.id } })).overtureId).toBe(
+      "08f-fixture-two",
+    );
   });
 
   it("follows merge chains to the surviving restaurant", async () => {

@@ -21,6 +21,7 @@
     "db:studio": "prisma studio",
     "menu:parse": "tsx scripts/parse-menu.ts",
     "rankings:recompute": "tsx scripts/recompute-rankings.ts",
+    "overture:sync": "tsx scripts/overture-sync.ts",
     "research:overture": "tsx scripts/research/overture-coverage.ts"
   },
   "dependencies": {

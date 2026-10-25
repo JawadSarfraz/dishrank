@@ -93,6 +93,32 @@ enum ClaimStatus {
   REJECTED
 }
 
+/// Where a restaurant record came from (OWNER arrives with owner sign-ups, Phase 6).
+enum RestaurantSource {
+  OVERTURE
+  MANUAL
+}
+
+/// Where a restaurant's lat/lng came from (PANEL_GPS arrives with panel visits).
+enum LocationSource {
+  OVERTURE
+  ADMIN
+}
+
+/// Review state of an Overture place (docs/07 §2).
+enum CandidateStatus {
+  NEW
+  CREATED
+  LINKED
+  SKIPPED
+}
+
+enum CandidateSkipReason {
+  CLOSED
+  DUPLICATE
+  NOT_A_RESTAURANT
+}
+
 // ---------- Auth (Better Auth) ----------
 // User, Session, Account and Verification carry Better Auth's core fields (prismaAdapter, provider "postgresql").
 // Better Auth runs with advanced.database.generateId = false, so ids come from these Prisma defaults like every other table.
@@ -120,9 +146,10 @@ model User {
   flags              Flag[]
   claims             OwnerClaim[]
   menuUploads        MenuUpload[]
-  resolvedItems      ReviewItem[] @relation("resolver")
-  createdItems       ReviewItem[] @relation("creator")
+  resolvedItems      ReviewItem[]        @relation("resolver")
+  createdItems       ReviewItem[]        @relation("creator")
   claimedRestaurants Restaurant[]
+  reviewedCandidates OvertureCandidate[]
 }
 
 model Account {
@@ -172,8 +199,8 @@ model Verification {
 
 // ---------- Geography ----------
 model City {
-  id          String       @id @default(cuid())
-  slug        String       @unique // islamabad, rawalpindi
+  id          String              @id @default(cuid())
+  slug        String              @unique // islamabad, rawalpindi
   name        String
   lat         Float
   lng         Float
@@ -181,17 +208,19 @@ model City {
   areas       Area[]
   restaurants Restaurant[]
   dishStats   DishStat[]
+  candidates  OvertureCandidate[]
 }
 
 model Area {
-  id          String       @id @default(cuid())
+  id          String              @id @default(cuid())
   cityId      String
   slug        String // f-7, saddar
   name        String
   lat         Float
   lng         Float
-  city        City         @relation(fields: [cityId], references: [id])
+  city        City                @relation(fields: [cityId], references: [id])
   restaurants Restaurant[]
+  candidates  OvertureCandidate[]
 
   @@unique([cityId, slug])
 }
@@ -204,10 +233,14 @@ model Restaurant {
   cityId          String
   areaId          String?
   address         String?
-  lat             Float? // typed by an admin; NULL = location unknown
+  lat             Float? // our own: from Overture or typed by an admin (locationSource); NULL = location unknown
   lng             Float?
+  locationSource  LocationSource? // NULL exactly when lat/lng are NULL
   phone           String?
+  website         String?
   priceBand       Int? // 1..4
+  source          RestaurantSource // how the record was created; never changes
+  overtureId      String?          @unique // GERS id of the Overture place it was created from or linked to
   status          RestaurantStatus @default(ACTIVE)
   aliases         String[]         @default([]) // other names typed by an admin ("but karahi"), docs/05
   searchText      String           @default("") // cleaned name + aliases, maintained by RestaurantService, for pg_trgm
@@ -217,20 +250,59 @@ model Restaurant {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  city        City             @relation(fields: [cityId], references: [id])
-  mergedInto  Restaurant?      @relation("merge", fields: [mergedIntoId], references: [id])
-  mergedFrom  Restaurant[]     @relation("merge")
-  area        Area?            @relation(fields: [areaId], references: [id])
-  claimedBy   User?            @relation(fields: [claimedByUserId], references: [id])
+  city        City                @relation(fields: [cityId], references: [id])
+  mergedInto  Restaurant?         @relation("merge", fields: [mergedIntoId], references: [id])
+  mergedFrom  Restaurant[]        @relation("merge")
+  area        Area?               @relation(fields: [areaId], references: [id])
+  claimedBy   User?               @relation(fields: [claimedByUserId], references: [id])
   dishes      RestaurantDish[]
   menuUploads MenuUpload[]
   claims      OwnerClaim[]
   reviewItems ReviewItem[]
+  candidates  OvertureCandidate[]
 
   @@index([cityId, status])
   @@index([cityId, areaId])
   // Trigram index, created by the raw SQL migration after pg_trgm exists; declared here so Prisma does not drop it.
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "restaurants_search_trgm")
+}
+
+// ---------- Overture candidates (docs/07 §1-2) ----------
+// Overture Maps places staged for admin review by `pnpm overture:sync`: food and drink places from
+// Meta and Microsoft only (CDLA Permissive 2.0). A later release only adds GERS ids not seen before;
+// existing rows keep their data and review state (only lastSeenRelease moves forward).
+model OvertureCandidate {
+  id               String               @id @default(cuid())
+  overtureId       String               @unique // GERS id
+  release          String // first Overture release that had it, e.g. 2026-10-21.0
+  lastSeenRelease  String // newest synced release that still had it
+  cityId           String // city of the nearest seed area centre
+  suggestedAreaId  String? // nearest seed area centre within 1.5 km; NULL when farther or location unknown
+  name             String
+  address          String? // Overture's freeform address without Google links
+  phone            String?
+  website          String? // first website that is not a Google link
+  category         String? // Overture taxonomy primary, e.g. pizza_restaurant
+  alternates       String[]             @default([]) // Overture taxonomy alternates
+  confidence       Float // Overture's existence score, 0..1 (relative, no threshold)
+  lat              Float? // NULL = location unknown (Overture's point is a placeholder)
+  lng              Float?
+  sources          String[] // Overture datasets of the whole record: meta, Microsoft
+  status           CandidateStatus      @default(NEW)
+  skipReason       CandidateSkipReason?
+  restaurantId     String? // CREATED or LINKED: the restaurant
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  city          City        @relation(fields: [cityId], references: [id])
+  suggestedArea Area?       @relation(fields: [suggestedAreaId], references: [id])
+  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+  reviewedBy    User?       @relation(fields: [reviewedByUserId], references: [id])
+
+  @@index([cityId, status, suggestedAreaId])
+  @@index([restaurantId])
 }
 
 // ---------- Dish taxonomy ----------

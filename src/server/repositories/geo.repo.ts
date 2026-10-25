@@ -51,3 +51,12 @@ export async function findAreaWithCityById(id: string, client: Client = db) {
     select: { ...areaSelect, city: { select: { id: true, slug: true, name: true } } },
   });
 }
+
+/** Every seed area with its city slug, for placing Overture candidates. */
+export async function listAreasWithCity(client: Client = db) {
+  const rows = await client.area.findMany({
+    orderBy: [{ cityId: "asc" }, { slug: "asc" }],
+    select: { id: true, cityId: true, lat: true, lng: true, city: { select: { slug: true } } },
+  });
+  return rows.map(({ city, ...area }) => ({ ...area, citySlug: city.slug }));
+}

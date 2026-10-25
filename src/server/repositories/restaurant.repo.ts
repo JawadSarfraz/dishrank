@@ -15,6 +15,32 @@ export async function findRestaurantBySlug(slug: string, client: Client = db) {
   return client.restaurant.findUnique({ where: { slug }, include: place });
 }
 
+export async function findRestaurantByOvertureId(overtureId: string, client: Client = db) {
+  return client.restaurant.findUnique({
+    where: { overtureId },
+    select: { id: true, slug: true, name: true },
+  });
+}
+
+/** Restaurants of a city that can still be matched (not merged away), for duplicate hints. */
+export async function listRestaurantsForDedupe(cityId: string, client: Client = db) {
+  const rows = await client.restaurant.findMany({
+    where: { cityId, status: { not: "DUPLICATE" } },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      aliases: true,
+      lat: true,
+      lng: true,
+      areaId: true,
+      status: true,
+      area: { select: { name: true } },
+    },
+  });
+  return rows.map(({ area, ...r }) => ({ ...r, areaName: area?.name ?? null }));
+}
+
 /** Slugs equal to `base` or starting with it, to pick a free `base-N`. */
 export async function listSlugsStartingWith(base: string, client: Client = db) {
   const rows = await client.restaurant.findMany({
@@ -122,6 +148,7 @@ export async function listRestaurantsPage(input: {
         slug: true,
         name: true,
         status: true,
+        source: true,
         lat: true,
         city: { select: { slug: true, name: true } },
         area: { select: { name: true } },

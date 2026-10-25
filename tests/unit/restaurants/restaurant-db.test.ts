@@ -48,6 +48,37 @@ describe("RestaurantService (test DB)", () => {
     ]);
   });
 
+  it("adds a restaurant by hand: source MANUAL, a typed location, ticked dishes as candidates", async () => {
+    const { restaurant, dishes } = await createRestaurant(
+      ADMIN,
+      await input("Fixture Dhaba", {
+        website: "https://fixture-dhaba.example",
+        dishSlugs: ["chai", "halwa-puri", "chai"],
+      }),
+    );
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } })).toMatchObject({
+      source: "MANUAL",
+      overtureId: null,
+      website: "https://fixture-dhaba.example",
+      lat: 33.7215,
+      lng: 73.0569,
+      locationSource: "ADMIN",
+    });
+    expect(dishes.map((d) => [d.status, d.created])).toEqual([
+      ["CANDIDATE", true],
+      ["CANDIDATE", true],
+    ]);
+    expect(
+      await db.restaurantDish.findMany({
+        where: { restaurantId: restaurant.id },
+        select: { source: true, confidence: true },
+      }),
+    ).toEqual([
+      { source: "ADMIN", confidence: 0.4 },
+      { source: "ADMIN", confidence: 0.4 },
+    ]);
+  });
+
   it("takes the city from the area; the location is optional", async () => {
     const { city, area } = await place("rawalpindi", "saddar");
     const { restaurant } = await createRestaurant(
@@ -55,7 +86,13 @@ describe("RestaurantService (test DB)", () => {
       await input("Fixture Saddar Tikka", { areaId: area.id, lat: undefined, lng: undefined }),
     );
     const row = await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } });
-    expect(row).toMatchObject({ cityId: city.id, areaId: area.id, lat: null, lng: null });
+    expect(row).toMatchObject({
+      cityId: city.id,
+      areaId: area.id,
+      lat: null,
+      lng: null,
+      locationSource: null,
+    });
     await expect(
       createRestaurant(ADMIN, await input("X", { areaId: "nosucharea0000" })),
     ).rejects.toMatchObject({ code: "AREA_NOT_FOUND" });
@@ -87,12 +124,18 @@ describe("RestaurantService (test DB)", () => {
 
   it("edits a restaurant: new search text, same slug; coordinates can be typed and cleared", async () => {
     const { area } = await place("islamabad", "f-6");
-    const r = await makeRestaurant("Fixture Chai Corner");
+    const r = await makeRestaurant("Fixture Chai Corner", {
+      source: "OVERTURE",
+      lat: 33.72,
+      lng: 73.05,
+      locationSource: "OVERTURE",
+    });
     const edit = {
       name: "Fixture Chai Corner F-6",
       areaId: area.id,
       address: "Plot 12, Fixture Market",
       phone: "0300 1234567",
+      website: "https://fixture-chai.example",
       priceBand: 2,
       aliases: ["fixture chai"],
     };
@@ -104,17 +147,21 @@ describe("RestaurantService (test DB)", () => {
       phone: "0300 1234567", // services get validated input; Zod normalises phones before this
       aliases: ["fixture chai"],
       searchText: "fixture chai corner f 6 fixture chai",
+      website: "https://fixture-chai.example",
+      source: "OVERTURE", // never changes
     });
+    const location = async () =>
+      db.restaurant.findUniqueOrThrow({
+        where: { id: r.id },
+        select: { lat: true, lng: true, locationSource: true },
+      });
+    // Saving the same coordinates keeps their source; new ones are the admin's; none = unknown.
+    await updateRestaurant(ADMIN, r.id, { ...edit, lat: 33.72, lng: 73.05 });
+    expect(await location()).toEqual({ lat: 33.72, lng: 73.05, locationSource: "OVERTURE" });
     await updateRestaurant(ADMIN, r.id, { ...edit, lat: 33.7, lng: 73.1 });
-    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
-      lat: 33.7,
-      lng: 73.1,
-    });
+    expect(await location()).toEqual({ lat: 33.7, lng: 73.1, locationSource: "ADMIN" });
     await updateRestaurant(ADMIN, r.id, { ...edit, lat: null, lng: null });
-    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
-      lat: null,
-      lng: null,
-    });
+    expect(await location()).toEqual({ lat: null, lng: null, locationSource: null });
   });
 
   it("changes status; a CLOSED restaurant leaves search and its page", async () => {

@@ -1,6 +1,11 @@
 // RestaurantService (docs/07 §2, docs/05 restaurant search). Admin functions take the current user
 // and check the role themselves (CLAUDE.md rule 6); inputs arrive already validated by Zod.
-import type { Prisma, RestaurantStatus } from "@/generated/prisma/client";
+import type {
+  LocationSource,
+  Prisma,
+  RestaurantSource,
+  RestaurantStatus,
+} from "@/generated/prisma/client";
 import { slugify } from "@/lib/slug";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
@@ -42,6 +47,8 @@ import {
   moveMenuUploads,
   moveOpenReviewItems,
 } from "@/server/repositories/moderation.repo";
+import { moveCandidatesToRestaurant } from "@/server/repositories/overture.repo";
+import { findDishesBySlugs } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
 import type {
@@ -107,8 +114,22 @@ export function pickUniqueSlug(base: string, taken: ReadonlySet<string>): string
 /** Dishes an admin ticks for a restaurant become this RestaurantDish (docs/07: CANDIDATE, 0.4). */
 export const ADMIN_DISH = { source: "ADMIN", confidence: 0.4 } as const;
 
+/** A restaurant as an admin confirmed it, with where the record and its location came from. */
+export type NewRestaurant = {
+  name: string;
+  areaId: string;
+  address: string;
+  phone?: string | null;
+  website?: string | null;
+  priceBand?: number | null;
+  aliases?: string[];
+  source: RestaurantSource;
+  overtureId?: string | null;
+  location: { lat: number; lng: number; source: LocationSource } | null;
+};
+
 /** Inside a transaction: checks the area, picks a unique slug, inserts. The city is the area's. */
-async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx) {
+export async function insertRestaurantTx(input: NewRestaurant, tx: Tx) {
   const area = await findAreaById(input.areaId, tx);
   if (!area) throw new AppError("AREA_NOT_FOUND", "Unknown area", 400);
   const aliases = normalizeAliases(input.aliases, input.name);
@@ -122,15 +143,31 @@ async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx) {
       cityId: area.cityId,
       areaId: area.id,
       address: input.address,
-      lat: input.lat ?? null,
-      lng: input.lng ?? null,
+      lat: input.location?.lat ?? null,
+      lng: input.location?.lng ?? null,
+      locationSource: input.location?.source ?? null,
       phone: input.phone ?? null,
+      website: input.website ?? null,
       priceBand: input.priceBand ?? null,
+      source: input.source,
+      overtureId: input.overtureId ?? null,
       aliases,
       searchText: buildSearchText(input.name, aliases),
     },
     tx,
   );
+}
+
+/** Dish ids for ticked slugs; an unknown slug is refused. */
+export async function resolveDishSlugs(slugs: readonly string[] | undefined): Promise<string[]> {
+  const wanted = [...new Set(slugs ?? [])];
+  if (wanted.length === 0) return [];
+  const dishes = await findDishesBySlugs(wanted);
+  const missing = wanted.filter((slug) => !dishes.some((d) => d.slug === slug));
+  if (missing.length > 0) {
+    throw new AppError("DISH_NOT_FOUND", `Unknown dish: ${missing.join(", ")}`, 400);
+  }
+  return dishes.map((d) => d.id);
 }
 
 /**
@@ -152,25 +189,51 @@ export async function ensureAdminDish(
   return { id: created.id, status: created.status, created: true };
 }
 
-/** POST /api/v1/admin/restaurants: create a restaurant (`dishId` adds its CANDIDATE row). */
-export async function createRestaurant(
-  actor: SessionUser | null,
-  input: AdminRestaurantInput,
-  options: { dishId?: string } = {},
+/** Adds a CANDIDATE row for each ticked dish (rows that exist are left as they are). */
+export async function addAdminDishesTx(
+  restaurant: { id: string; cityId: string },
+  dishIds: readonly string[],
+  tx: Tx,
 ) {
+  const rows = [];
+  for (const dishId of dishIds) rows.push(await ensureAdminDish(restaurant, dishId, tx));
+  return rows;
+}
+
+/**
+ * POST /api/v1/admin/restaurants and /admin/restaurants/new: a restaurant added by hand (source
+ * MANUAL) for a place Overture misses; the location is optional and counts as typed by an admin.
+ */
+export async function createRestaurant(actor: SessionUser | null, input: AdminRestaurantInput) {
   const admin = assertRole(actor, "ADMIN");
   const started = Date.now();
+  const dishIds = await resolveDishSlugs(input.dishSlugs);
   const result = await inTransaction(async (tx) => {
-    const restaurant = await createRestaurantTx(input, tx);
-    const restaurantDish = options.dishId
-      ? await ensureAdminDish(restaurant, options.dishId, tx)
-      : null;
-    return { restaurant, restaurantDish };
+    const restaurant = await insertRestaurantTx(
+      {
+        name: input.name,
+        areaId: input.areaId,
+        address: input.address,
+        phone: input.phone,
+        website: input.website,
+        priceBand: input.priceBand,
+        aliases: input.aliases,
+        source: "MANUAL",
+        location:
+          input.lat !== undefined && input.lng !== undefined
+            ? { lat: input.lat, lng: input.lng, source: "ADMIN" }
+            : null,
+      },
+      tx,
+    );
+    const dishes = await addAdminDishesTx(restaurant, dishIds, tx);
+    return { restaurant, dishes };
   }).catch(rethrowConflict);
   logEvent("restaurant.create", {
     userId: admin.id,
     entityId: result.restaurant.id,
-    restaurantDishId: result.restaurantDish?.id ?? null,
+    source: "MANUAL",
+    restaurantDishIds: result.dishes.map((d) => d.id),
     durationMs: Date.now() - started,
   });
   return result;
@@ -207,11 +270,15 @@ export async function updateRestaurant(
   }
   const data: Prisma.RestaurantUncheckedUpdateInput = {};
   if (input.lat !== undefined || input.lng !== undefined) {
-    const hasLat = input.lat !== undefined && input.lat !== null;
-    const hasLng = input.lng !== undefined && input.lng !== null;
-    if (hasLat !== hasLng) throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
-    data.lat = input.lat ?? null;
-    data.lng = input.lng ?? null;
+    const lat = input.lat ?? null;
+    const lng = input.lng ?? null;
+    if ((lat === null) !== (lng === null)) {
+      throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
+    }
+    // Unchanged coordinates keep their source; typed ones are the admin's; none means unknown.
+    if (lat !== restaurant.lat || lng !== restaurant.lng) {
+      Object.assign(data, { lat, lng, locationSource: lat === null ? null : "ADMIN" });
+    }
   }
   const aliases = normalizeAliases(input.aliases, input.name);
   const updated = await updateRestaurantById(id, {
@@ -220,6 +287,7 @@ export async function updateRestaurant(
     areaId: input.areaId,
     address: input.address,
     phone: input.phone,
+    website: input.website,
     priceBand: input.priceBand,
     aliases,
     searchText: buildSearchText(input.name, aliases),
@@ -302,7 +370,10 @@ export async function searchRestaurantsForAdmin(
 /** Merged restaurants point to their survivor; chains are followed this many hops at most. */
 const MAX_MERGE_HOPS = 10;
 
-/** The public view of a restaurant. */
+/**
+ * The public view of a restaurant. lat/lng are our own (from Overture or typed by an admin) and
+ * drive the Phase 4 distance features; null = location unknown.
+ */
 export type PublicRestaurant = {
   id: string;
   slug: string;
@@ -311,7 +382,10 @@ export type PublicRestaurant = {
   area: { slug: string; name: string } | null;
   address: string | null;
   phone: string | null;
+  website: string | null;
   priceBand: number | null;
+  lat: number | null;
+  lng: number | null;
 };
 
 export type PublicRestaurantDish = {
@@ -382,7 +456,10 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
       area: restaurant.area ? { slug: restaurant.area.slug, name: restaurant.area.name } : null,
       address: restaurant.address,
       phone: restaurant.phone,
+      website: restaurant.website,
       priceBand: restaurant.priceBand,
+      lat: restaurant.lat,
+      lng: restaurant.lng,
     },
     dishes,
     claimed: Boolean(restaurant.claimedByUserId),
@@ -446,7 +523,10 @@ export type MergeResult = {
   droppedClaims: string[];
   movedMenuUploads: number;
   movedReviewItems: number;
+  movedCandidates: number;
   ownerMoved: boolean;
+  overtureIdMoved: boolean;
+  locationMoved: boolean;
   /** Kept rows whose ratings changed: recomputeOne runs on them after commit. */
   recomputeIds: string[];
   /** Dishes of the source, whose ranking pages change. */
@@ -518,7 +598,10 @@ export async function mergeRestaurants(
       droppedClaims: [],
       movedMenuUploads: 0,
       movedReviewItems: 0,
+      movedCandidates: 0,
       ownerMoved: owner.moveToTarget,
+      overtureIdMoved: false,
+      locationMoved: false,
       recomputeIds: [],
       dishSlugs: sourceDishes.map((rd) => rd.dish.slug),
     };
@@ -589,8 +672,10 @@ export async function mergeRestaurants(
     out.droppedClaims = claimPlan.drop;
     out.movedClaims = claimPlan.move;
     out.movedReviewItems = (await moveOpenReviewItems(sourceId, targetId, tx)).count;
+    out.movedCandidates = (await moveCandidatesToRestaurant(sourceId, targetId, tx)).count;
 
-    // Steps 5-6: owner, status.
+    // Steps 5-6: Overture id and location (the target keeps its own; it takes the source's only
+    // when it has none; the unique overtureId is cleared on the source first), owner, status.
     const sourceUpdate: Prisma.RestaurantUncheckedUpdateInput = {
       status: "DUPLICATE",
       mergedIntoId: targetId,
@@ -598,6 +683,23 @@ export async function mergeRestaurants(
       claimedAt: null,
     };
     const targetUpdate: Prisma.RestaurantUncheckedUpdateInput = {};
+    if (source.overtureId && !target.overtureId) {
+      sourceUpdate.overtureId = null;
+      targetUpdate.overtureId = source.overtureId;
+      out.overtureIdMoved = true;
+    }
+    if (
+      source.lat !== null &&
+      source.lng !== null &&
+      (target.lat === null || target.lng === null)
+    ) {
+      Object.assign(targetUpdate, {
+        lat: source.lat,
+        lng: source.lng,
+        locationSource: source.locationSource,
+      });
+      out.locationMoved = true;
+    }
     if (owner.moveToTarget) {
       targetUpdate.claimedByUserId = source.claimedByUserId;
       targetUpdate.claimedAt = source.claimedAt;
@@ -623,7 +725,10 @@ export async function mergeRestaurants(
     droppedClaims: result.droppedClaims,
     movedMenuUploads: result.movedMenuUploads,
     movedReviewItems: result.movedReviewItems,
+    movedCandidates: result.movedCandidates,
     ownerMoved: result.ownerMoved,
+    overtureIdMoved: result.overtureIdMoved,
+    locationMoved: result.locationMoved,
     durationMs: Date.now() - started,
   });
   return result;

@@ -5,12 +5,14 @@ import { z } from "zod";
 import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
+  createRestaurant,
   mergeRestaurants,
   searchRestaurantsForAdmin,
   setRestaurantStatus,
   updateRestaurant,
 } from "@/server/services/restaurant.service";
 import {
+  adminRestaurantInput,
   adminRestaurantUpdateInput,
   parseInput,
   restaurantMergeInput,
@@ -26,6 +28,15 @@ async function adminWriter() {
 }
 
 const restaurantPage = (citySlug: string, slug: string) => `/${citySlug}/r/${slug}`;
+
+/** /admin/restaurants/new: a restaurant added by hand (source MANUAL). */
+export async function createRestaurantAction(input: unknown) {
+  return runAction("restaurant.create", async () => {
+    const actor = await adminWriter();
+    const { restaurant } = await createRestaurant(actor, parseInput(adminRestaurantInput, input));
+    return { restaurant };
+  });
+}
 
 export async function updateRestaurantAction(restaurantId: unknown, input: unknown) {
   return runAction("restaurant.update", async () => {

@@ -32,7 +32,12 @@ export default async function AdminRestaurantsPage({
 
   return (
     <main className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Restaurants</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold">Restaurants</h1>
+        <Link href="/admin/restaurants/new" className="text-sm underline">
+          Add restaurant
+        </Link>
+      </div>
       <form className="flex flex-wrap items-end gap-2" role="search">
         <label className="flex flex-col gap-1 text-sm">
           Name or slug
@@ -76,6 +81,7 @@ export default async function AdminRestaurantsPage({
             </div>
             <span className="text-muted-foreground">
               {r.area?.name ?? "no area"}, {r.city.name} · {r._count.dishes} dishes ·{" "}
+              {r.source === "OVERTURE" ? "from Overture" : "added by hand"} ·{" "}
               {r.lat === null ? "no location" : "location set"} · {r.slug}
             </span>
           </li>

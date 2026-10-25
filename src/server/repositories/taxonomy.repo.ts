@@ -119,3 +119,21 @@ export async function listDishesForPicker(client: Client = db) {
     select: { slug: true, name: true, isLaunch: true },
   });
 }
+
+/** Launch dishes for the admin tick boxes, by category order then name. */
+export async function listLaunchDishes(client: Client = db) {
+  return client.dish.findMany({
+    where: { isLaunch: true },
+    orderBy: [{ category: { sortOrder: "asc" } }, { name: "asc" }],
+    select: { id: true, slug: true, name: true },
+  });
+}
+
+/** Every alias of the launch dishes, for the import's dish hints. */
+export async function listLaunchDishAliases(client: Client = db) {
+  const rows = await client.dishAlias.findMany({
+    where: { dish: { isLaunch: true } },
+    select: { alias: true, dish: { select: { slug: true } } },
+  });
+  return rows.map((r) => ({ alias: r.alias, dishSlug: r.dish.slug }));
+}

@@ -54,6 +54,34 @@ export default async function AdminRestaurantPage({
         )}
       </header>
 
+      <section className="flex flex-col gap-1 text-sm" aria-label="Source and location">
+        <h2 className="text-lg font-semibold">Source and location</h2>
+        <p>
+          {r.source === "OVERTURE"
+            ? "Created from an Overture Maps place"
+            : "Added by hand (not from Overture)"}
+          {r.overtureId ? ` · Overture id ${r.overtureId}` : ""}
+        </p>
+        <p>
+          {r.lat !== null && r.lng !== null ? (
+            <>
+              {r.lat}, {r.lng} (
+              {r.locationSource === "OVERTURE" ? "from Overture" : "typed by an admin"}) ·{" "}
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lng}#map=18/${r.lat}/${r.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Check on OpenStreetMap
+              </a>
+            </>
+          ) : (
+            "Location unknown: type it below to enable distance."
+          )}
+        </p>
+      </section>
+
       {!merged && (
         <>
           <section className="flex flex-col gap-3" aria-label="Edit">
@@ -65,6 +93,7 @@ export default async function AdminRestaurantPage({
                 areaId: r.areaId,
                 address: r.address,
                 phone: r.phone,
+                website: r.website,
                 priceBand: r.priceBand,
                 aliases: r.aliases,
                 lat: r.lat,

@@ -28,6 +28,7 @@ export type EditableRestaurant = {
   areaId: string | null;
   address: string | null;
   phone: string | null;
+  website: string | null;
   priceBand: number | null;
   aliases: string[];
   lat: number | null;
@@ -62,6 +63,7 @@ export function RestaurantEditForm({
       areaId: value("areaId"),
       address: value("address"),
       phone: value("phone") || null,
+      website: value("website") || null,
       priceBand: value("priceBand") ? Number(value("priceBand")) : null,
       aliases: value("aliases")
         .split(",")
@@ -120,6 +122,10 @@ export function RestaurantEditForm({
         <Input name="phone" defaultValue={restaurant.phone ?? ""} inputMode="tel" maxLength={20} />
       </label>
       <label className="flex flex-col gap-1 text-sm">
+        Website
+        <Input name="website" type="url" defaultValue={restaurant.website ?? ""} maxLength={300} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
         Price band
         <select
           name="priceBand"
@@ -137,6 +143,10 @@ export function RestaurantEditForm({
         Other names people search for (comma-separated)
         <Input name="aliases" defaultValue={restaurant.aliases.join(", ")} maxLength={600} />
       </label>
+      <p className="text-xs text-muted-foreground">
+        Changing the coordinates marks them as typed by an admin; clear both if the location is
+        unknown.
+      </p>
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm">
           Latitude

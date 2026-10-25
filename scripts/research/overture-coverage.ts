@@ -2,18 +2,23 @@
 // Research only (docs/research/overture-coverage.md). Downloads Overture Maps places (open data) for a box
 // around seed/areas.json into tmp/overture/ and writes coverage tables as Markdown to
 // tmp/overture/coverage-<release>.md. Never touches the app DB, never calls Google.
-import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import type { DuckDBConnection } from "@duckdb/node-api";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import areas from "../../seed/areas.json";
 import dishes from "../../seed/dishes.json";
 import { cleanText, indexOfPhrase, tokenize } from "@/server/services/matching/normalize";
-
-const OUT_DIR = resolve("tmp/overture");
-const STAC_CATALOG = "https://stac.overturemaps.org/catalog.json";
-const S3_PLACES = (release: string) =>
-  `s3://overturemaps-us-west-2/release/${release}/theme=places/type=place/*.parquet`;
+import { RELEASE_PATTERN } from "@/server/services/overture/places";
+import {
+  KM_PER_DEGREE,
+  OUT_DIR,
+  argValue,
+  downloadPlaces,
+  latestRelease,
+  openDuckDb,
+  seedBox,
+  type Box,
+} from "../lib/overture";
 
 /** A place counts for an area when that area's centre is the nearest one and within this distance. */
 const AREA_KM = 1.5;
@@ -104,27 +109,6 @@ const NOT_OWN_SITE =
 const GOOGLE_MAPS =
   "google\\.[a-z.]+/maps|maps\\.google|maps\\.app\\.goo\\.gl|goo\\.gl/maps|share\\.google";
 
-type Box = { west: number; south: number; east: number; north: number };
-
-const KM_PER_DEGREE = (6371 * Math.PI) / 180;
-
-/** Box around every seed area centre, padded by `marginKm` (flat-earth degrees are fine at this size). */
-function seedBox(points: readonly { lat: number; lng: number }[], marginKm: number): Box {
-  const lats = points.map((p) => p.lat);
-  const lngs = points.map((p) => p.lng);
-  const south = Math.min(...lats);
-  const north = Math.max(...lats);
-  const dLat = marginKm / KM_PER_DEGREE;
-  const widest = Math.max(Math.abs(south), Math.abs(north));
-  const dLng = marginKm / (KM_PER_DEGREE * Math.cos((widest * Math.PI) / 180));
-  return {
-    west: Math.min(...lngs) - dLng,
-    south: south - dLat,
-    east: Math.max(...lngs) + dLng,
-    north: north + dLat,
-  };
-}
-
 /** Jaro-Winkler similarity, 0..1. */
 function jaroWinkler(a: string, b: string): number {
   if (a === b) return 1;
@@ -179,34 +163,7 @@ function hasDishPhrase(tokens: readonly string[], phrase: readonly string[]): bo
   return false;
 }
 
-async function latestRelease(): Promise<string> {
-  const res = await fetch(STAC_CATALOG);
-  if (!res.ok) throw new Error(`STAC catalog: HTTP ${res.status}`);
-  const catalog = (await res.json()) as { latest?: string };
-  if (!catalog.latest) throw new Error("STAC catalog has no 'latest' release");
-  return catalog.latest;
-}
-
-function arg(name: string): string | undefined {
-  const hit = process.argv.slice(2).find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
-  if (!hit) return undefined;
-  return hit.includes("=") ? hit.slice(hit.indexOf("=") + 1) : "true";
-}
-
-/** Copies the places inside `box` from Overture's public S3 bucket to one local Parquet file. */
-async function extract(c: DuckDBConnection, release: string, box: Box, file: string) {
-  const t0 = Date.now();
-  const part = `${file}.part`;
-  await c.run(`INSTALL httpfs; LOAD httpfs; SET s3_region = 'us-west-2';`);
-  await c.run(`
-    COPY (
-      SELECT * FROM read_parquet('${S3_PLACES(release)}')
-      WHERE bbox.xmin <= ${box.east} AND bbox.xmax >= ${box.west}
-        AND bbox.ymin <= ${box.north} AND bbox.ymax >= ${box.south}
-    ) TO '${part}' (FORMAT parquet, COMPRESSION zstd)`);
-  renameSync(part, file); // an interrupted download never looks like a finished one
-  console.error(`extracted ${release} in ${Math.round((Date.now() - t0) / 1000)} s → ${file}`);
-}
+const arg = (name: string) => argValue(process.argv.slice(2), name);
 
 // ---------- Markdown helpers ----------
 
@@ -857,22 +814,17 @@ async function analyse(
 
 async function main() {
   const release = arg("release") ?? (await latestRelease());
-  if (!/^\d{4}-\d{2}-\d{2}\.\d+$/.test(release)) throw new Error(`bad release: ${release}`);
+  if (!RELEASE_PATTERN.test(release)) throw new Error(`bad release: ${release}`);
   const marginKm = Number(arg("margin-km") ?? 3);
   if (!Number.isFinite(marginKm) || marginKm <= 0)
     throw new Error(`bad --margin-km: ${arg("margin-km")}`);
   const box = seedBox(areas, marginKm);
-  mkdirSync(OUT_DIR, { recursive: true });
-  // The cache is per release and box, so a new margin or a new seed area re-downloads.
-  const boxKey = createHash("sha1").update(JSON.stringify(box)).digest("hex").slice(0, 8);
-  const file = resolve(OUT_DIR, `places-${release}-${boxKey}.parquet`);
-  rmSync(`${file}.part`, { force: true });
-
-  const db = await DuckDBInstance.create(":memory:", {
-    extension_directory: resolve(OUT_DIR, "duckdb-extensions"),
-  });
-  const c = await db.connect();
-  if (!existsSync(file) || arg("refresh") === "true") await extract(c, release, box, file);
+  const c = await openDuckDb();
+  const t0 = Date.now();
+  const { file, downloaded } = await downloadPlaces(c, release, box, arg("refresh") === "true");
+  if (downloaded) {
+    console.error(`extracted ${release} in ${Math.round((Date.now() - t0) / 1000)} s → ${file}`);
+  }
   const report = await analyse(c, file, release, box);
   const reportFile = resolve(OUT_DIR, `coverage-${release}.md`);
   writeFileSync(reportFile, report);

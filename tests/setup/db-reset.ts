@@ -10,7 +10,7 @@ export async function resetAppData(): Promise<void> {
   const [row] = await db.$queryRaw<{ name: string }[]>`SELECT current_database() AS name`;
   assertTestDatabaseName(row?.name ?? "");
   await db.$executeRawUnsafe(
-    `TRUNCATE "Restaurant", "RestaurantDish", "Rating", "RatingHistory", "Flag", "MenuUpload",
+    `TRUNCATE "OvertureCandidate", "Restaurant", "RestaurantDish", "Rating", "RatingHistory", "Flag", "MenuUpload",
       "MenuItem", "OwnerClaim", "ReviewItem", "JobRun", "RateLimitBucket", "RankingSnapshot",
       "PairwiseVote", "DishStat", "Session", "Account", "Verification", "User" CASCADE`,
   );

@@ -48,6 +48,7 @@ export async function makeRestaurant(
       cityId: city.id,
       areaId: area.id,
       address: `${area.name}, ${city.name}`,
+      source: "MANUAL",
       searchText: buildSearchText(name, (data.aliases as string[] | undefined) ?? []),
       ...data,
     },

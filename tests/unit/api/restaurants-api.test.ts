@@ -56,7 +56,11 @@ describe("restaurant API (docs/06, test DB)", () => {
   });
 
   it("GET /restaurants/:slug returns the restaurant with its dishes", async () => {
-    const r = await makeRestaurant("Fixture Pulao House");
+    const r = await makeRestaurant("Fixture Pulao House", {
+      lat: 33.7215,
+      lng: 73.0569,
+      locationSource: "OVERTURE",
+    });
     await makeDish(r, "chicken-pulao", { distinctRaters: 2 });
     await makeDish(r, "chicken-karahi", { status: "USER_CONFIRMED", rankInCity: 3, score: 8.1 });
     await makeDish(r, "haleem", { status: "REMOVED" });
@@ -67,7 +71,11 @@ describe("restaurant API (docs/06, test DB)", () => {
       id: r.id,
       name: "Fixture Pulao House",
       area: { slug: "f-7" },
+      lat: 33.7215, // our own coordinates (Overture or admin), for distance
+      lng: 73.0569,
+      website: null,
     });
+    expect(body.data.restaurant).not.toHaveProperty("locationSource");
     expect(body.data.claimed).toBe(false);
     expect(body.data.dishes.map((d: { dish: { slug: string } }) => d.dish.slug)).toEqual([
       "chicken-karahi",

@@ -6,6 +6,15 @@ export async function startJobRun(name: string, startedAt: Date) {
   return db.jobRun.create({ data: { name, startedAt }, select: { id: true } });
 }
 
+/** Successful runs of one job, oldest first. */
+export async function listSuccessfulJobRuns(name: string) {
+  return db.jobRun.findMany({
+    where: { name, ok: true },
+    orderBy: { startedAt: "asc" },
+    select: { startedAt: true, summary: true },
+  });
+}
+
 export async function finishJobRun(
   id: string,
   data: { ok: boolean; summary: Prisma.InputJsonValue; finishedAt: Date },

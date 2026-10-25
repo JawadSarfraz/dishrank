@@ -2,7 +2,12 @@
 // Rules that need the database or the session (ownership, roles, rate limits) are enforced in
 // services, not here.
 import { z } from "zod";
-import { FlagReason, RestaurantStatus, ReviewItemType } from "@/generated/prisma/enums";
+import {
+  CandidateSkipReason,
+  FlagReason,
+  RestaurantStatus,
+  ReviewItemType,
+} from "@/generated/prisma/enums";
 import { id, latitude, longitude, optionalQuery, optionalText, phone, slug, text } from "./common";
 
 export { parseInput } from "./common";
@@ -121,23 +126,58 @@ const restaurantAliases = z.array(text(120)).max(20);
 const bothOrNeither = (r: { lat?: number | null; lng?: number | null }) =>
   (r.lat === undefined || r.lat === null) === (r.lng === undefined || r.lng === null);
 
+/** The restaurant's own site or page: http(s) only. */
+const website = z.url({ protocol: /^https?$/, error: "Invalid website" }).max(300);
+
+/** Dishes an admin ticks: each becomes a CANDIDATE RestaurantDish (docs/07 §2). */
+const dishSlugs = z.array(slug).max(40);
+
+/** Fields an admin types or confirms (prefilled from Overture on /admin/import, docs/07 §2). */
+const restaurantFields = {
+  name: text(120),
+  areaId: id,
+  address: text(300),
+  phone: optionalQuery(phone),
+  website: optionalQuery(website),
+  priceBand: z.int().min(1).max(4).optional(),
+  aliases: restaurantAliases.optional(),
+  dishSlugs: dishSlugs.optional(),
+};
+
 /**
- * POST /api/v1/admin/restaurants (create). Name and address are our own record, typed or confirmed
- * by an admin (docs/07 §1); the city is the area's city; a location is optional.
+ * POST /api/v1/admin/restaurants and /admin/restaurants/new: a restaurant added by hand. The city
+ * is the area's city; a location is optional.
  */
 export const adminRestaurantInput = z
-  .strictObject({
-    name: text(120),
-    areaId: id,
-    address: text(300),
-    phone: phone.optional(),
-    priceBand: z.int().min(1).max(4).optional(),
-    aliases: restaurantAliases.optional(),
-    lat: latitude.optional(),
-    lng: longitude.optional(),
-  })
+  .strictObject({ ...restaurantFields, lat: latitude.optional(), lng: longitude.optional() })
   .refine(bothOrNeither, { message: "lat and lng go together", path: ["lat"] });
 export type AdminRestaurantInput = z.infer<typeof adminRestaurantInput>;
+
+/** /admin/import Create: the form for one Overture candidate; its location comes from Overture. */
+export const candidateCreateInput = z.strictObject({ candidateId: id, ...restaurantFields });
+export type CandidateCreateInput = z.infer<typeof candidateCreateInput>;
+
+/** /admin/import Link: this candidate is that restaurant. */
+export const candidateLinkInput = z.strictObject({ candidateId: id, restaurantId: id });
+export type CandidateLinkInput = z.infer<typeof candidateLinkInput>;
+
+/** /admin/import Skip, with an optional reason. */
+export const candidateSkipInput = z.strictObject({
+  candidateId: id,
+  reason: z.enum(CandidateSkipReason).optional(),
+});
+export type CandidateSkipInput = z.infer<typeof candidateSkipInput>;
+
+/** /admin/import Reopen: a skipped candidate goes back to the list. */
+export const candidateReopenInput = z.strictObject({ candidateId: id });
+
+/** /admin/import query string: city, area ("none" = no suggested area) and which candidates. */
+export const importQueueQuery = z.object({
+  city: optionalQuery(slug),
+  area: optionalQuery(z.union([z.literal("none"), slug])),
+  show: optionalQuery(z.enum(["new", "skipped", "done"])),
+});
+export type ImportQueueQuery = z.infer<typeof importQueueQuery>;
 
 /** PATCH /api/v1/admin/restaurants/:id (edit). The slug never changes; null clears the location. */
 export const adminRestaurantUpdateInput = z
@@ -146,6 +186,7 @@ export const adminRestaurantUpdateInput = z
     areaId: id,
     address: text(300),
     phone: phone.nullable(),
+    website: website.nullable(),
     priceBand: z.int().min(1).max(4).nullable(),
     aliases: restaurantAliases,
     lat: latitude.nullable().optional(),
