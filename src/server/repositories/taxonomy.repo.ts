@@ -79,3 +79,21 @@ export async function listDishAliases(client: Client = db) {
     select: { alias: true, dish: { select: { id: true, slug: true, name: true } } },
   });
 }
+
+/**
+ * docs/05 step 4: best similarity per dish, one alias at a time. SET LOCAL (set_config(..., true))
+ * makes the `%` operator use the GIN index with the same threshold the caller asks for.
+ */
+export async function findTrigramMatches(text: string, threshold: number, limit: number) {
+  return db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT set_config('pg_trgm.similarity_threshold', ${String(threshold)}, true)`;
+    return tx.$queryRaw<{ dishId: string; dishSlug: string; similarity: number }[]>`
+      SELECT d.id AS "dishId", d.slug AS "dishSlug", max(similarity(a.alias, ${text}))::float8 AS "similarity"
+      FROM "DishAlias" a
+      JOIN "Dish" d ON d.id = a."dishId"
+      WHERE a.alias % ${text}
+      GROUP BY d.id, d.slug
+      ORDER BY "similarity" DESC, d.slug ASC
+      LIMIT ${limit}`;
+  });
+}

@@ -38,7 +38,7 @@ GOOGLE_PLACES_API_KEY=
 # Anthropic
 ANTHROPIC_API_KEY=
 ANTHROPIC_VISION_MODEL=            # set to a current Claude model id
-ANTHROPIC_MATCH_MODEL=             # a small/fast Claude model id
+ANTHROPIC_MATCH_MODEL=             # a small/fast Claude model id, e.g. claude-haiku-5-5; the LLM step runs only when this and the key are set
 
 # App
 NEXT_PUBLIC_SITE_URL=https://dishrank.pk

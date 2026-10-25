@@ -70,8 +70,10 @@ input: rawName ("Chicken White Karahi Full 1kg Rs 2400")
    - the top 3 dishes become review suggestions; all 10 go to step 5
 
 5. llmMatch(text, candidates), menu uploads only, when steps 2-4 did not reach 0.85
-   - Anthropic API, model from env ANTHROPIC_MATCH_MODEL, tool-use with schema
-     { dishSlug: string | null, confidence: number, reason: string }
+   - Anthropic API, model from env ANTHROPIC_MATCH_MODEL, structured output (output_config.format) with schema
+     { dishSlug: string | null, confidence: number, reason: string }; current Claude models reject forced tool_choice
+   - skipped unless both ANTHROPIC_API_KEY and ANTHROPIC_MATCH_MODEL are set, and when there are no candidates
+     (the LLM may only choose among them)
    - the prompt includes the alias suggestion (if any), the trigram candidates and category hints from rawSection
    - accept if confidence ≥ 0.85 → method LLM; otherwise keep the best suggestion
 
