@@ -54,7 +54,7 @@ pnpm build            # production build
 pnpm start            # production server (requires every required env var)
 pnpm lint             # eslint
 pnpm typecheck        # next typegen && tsc --noEmit
-pnpm test             # vitest (unit + DB tests; needs DATABASE_URL)
+pnpm test             # vitest; DB tests use their own database (see below), never the dev one
 pnpm test:e2e         # playwright, Chromium only
 pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
@@ -64,6 +64,10 @@ pnpm seed:places -- --city=islamabad --dish=chicken-karahi   # Phase 2
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # Phase 4
 ```
+
+Tests never touch the dev database: `pnpm test` creates `dishrank_test` on the same server as `DATABASE_URL`
+(or uses `TEST_DATABASE_URL`), applies the migrations and seeds it, and test files that write empty its app
+tables. Any database whose name does not end in `_test` is refused (`tests/setup/test-database.ts`).
 
 CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`: Node from `.nvmrc`, `pnpm install`,
 a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and test.
