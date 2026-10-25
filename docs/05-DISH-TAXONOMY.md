@@ -133,7 +133,7 @@ Seed tests in the same folder: every alias equals `normalize(alias)`; no alias s
 
 ## Restaurant search (Roman Urdu tolerant)
 
-`restaurants.searchText = lower(unaccent(name)) + ' ' + aliases` where aliases are admin-entered alternative names ("Butt Karahi", "Butt Karahi Lakshmi", "but karahi"). Query: trigram similarity ≥ 0.3 OR `ILIKE '%q%'`, ordered by similarity, limited to the selected city, `status = ACTIVE`, top 8.
+`Restaurant.searchText` = the name and every `Restaurant.aliases` entry (other names an admin types: "Butt Karahi Lakshmi", "but karahi"), each cleaned like `normalize()` step 1 (lowercase ASCII words) and joined with spaces; `RestaurantService` rewrites it on every create and edit. The query `q` is cleaned the same way. Query: trigram similarity ≥ 0.3 (the `%` operator on the GIN index) OR `ILIKE '%q%'`, ordered by similarity, limited to the selected city, `status = ACTIVE`, top 8.
 
 ## Adding a dish to a restaurant from the rate flow
 

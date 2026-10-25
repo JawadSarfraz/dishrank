@@ -27,11 +27,14 @@ const row = (over: Partial<CandidateRow> = {}): CandidateRow => ({
 describe("csv", () => {
   it("round-trips commas, quotes and line breaks", () => {
     const rows = [["a,b", 'say "hi"', "two\nlines", ""]];
-    expect(parseCsv(encodeCsv(["w", "x", "y", "z"], rows))).toEqual([["w", "x", "y", "z"], ...rows]);
+    expect(parseCsv(encodeCsv(["w", "x", "y", "z"], rows))).toEqual([
+      ["w", "x", "y", "z"],
+      ...rows,
+    ]);
   });
 
   it("accepts CRLF, a BOM and blank lines", () => {
-    expect(parseCsv('﻿a,b\r\n\r\n1,"2"\r\n')).toEqual([
+    expect(parseCsv('\uFEFFa,b\r\n\r\n1,"2"\r\n')).toEqual([
       ["a", "b"],
       ["1", "2"],
     ]);

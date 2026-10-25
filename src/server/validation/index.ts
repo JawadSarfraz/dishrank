@@ -2,7 +2,7 @@
 // Rules that need the database or the session (ownership, roles, rate limits, the 30-day
 // fetchedAt age) are enforced in services, not here.
 import { z } from "zod";
-import { FlagReason, ReviewItemType } from "@/generated/prisma/enums";
+import { FlagReason, RestaurantStatus, ReviewItemType } from "@/generated/prisma/enums";
 import {
   googlePlaceId,
   id,
@@ -125,6 +125,24 @@ export const restaurantSearchQuery = z.object({
 });
 export type RestaurantSearchQuery = z.infer<typeof restaurantSearchQuery>;
 
+/** Other names a restaurant goes by ("but karahi"); part of its search text (docs/05). */
+const restaurantAliases = z.array(text(120)).max(20);
+
+/** Fields an admin types or confirms for a restaurant. Name and address are our own record (docs/07 §1). */
+const restaurantFields = {
+  name: text(120),
+  cityId: id,
+  areaId: id,
+  address: text(300),
+  lat: latitude,
+  lng: longitude,
+  phone: phone.optional(),
+  priceBand: z.int().min(1).max(4).optional(),
+  aliases: restaurantAliases.optional(),
+};
+
+const isoDateTime = z.iso.datetime({ offset: true });
+
 /**
  * POST /api/v1/admin/restaurants (create from an import row or by hand). With a googlePlaceId the
  * CSV fetchedAt is required, because googleSyncedAt = fetchedAt (docs/07 §2); the service rejects
@@ -132,22 +150,73 @@ export type RestaurantSearchQuery = z.infer<typeof restaurantSearchQuery>;
  */
 export const adminRestaurantInput = z
   .strictObject({
-    name: text(120),
-    cityId: id,
-    areaId: id,
-    address: text(300),
-    lat: latitude,
-    lng: longitude,
+    ...restaurantFields,
     googlePlaceId: googlePlaceId.optional(),
-    fetchedAt: z.iso.datetime({ offset: true }).optional(),
-    phone: phone.optional(),
-    priceBand: z.int().min(1).max(4).optional(),
+    fetchedAt: isoDateTime.optional(),
   })
   .refine((r) => !r.googlePlaceId || r.fetchedAt, {
     message: "fetchedAt is required with a googlePlaceId",
     path: ["fetchedAt"],
   });
 export type AdminRestaurantInput = z.infer<typeof adminRestaurantInput>;
+
+/** /admin/import Create: the form the admin confirmed for one CSV row (docs/07 §2). */
+export const importCreateInput = z.strictObject({
+  ...restaurantFields,
+  googlePlaceId,
+  fetchedAt: isoDateTime,
+  dishSlug: slug,
+});
+export type ImportCreateInput = z.infer<typeof importCreateInput>;
+
+/** /admin/import Link: attach a CSV row's place and dish to an existing restaurant. */
+export const importLinkInput = z.strictObject({
+  restaurantId: id,
+  googlePlaceId,
+  lat: latitude,
+  lng: longitude,
+  fetchedAt: isoDateTime,
+  dishSlug: slug,
+});
+export type ImportLinkInput = z.infer<typeof importLinkInput>;
+
+/**
+ * PATCH /api/v1/admin/restaurants/:id (edit). The slug never changes. lat/lng can be typed only for
+ * a restaurant without a googlePlaceId: Google coordinates come from the CSV and the daily refresh.
+ */
+export const adminRestaurantUpdateInput = z.strictObject({
+  name: text(120),
+  areaId: id,
+  address: text(300),
+  phone: phone.nullable(),
+  priceBand: z.int().min(1).max(4).nullable(),
+  aliases: restaurantAliases,
+  lat: latitude.nullable().optional(),
+  lng: longitude.nullable().optional(),
+});
+export type AdminRestaurantUpdateInput = z.infer<typeof adminRestaurantUpdateInput>;
+
+/** PATCH /api/v1/admin/restaurants/:id { status }. DUPLICATE is set only by a merge. */
+export const restaurantStatusInput = z.strictObject({
+  status: z.enum(["ACTIVE", "CLOSED", "HIDDEN"]),
+});
+export type RestaurantStatusInput = z.infer<typeof restaurantStatusInput>;
+
+/** PATCH /api/v1/admin/restaurants/:id { mergeIntoId }: this restaurant becomes a duplicate of that one. */
+export const restaurantMergeInput = z.strictObject({ mergeIntoId: id });
+export type RestaurantMergeInput = z.infer<typeof restaurantMergeInput>;
+
+/** /admin/restaurants list filters (query string). */
+export const adminRestaurantListQuery = z.object({
+  q: optionalQuery(z.string().trim().max(80)),
+  city: optionalQuery(slug),
+  status: optionalQuery(z.enum(RestaurantStatus)),
+  page: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(1).max(10_000).default(1),
+  ),
+});
+export type AdminRestaurantListQuery = z.infer<typeof adminRestaurantListQuery>;
 
 /** A dish created by an admin from the review queue (aliases are normalised by the service). */
 export const newDishInput = z.strictObject({

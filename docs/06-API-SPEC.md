@@ -21,6 +21,7 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `user:{id}:upload` | 20 / day |
 | `ip:{hash}:search` | 120 / min |
 | `ip:{hash}:api` | 600 / hour (public GETs) |
+| `user:{id}:admin-write` | 600 / hour (every admin write: import create/link, edit, status, merge) |
 
 Exceeding → `429 { error: { code: "RATE_LIMITED" } }`.
 
@@ -54,10 +55,10 @@ Exceeding → `429 { error: { code: "RATE_LIMITED" } }`.
 Sort `price` uses `price ASC NULLS LAST` among eligible only. `votes` = `distinctRaters DESC`. `rank` is always the city-wide rank, also when `area`, `sort` or `radiusKm` narrow or reorder the list. The ranking page does not call this endpoint with filters; it filters in the browser.
 
 ### `GET /api/v1/restaurants/search?city=&q=`
-→ `[{ id, slug, name, area, address }]` (max 8)
+→ `[{ id, slug, name, area, address }]` (max 8; `area` is the area name). Unknown city → `404 CITY_NOT_FOUND`; a `q` with no letters or digits → `[]`. Limits: `ip:{hash}:search` and `ip:{hash}:api`.
 
 ### `GET /api/v1/restaurants/:slug`
-→ `{ restaurant, dishes: [{ dish, restaurantDishId, score, votes, rankInCity, status, price, variantTags }], claimed: boolean }` (dishes ordered: eligible by score, then others by votes). A merged restaurant (`status DUPLICATE`) answers `301` with `Location` set to the surviving restaurant's endpoint.
+→ `{ restaurant, dishes: [{ dish, restaurantDishId, score, votes, rankInCity, status, price, variantTags }], claimed: boolean }` (dishes ordered: eligible by score, then others by votes). A merged restaurant (`status DUPLICATE`) answers `301` with `Location` set to the surviving restaurant's endpoint (chains of merges are followed). CLOSED and HIDDEN restaurants answer `404`. Limit: `ip:{hash}:api`.
 
 ### `GET /api/v1/users/:username` → public profile: ratingsCount, recent ratings (no email).
 
@@ -100,8 +101,8 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 
 - `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=`
 - `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both`, `relink`, `mark_closed`, `keep_without_coordinates` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`).
-- `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, fetchedAt?, phone?, priceBand? }`; `fetchedAt` (the CSV's Google call time) is required with `googlePlaceId`, because `googleSyncedAt = fetchedAt`.
-- `PATCH /api/v1/admin/restaurants/:id` — edit, `status`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE).
+- `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, fetchedAt?, phone?, priceBand?, aliases? }`; `fetchedAt` (the CSV's Google call time) is required with `googlePlaceId`, because `googleSyncedAt = fetchedAt`. The slug is `<name>-<area slug>` (area not repeated when the name ends with it), then `-2`, `-3`… when taken; it never changes afterwards.
+- `PATCH /api/v1/admin/restaurants/:id` — edit `{ name, areaId, address, phone|null, priceBand|null, aliases, lat?, lng? }` (lat/lng only for a restaurant without a `googlePlaceId`), `{ status: ACTIVE|CLOSED|HIDDEN }`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE). In v1 these admin operations are server actions on /admin pages (`src/server/actions/admin-*.ts`) calling the same services; the JSON routes are not built yet (KICKOFF-REVIEW AP-07).
 - `PATCH /api/v1/admin/restaurant-dishes/:id` — status / confidence / tags.
 - `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules).
 - `PATCH /api/v1/admin/ratings/:id` — `status: ACTIVE|HELD|HIDDEN`.

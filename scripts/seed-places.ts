@@ -49,8 +49,10 @@ function parseCli(argv: string[]) {
     ?.split(",")
     .map((a) => a.trim())
     .filter(Boolean);
-  if (areas?.some((a) => !isSlug(a))) throw new UsageError("--areas must be comma-separated slugs.");
-  const maxCalls = values["max-calls"] === undefined ? DEFAULT_MAX_CALLS : Number(values["max-calls"]);
+  if (areas?.some((a) => !isSlug(a)))
+    throw new UsageError("--areas must be comma-separated slugs.");
+  const maxCalls =
+    values["max-calls"] === undefined ? DEFAULT_MAX_CALLS : Number(values["max-calls"]);
   if (!Number.isInteger(maxCalls) || maxCalls < 1) {
     throw new UsageError("--max-calls must be a positive integer.");
   }
@@ -86,7 +88,9 @@ async function main(): Promise<number> {
       `before retries) · budget --max-calls: ${cli.maxCalls}`,
   );
   if (maxCalls > cli.maxCalls) {
-    console.log(`note: the run stops before going over ${cli.maxCalls} calls; later areas are skipped.`);
+    console.log(
+      `note: the run stops before going over ${cli.maxCalls} calls; later areas are skipped.`,
+    );
   }
 
   if (cli.dryRun) {
@@ -123,7 +127,9 @@ async function main(): Promise<number> {
   });
 
   if (run.stoppedEarly) {
-    console.warn(`stopped early: ${run.stoppedEarly}. Not searched: ${run.notSearched.join(", ") || "none"}.`);
+    console.warn(
+      `stopped early: ${run.stoppedEarly}. Not searched: ${run.notSearched.join(", ") || "none"}.`,
+    );
   }
   console.log(
     `unique places: ${run.rows.length} · calls used: ${run.calls} of ${cli.maxCalls} ` +
@@ -133,9 +139,15 @@ async function main(): Promise<number> {
     console.log("no rows: nothing written.");
     return run.stoppedEarly ? 1 : 0;
   }
-  const file = outputPath(target.city.slug, target.dish.slug, new Date().toISOString().slice(0, 10));
+  const file = outputPath(
+    target.city.slug,
+    target.dish.slug,
+    new Date().toISOString().slice(0, 10),
+  );
   writeFileSync(file, encodeCandidatesCsv(run.rows), "utf8");
-  console.log(`wrote ${path.relative(process.cwd(), file)} (import it at /admin/import within 30 days)`);
+  console.log(
+    `wrote ${path.relative(process.cwd(), file)} (import it at /admin/import within 30 days)`,
+  );
   return run.stoppedEarly ? 1 : 0;
 }
 

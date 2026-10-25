@@ -213,7 +213,8 @@ model Restaurant {
   googlePlaceId   String?          @unique
   googleSyncedAt  DateTime? // time of the Google call behind lat/lng (CSV fetchedAt or refresh); NULL with a googlePlaceId = due
   status          RestaurantStatus @default(ACTIVE)
-  searchText      String           @default("") // name + aliases, lowercased, for pg_trgm
+  aliases         String[]         @default([]) // other names typed by an admin ("but karahi"), docs/05
+  searchText      String           @default("") // cleaned name + aliases, maintained by RestaurantService, for pg_trgm
   claimedByUserId String?
   claimedAt       DateTime?
   mergedIntoId    String? // set with status DUPLICATE; its URLs redirect permanently to this restaurant

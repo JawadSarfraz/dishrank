@@ -1,27 +1,9 @@
 // Test doubles for the matching pipeline: an alias index built from seed/*.json and an in-memory
-// trigram search with pg_trgm's similarity() semantics (lowercase alphanumeric words, each padded
-// "  word ", Jaccard similarity of the trigram sets). No database, no network.
+// trigram search with pg_trgm's similarity() semantics (src/lib/trigram.ts). No database, no network.
+import { similarity } from "@/lib/trigram";
 import { AliasIndex, type AliasEntry, type MatchDeps } from "@/server/services/matching";
 import type { TrigramSearch } from "@/server/services/matching/trigram";
 import { buildSeedPlan, loadSeedFiles } from "@/server/services/taxonomy-seed";
-
-export function trigrams(s: string): Set<string> {
-  const out = new Set<string>();
-  for (const word of s.toLowerCase().match(/[a-z0-9]+/g) ?? []) {
-    const padded = `  ${word} `;
-    for (let i = 0; i + 3 <= padded.length; i++) out.add(padded.slice(i, i + 3));
-  }
-  return out;
-}
-
-export function similarity(a: string, b: string): number {
-  const A = trigrams(a);
-  const B = trigrams(b);
-  if (A.size === 0 || B.size === 0) return 0;
-  let shared = 0;
-  for (const t of A) if (B.has(t)) shared++;
-  return shared / (A.size + B.size - shared);
-}
 
 export function seedAliasEntries(): AliasEntry[] {
   const plan = buildSeedPlan(loadSeedFiles());

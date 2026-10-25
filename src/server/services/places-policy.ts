@@ -26,8 +26,7 @@ export function daysBefore(now: Date, days: number): Date {
 }
 
 export type FetchedAtCheck =
-  | { ok: true; fetchedAt: Date; ageDays: number }
-  | { ok: false; reason: string };
+  { ok: true; fetchedAt: Date; ageDays: number } | { ok: false; reason: string };
 
 const isoDateTime = z.iso.datetime({ offset: true });
 

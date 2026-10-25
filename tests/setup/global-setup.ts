@@ -12,7 +12,9 @@ async function createDatabaseIfMissing(url: string): Promise<void> {
     adapter: new PrismaPg({ connectionString: maintenanceUrl(url) }),
   });
   try {
-    const rows = await admin.$queryRaw<unknown[]>`SELECT 1 FROM pg_database WHERE datname = ${name}`;
+    const rows = await admin.$queryRaw<
+      unknown[]
+    >`SELECT 1 FROM pg_database WHERE datname = ${name}`;
     if (rows.length === 0) await admin.$executeRawUnsafe(`CREATE DATABASE "${name}"`);
   } finally {
     await admin.$disconnect();

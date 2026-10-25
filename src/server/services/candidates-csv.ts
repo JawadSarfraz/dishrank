@@ -43,12 +43,7 @@ export function encodeCandidatesCsv(rows: readonly CandidateRow[]): string {
 }
 
 const coordinate = (min: number, max: number) =>
-  z
-    .string()
-    .trim()
-    .min(1, "missing")
-    .transform(Number)
-    .pipe(z.number().min(min).max(max));
+  z.string().trim().min(1, "missing").transform(Number).pipe(z.number().min(min).max(max));
 
 const rowSchema = z.object({
   googlePlaceId,
@@ -87,7 +82,8 @@ export function parseCandidatesCsv(text: string, now: Date): ParsedCandidate[] {
     const reasons: string[] = [];
     const parsed = rowSchema.safeParse(raw);
     if (!parsed.success) {
-      for (const issue of parsed.error.issues) reasons.push(`${issue.path.join(".")}: ${issue.message}`);
+      for (const issue of parsed.error.issues)
+        reasons.push(`${issue.path.join(".")}: ${issue.message}`);
     }
     const age = checkFetchedAt(raw.fetchedAt, now);
     if (!age.ok) reasons.push(age.reason);
