@@ -108,10 +108,14 @@ describe("restaurantDishInput, flagInput, claimInput, uploadSignInput", () => {
 describe("proposalInput", () => {
   it("accepts dish and restaurant proposals", () => {
     expect(ok(proposalInput, { type: "DISH", name: "Peshawari Qehwa" })).toBe(true);
-    expect(ok(proposalInput, { type: "RESTAURANT", name: "Butt Karahi", cityId: rid })).toBe(true);
+    expect(
+      ok(proposalInput, { type: "RESTAURANT", name: "Butt Karahi", cityId: rid, areaId: did }),
+    ).toBe(true);
+    expect(ok(proposalInput, { type: "DISH", name: "Lahori Fish", restaurantId: rid })).toBe(true);
   });
-  it("needs a city for restaurant proposals and a real name", () => {
+  it("needs a city and an area for restaurant proposals and a real name", () => {
     expect(ok(proposalInput, { type: "RESTAURANT", name: "Butt Karahi" })).toBe(false);
+    expect(ok(proposalInput, { type: "RESTAURANT", name: "Butt Karahi", cityId: rid })).toBe(false);
     expect(ok(proposalInput, { type: "DISH", name: "x" })).toBe(false);
     expect(ok(proposalInput, { type: "SHOP", name: "Butt Karahi" })).toBe(false);
   });

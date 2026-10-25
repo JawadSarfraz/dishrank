@@ -52,6 +52,8 @@ export const proposalInput = z.discriminatedUnion("type", [
   z.strictObject({
     type: z.literal("DISH"),
     name: text(120, 2),
+    /** The restaurant the diner was rating when the dish was missing (docs/07 §6 payload). */
+    restaurantId: id.optional(),
     cityId: id.optional(),
     areaId: id.optional(),
     note: optionalText(280),
@@ -60,11 +62,21 @@ export const proposalInput = z.discriminatedUnion("type", [
     type: z.literal("RESTAURANT"),
     name: text(120, 2),
     cityId: id, // docs/07: a restaurant proposal is always for a city
-    areaId: id.optional(),
+    areaId: id, // the /rate "Can't find it?" form asks for the area
     note: optionalText(280),
   }),
 ]);
 export type ProposalInput = z.infer<typeof proposalInput>;
+
+/** POST /api/v1/location-observations: a panel member at a restaurant shares the browser's location. */
+export const locationObservationInput = z.strictObject({
+  restaurantId: id,
+  lat: latitude,
+  lng: longitude,
+  /** Browser accuracy radius in metres; worse than 50 m is never saved (docs/07 §7). */
+  accuracyM: z.number().positive().max(50, "Location not accurate enough (50 m or better)"),
+});
+export type LocationObservationInput = z.infer<typeof locationObservationInput>;
 
 /** POST /api/v1/owner/claims. */
 export const claimInput = z.strictObject({

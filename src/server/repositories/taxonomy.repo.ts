@@ -105,6 +105,13 @@ export async function findDishBySlug(slug: string, client: Client = db) {
   });
 }
 
+export async function findDishById(id: string, client: Client = db) {
+  return client.dish.findUnique({
+    where: { id },
+    select: { id: true, slug: true, name: true, isLaunch: true },
+  });
+}
+
 export async function findDishesBySlugs(slugs: readonly string[], client: Client = db) {
   return client.dish.findMany({
     where: { slug: { in: [...slugs] } },

@@ -30,6 +30,33 @@ export async function insertCandidateDish(
   });
 }
 
+/**
+ * The (restaurant, dish) row, created as CANDIDATE with the given source when absent. Safe under
+ * concurrent calls (INSERT … ON CONFLICT DO NOTHING); `created` tells whether this call added it.
+ */
+export async function ensureRestaurantDish(
+  data: {
+    restaurantId: string;
+    dishId: string;
+    cityId: string;
+    source: SourceType;
+    confidence: number;
+    menuName?: string | null;
+    price?: number | null;
+  },
+  client: Client = db,
+) {
+  const { count } = await client.restaurantDish.createMany({
+    data: [{ ...data, status: "CANDIDATE" }],
+    skipDuplicates: true,
+  });
+  const row = await client.restaurantDish.findUniqueOrThrow({
+    where: { restaurantId_dishId: { restaurantId: data.restaurantId, dishId: data.dishId } },
+    select: { id: true, status: true },
+  });
+  return { ...row, created: count > 0 };
+}
+
 /** Which of these (restaurant, dish) pairs already exist, for the import preview. */
 export async function listRestaurantDishPairs(
   restaurantIds: readonly string[],

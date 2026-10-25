@@ -73,15 +73,57 @@ export async function findOpenReviewItem(
 ) {
   return client.reviewItem.findFirst({
     where: { type, restaurantId, status: "OPEN" },
-    select: { id: true },
+    select: { id: true, payload: true },
+  });
+}
+
+/** The OPEN item of a type for one dish row and reason (payload.restaurantDishId, payload.reason). */
+export async function findOpenItemForDishRow(
+  type: ReviewItemType,
+  restaurantDishId: string,
+  reason: string,
+  client: Client = db,
+) {
+  return client.reviewItem.findFirst({
+    where: {
+      type,
+      status: "OPEN",
+      AND: [
+        { payload: { path: ["restaurantDishId"], equals: restaurantDishId } },
+        { payload: { path: ["reason"], equals: reason } },
+      ],
+    },
+    select: { id: true, payload: true },
+  });
+}
+
+/** One person's OPEN items of a type (to avoid filing the same suggestion twice). */
+export async function listOpenItemsCreatedBy(type: ReviewItemType, userId: string) {
+  return db.reviewItem.findMany({
+    where: { type, status: "OPEN", createdByUserId: userId },
+    select: { id: true, payload: true },
   });
 }
 
 export async function createReviewItem(
-  data: { type: ReviewItemType; restaurantId: string; payload: Prisma.InputJsonValue },
+  data: {
+    type: ReviewItemType;
+    payload: Prisma.InputJsonValue;
+    restaurantId?: string | null;
+    dishId?: string | null;
+    createdByUserId?: string | null;
+  },
   client: Client = db,
 ) {
   return client.reviewItem.create({ data, select: { id: true } });
+}
+
+export async function updateReviewItemPayload(
+  id: string,
+  payload: Prisma.InputJsonValue,
+  client: Client = db,
+) {
+  return client.reviewItem.update({ where: { id }, data: { payload }, select: { id: true } });
 }
 
 /** Closes every OPEN item of this type for the restaurant (no resolver: the system resolved it). */
