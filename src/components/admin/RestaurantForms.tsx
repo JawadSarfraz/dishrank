@@ -32,7 +32,6 @@ export type EditableRestaurant = {
   aliases: string[];
   lat: number | null;
   lng: number | null;
-  googleLinked: boolean;
 };
 
 function Message({ text, error }: { text: string | null; error?: boolean }) {
@@ -58,12 +57,6 @@ export function RestaurantEditForm({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const value = (key: string) => String(form.get(key) ?? "").trim();
-    const coordinates = restaurant.googleLinked
-      ? {}
-      : {
-          lat: value("lat") ? Number(value("lat")) : null,
-          lng: value("lng") ? Number(value("lng")) : null,
-        };
     const input = {
       name: value("name"),
       areaId: value("areaId"),
@@ -74,7 +67,8 @@ export function RestaurantEditForm({
         .split(",")
         .map((a) => a.trim())
         .filter(Boolean),
-      ...coordinates,
+      lat: value("lat") ? Number(value("lat")) : null,
+      lng: value("lng") ? Number(value("lng")) : null,
     };
     startTransition(async () => {
       const res = await updateRestaurantAction(restaurant.id, input);
@@ -143,22 +137,16 @@ export function RestaurantEditForm({
         Other names people search for (comma-separated)
         <Input name="aliases" defaultValue={restaurant.aliases.join(", ")} maxLength={600} />
       </label>
-      {restaurant.googleLinked ? (
-        <p className="text-xs text-muted-foreground">
-          Location comes from Google and is refreshed daily; it cannot be typed here.
-        </p>
-      ) : (
-        <div className="flex gap-2">
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            Latitude
-            <Input name="lat" defaultValue={restaurant.lat?.toString() ?? ""} inputMode="decimal" />
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            Longitude
-            <Input name="lng" defaultValue={restaurant.lng?.toString() ?? ""} inputMode="decimal" />
-          </label>
-        </div>
-      )}
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm">
+          Latitude
+          <Input name="lat" defaultValue={restaurant.lat?.toString() ?? ""} inputMode="decimal" />
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm">
+          Longitude
+          <Input name="lng" defaultValue={restaurant.lng?.toString() ?? ""} inputMode="decimal" />
+        </label>
+      </div>
       <Button type="submit" disabled={pending} className="self-start">
         {pending ? "Saving…" : "Save"}
       </Button>
@@ -245,9 +233,9 @@ export function MergeRestaurantDialog({
         <DialogHeader>
           <DialogTitle>Merge {source.name}</DialogTitle>
           <DialogDescription>
-            {source.name} becomes a duplicate: its dishes, ratings, flags, menu photos, claims and
-            Google place move to the restaurant you pick, and its page redirects there. This cannot
-            be undone from the admin.
+            {source.name} becomes a duplicate: its dishes, ratings, flags, menu photos and claims
+            move to the restaurant you pick, and its page redirects there. This cannot be undone
+            from the admin.
           </DialogDescription>
         </DialogHeader>
         {target ? (

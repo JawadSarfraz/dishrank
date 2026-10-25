@@ -19,7 +19,6 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "seed:places": "tsx scripts/seed-places.ts",
     "menu:parse": "tsx scripts/parse-menu.ts",
     "rankings:recompute": "tsx scripts/recompute-rankings.ts",
     "research:overture": "tsx scripts/research/overture-coverage.ts"

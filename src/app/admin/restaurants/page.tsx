@@ -76,8 +76,7 @@ export default async function AdminRestaurantsPage({
             </div>
             <span className="text-muted-foreground">
               {r.area?.name ?? "no area"}, {r.city.name} · {r._count.dishes} dishes ·{" "}
-              {r.googlePlaceId ? "Google-linked" : "not on Google"}
-              {r.googlePlaceId && r.lat === null ? " · location cleared" : ""} · {r.slug}
+              {r.lat === null ? "no location" : "location set"} · {r.slug}
             </span>
           </li>
         ))}

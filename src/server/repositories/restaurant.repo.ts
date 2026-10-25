@@ -15,50 +15,6 @@ export async function findRestaurantBySlug(slug: string, client: Client = db) {
   return client.restaurant.findUnique({ where: { slug }, include: place });
 }
 
-export async function findRestaurantByGooglePlaceId(googlePlaceId: string, client: Client = db) {
-  return client.restaurant.findUnique({
-    where: { googlePlaceId },
-    select: { id: true, slug: true, name: true },
-  });
-}
-
-export async function findRestaurantsByGooglePlaceIds(ids: readonly string[], client: Client = db) {
-  if (ids.length === 0) return [];
-  return client.restaurant.findMany({
-    where: { googlePlaceId: { in: [...ids] } },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      status: true,
-      cityId: true,
-      googlePlaceId: true,
-      city: { select: { name: true } },
-      area: { select: { name: true } },
-    },
-  });
-}
-
-/** Every restaurant of a city that can still be matched (not merged away), for import dedupe. */
-/** Restaurants of these areas that can still be matched (not merged away), for import dedupe. */
-export async function listRestaurantsInAreas(areaIds: readonly string[], client: Client = db) {
-  if (areaIds.length === 0) return [];
-  return client.restaurant.findMany({
-    where: { areaId: { in: [...areaIds] }, status: { not: "DUPLICATE" } },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      aliases: true,
-      areaId: true,
-      status: true,
-      googlePlaceId: true,
-      area: { select: { name: true } },
-      city: { select: { name: true } },
-    },
-  });
-}
-
 /** Slugs equal to `base` or starting with it, to pick a free `base-N`. */
 export async function listSlugsStartingWith(base: string, client: Client = db) {
   const rows = await client.restaurant.findMany({
@@ -166,8 +122,6 @@ export async function listRestaurantsPage(input: {
         slug: true,
         name: true,
         status: true,
-        googlePlaceId: true,
-        googleSyncedAt: true,
         lat: true,
         city: { select: { slug: true, name: true } },
         area: { select: { name: true } },
@@ -182,35 +136,4 @@ export async function listRestaurantsPage(input: {
 /** Serialises slug picking for one base inside a transaction (released at commit or rollback). */
 export async function lockSlugBase(base: string, tx: Tx) {
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${base}))`;
-}
-
-const refreshSelect = {
-  id: true,
-  googlePlaceId: true,
-  googleSyncedAt: true,
-  lat: true,
-  lng: true,
-} as const;
-
-/** Rows still holding coordinates from a Google call older than `cutoff` (refresh catch-up). */
-export async function listGoogleCoordinatesSyncedBefore(cutoff: Date) {
-  return db.restaurant.findMany({
-    where: {
-      googleSyncedAt: { lt: cutoff },
-      OR: [{ lat: { not: null } }, { lng: { not: null } }],
-    },
-    select: refreshSelect,
-  });
-}
-
-/** Rows with a googlePlaceId whose googleSyncedAt is NULL or older than `cutoff`, oldest first. */
-export async function listRestaurantsDueForRefresh(cutoff: Date) {
-  return db.restaurant.findMany({
-    where: {
-      googlePlaceId: { not: null },
-      OR: [{ googleSyncedAt: null }, { googleSyncedAt: { lt: cutoff } }],
-    },
-    orderBy: [{ googleSyncedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }],
-    select: refreshSelect,
-  });
 }

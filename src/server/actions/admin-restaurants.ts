@@ -70,7 +70,6 @@ export async function mergeRestaurantAction(restaurantId: unknown, input: unknow
       mergedDishes: result.mergedDishes.length,
       movedRatings: result.movedRatings.length,
       mergedRatings: result.mergedRatings.length,
-      googlePlaceMoved: result.googlePlaceMoved,
     };
   });
 }

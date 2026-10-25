@@ -8,13 +8,12 @@ import {
   updateRestaurant,
 } from "@/server/services/restaurant.service";
 import { resetAppData } from "../../setup/db-reset";
-import { ADMIN, USER, daysAgo, makeRestaurant, place } from "./fixtures";
+import { ADMIN, USER, makeRestaurant, place } from "./fixtures";
 
 async function input(name: string, over: Record<string, unknown> = {}) {
-  const { city, area } = await place("islamabad", "f-7");
+  const { area } = await place("islamabad", "f-7");
   return {
     name,
-    cityId: city.id,
     areaId: area.id,
     address: "Plot 1, Fixture Market",
     lat: 33.7215,
@@ -49,45 +48,17 @@ describe("RestaurantService (test DB)", () => {
     ]);
   });
 
-  it("stores googleSyncedAt = fetchedAt and refuses Google data older than 24 hours", async () => {
-    const fetchedAt = daysAgo(0.1);
+  it("takes the city from the area; the location is optional", async () => {
+    const { city, area } = await place("rawalpindi", "saddar");
     const { restaurant } = await createRestaurant(
       ADMIN,
-      await input("Fixture Pulao House", {
-        googlePlaceId: "ChIJ-fixture-0001",
-        fetchedAt: fetchedAt.toISOString(),
-      }),
+      await input("Fixture Saddar Tikka", { areaId: area.id, lat: undefined, lng: undefined }),
     );
     const row = await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } });
-    expect(row.googleSyncedAt?.toISOString()).toBe(fetchedAt.toISOString());
-
+    expect(row).toMatchObject({ cityId: city.id, areaId: area.id, lat: null, lng: null });
     await expect(
-      createRestaurant(
-        ADMIN,
-        await input("Old Row", {
-          googlePlaceId: "ChIJ-old-00001",
-          fetchedAt: daysAgo(1.5).toISOString(),
-        }),
-      ),
-    ).rejects.toMatchObject({ code: "GOOGLE_DATA_TOO_OLD" });
-    await expect(
-      createRestaurant(
-        ADMIN,
-        await input("Fixture Again", {
-          googlePlaceId: "ChIJ-fixture-0001",
-          fetchedAt: fetchedAt.toISOString(),
-        }),
-      ),
-    ).rejects.toMatchObject({ code: "PLACE_ALREADY_LINKED" });
-  });
-
-  it("refuses an area of another city", async () => {
-    const { area } = await place("rawalpindi", "saddar");
-    await expect(
-      createRestaurant(ADMIN, await input("X", { areaId: area.id })),
-    ).rejects.toMatchObject({
-      code: "AREA_NOT_IN_CITY",
-    });
+      createRestaurant(ADMIN, await input("X", { areaId: "nosucharea0000" })),
+    ).rejects.toMatchObject({ code: "AREA_NOT_FOUND" });
   });
 
   it('search "but karahi" finds "Butt Karahi" (typo, trigram ≥ 0.3), only ACTIVE, only in the city', async () => {
@@ -114,9 +85,9 @@ describe("RestaurantService (test DB)", () => {
     });
   });
 
-  it("edits a restaurant: new search text, same slug; Google coordinates cannot be typed", async () => {
+  it("edits a restaurant: new search text, same slug; coordinates can be typed and cleared", async () => {
     const { area } = await place("islamabad", "f-6");
-    const r = await makeRestaurant("Fixture Chai Corner", { googlePlaceId: "ChIJ-fixturechai1" });
+    const r = await makeRestaurant("Fixture Chai Corner");
     const edit = {
       name: "Fixture Chai Corner F-6",
       areaId: area.id,
@@ -134,10 +105,15 @@ describe("RestaurantService (test DB)", () => {
       aliases: ["fixture chai"],
       searchText: "fixture chai corner f 6 fixture chai",
     });
-    await expect(
-      updateRestaurant(ADMIN, r.id, { ...edit, lat: 33.7, lng: 73.1 }),
-    ).rejects.toMatchObject({
-      code: "COORDINATES_FROM_GOOGLE",
+    await updateRestaurant(ADMIN, r.id, { ...edit, lat: 33.7, lng: 73.1 });
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
+      lat: 33.7,
+      lng: 73.1,
+    });
+    await updateRestaurant(ADMIN, r.id, { ...edit, lat: null, lng: null });
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
+      lat: null,
+      lng: null,
     });
   });
 

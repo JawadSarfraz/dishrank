@@ -10,7 +10,6 @@ const valid = {
   GOOGLE_CLIENT_ID: "id",
   GOOGLE_CLIENT_SECRET: "secret",
   CRON_SECRET: "c".repeat(64),
-  GOOGLE_PLACES_API_KEY: "places-key",
 };
 
 describe("env schema", () => {

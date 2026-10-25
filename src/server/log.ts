@@ -1,6 +1,6 @@
 /**
  * One JSON line per event (docs/02 Observability: action, userId, entityId, durationMs…). Callers
- * pass ids and counts only: never secrets, request headers or Google request bodies.
+ * pass ids and counts only: never secrets or request headers.
  */
 export function logEvent(
   action: string,

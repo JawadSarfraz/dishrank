@@ -1,19 +1,9 @@
 // Zod schemas shared by server actions and /api/v1 route handlers (docs/06 "Zod schemas").
-// Rules that need the database or the session (ownership, roles, rate limits, the 30-day
-// fetchedAt age) are enforced in services, not here.
+// Rules that need the database or the session (ownership, roles, rate limits) are enforced in
+// services, not here.
 import { z } from "zod";
 import { FlagReason, RestaurantStatus, ReviewItemType } from "@/generated/prisma/enums";
-import {
-  googlePlaceId,
-  id,
-  latitude,
-  longitude,
-  optionalQuery,
-  optionalText,
-  phone,
-  slug,
-  text,
-} from "./common";
+import { id, latitude, longitude, optionalQuery, optionalText, phone, slug, text } from "./common";
 
 export { parseInput } from "./common";
 
@@ -128,84 +118,40 @@ export type RestaurantSearchQuery = z.infer<typeof restaurantSearchQuery>;
 /** Other names a restaurant goes by ("but karahi"); part of its search text (docs/05). */
 const restaurantAliases = z.array(text(120)).max(20);
 
-/** Fields an admin types or confirms for a restaurant. Name and address are our own record (docs/07 §1). */
-const restaurantFields = {
-  name: text(120),
-  cityId: id,
-  areaId: id,
-  address: text(300),
-  lat: latitude,
-  lng: longitude,
-  phone: phone.optional(),
-  priceBand: z.int().min(1).max(4).optional(),
-  aliases: restaurantAliases.optional(),
-};
-
-const isoDateTime = z.iso.datetime({ offset: true });
+const bothOrNeither = (r: { lat?: number | null; lng?: number | null }) =>
+  (r.lat === undefined || r.lat === null) === (r.lng === undefined || r.lng === null);
 
 /**
- * POST /api/v1/admin/restaurants (create from a live search result or by hand). With a
- * googlePlaceId the fetchedAt of that Google response is required, because googleSyncedAt =
- * fetchedAt (docs/07 §2); the service rejects Google data older than 30 days.
+ * POST /api/v1/admin/restaurants (create). Name and address are our own record, typed or confirmed
+ * by an admin (docs/07 §1); the city is the area's city; a location is optional.
  */
 export const adminRestaurantInput = z
   .strictObject({
-    ...restaurantFields,
-    googlePlaceId: googlePlaceId.optional(),
-    fetchedAt: isoDateTime.optional(),
+    name: text(120),
+    areaId: id,
+    address: text(300),
+    phone: phone.optional(),
+    priceBand: z.int().min(1).max(4).optional(),
+    aliases: restaurantAliases.optional(),
+    lat: latitude.optional(),
+    lng: longitude.optional(),
   })
-  .refine((r) => !r.googlePlaceId || r.fetchedAt, {
-    message: "fetchedAt is required with a googlePlaceId",
-    path: ["fetchedAt"],
-  });
+  .refine(bothOrNeither, { message: "lat and lng go together", path: ["lat"] });
 export type AdminRestaurantInput = z.infer<typeof adminRestaurantInput>;
 
-/**
- * /admin/import Create (docs/07 §2): name and address are typed by the admin, never copied from
- * Google; googlePlaceId, lat/lng and fetchedAt come from the live search result.
- */
-export const importCreateInput = z.strictObject({
-  ...restaurantFields,
-  googlePlaceId,
-  fetchedAt: isoDateTime,
-  dishSlug: slug,
-});
-export type ImportCreateInput = z.infer<typeof importCreateInput>;
-
-/** /admin/import Link: attach a search result's place and dish to an existing restaurant. */
-export const importLinkInput = z.strictObject({
-  restaurantId: id,
-  googlePlaceId,
-  lat: latitude,
-  lng: longitude,
-  fetchedAt: isoDateTime,
-  dishSlug: slug,
-});
-export type ImportLinkInput = z.infer<typeof importLinkInput>;
-
-/** /admin/import live search: one Text Search page for a dish in an area (pageToken = "Load more"). */
-export const placesSearchInput = z.strictObject({
-  dishSlug: slug,
-  areaId: id,
-  pageToken: z.string().min(1).max(4096).optional(),
-});
-export type PlacesSearchInput = z.infer<typeof placesSearchInput>;
-
-/**
- * PATCH /api/v1/admin/restaurants/:id (edit). The slug never changes. lat/lng can be typed only for
- * a restaurant without a googlePlaceId: Google coordinates come only from a search result (Create
- * or Link) and the daily refresh.
- */
-export const adminRestaurantUpdateInput = z.strictObject({
-  name: text(120),
-  areaId: id,
-  address: text(300),
-  phone: phone.nullable(),
-  priceBand: z.int().min(1).max(4).nullable(),
-  aliases: restaurantAliases,
-  lat: latitude.nullable().optional(),
-  lng: longitude.nullable().optional(),
-});
+/** PATCH /api/v1/admin/restaurants/:id (edit). The slug never changes; null clears the location. */
+export const adminRestaurantUpdateInput = z
+  .strictObject({
+    name: text(120),
+    areaId: id,
+    address: text(300),
+    phone: phone.nullable(),
+    priceBand: z.int().min(1).max(4).nullable(),
+    aliases: restaurantAliases,
+    lat: latitude.nullable().optional(),
+    lng: longitude.nullable().optional(),
+  })
+  .refine(bothOrNeither, { message: "lat and lng go together", path: ["lat"] });
 export type AdminRestaurantUpdateInput = z.infer<typeof adminRestaurantUpdateInput>;
 
 /** PATCH /api/v1/admin/restaurants/:id { status }. DUPLICATE is set only by a merge. */
@@ -279,18 +225,6 @@ export const reviewResolveInput = z.discriminatedUnion("action", [
   // DUPLICATE_RESTAURANT (merge B into A, docs/07 §2)
   z.strictObject({ action: z.literal("merge"), payload: noPayload }),
   z.strictObject({ action: z.literal("keep_both"), payload: noPayload }),
-  // PLACE_REFRESH_FAILED
-  z.strictObject({
-    action: z.literal("relink"),
-    payload: z.strictObject({
-      googlePlaceId,
-      lat: latitude,
-      lng: longitude,
-      fetchedAt: z.iso.datetime({ offset: true }),
-    }),
-  }),
-  z.strictObject({ action: z.literal("mark_closed"), payload: noPayload }),
-  z.strictObject({ action: z.literal("keep_without_coordinates"), payload: noPayload }),
 ]);
 export type ReviewResolveInput = z.infer<typeof reviewResolveInput>;
 export type ReviewAction = ReviewResolveInput["action"];
@@ -304,7 +238,6 @@ export const REVIEW_ACTIONS: Record<ReviewItemType, readonly ReviewAction[]> = {
   SUSPICIOUS_RATINGS: ["release", "hide", "ban_users"],
   OWNER_CLAIM: ["approve", "reject"],
   DUPLICATE_RESTAURANT: ["merge", "keep_both"],
-  PLACE_REFRESH_FAILED: ["relink", "mark_closed", "keep_without_coordinates"],
 };
 
 export function isReviewActionAllowed(type: ReviewItemType, action: ReviewAction): boolean {

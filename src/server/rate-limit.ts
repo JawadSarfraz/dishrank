@@ -10,12 +10,6 @@ export const RATE_LIMITS = {
   search: { limit: 120, windowSeconds: 60 },
   /** `ip:{hash}:api` (every public GET). */
   api: { limit: 600, windowSeconds: 3600 },
-  /**
-   * `global:places-search`, shared by all admins: every live Places search page on /admin/import is a
-   * billable Text Search Pro call.
-   */
-  // DECISION-PENDING: 150 per day in total keeps a month under the 5,000 free Text Search Pro calls.
-  placesSearch: { limit: 150, windowSeconds: 86_400 },
   /** `user:{id}:admin-write` (every admin write: import, edit, status, merge). */
   // DECISION-PENDING: docs/06 has no admin key; 600 per hour leaves room for a long import session.
   adminWrite: { limit: 600, windowSeconds: 3600 },

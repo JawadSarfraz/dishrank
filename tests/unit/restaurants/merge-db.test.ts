@@ -6,7 +6,7 @@ import { ADMIN, USER, daysAgo, makeDish, makeRating, makeRestaurant, makeUser } 
 
 /**
  * Source S and target T share chicken-karahi (S's row is stronger) and a rater (u1, who rated
- * both); S also serves mutton-karahi, T also serves haleem. S is claimed and linked to Google.
+ * both); S also serves mutton-karahi, T also serves haleem. S is claimed.
  */
 async function scenario() {
   const [u1, u2, u3, owner] = [
@@ -15,13 +15,10 @@ async function scenario() {
     await makeUser("u3"),
     await makeUser("owner"),
   ];
-  const syncedAt = daysAgo(5);
   const target = await makeRestaurant("Fixture Karahi", { lat: 33.72, lng: 73.05 });
   const source = await makeRestaurant("Fixture Karahi Markaz", {
-    googlePlaceId: "ChIJ-source-place",
     lat: 33.7212,
     lng: 73.0571,
-    googleSyncedAt: syncedAt,
     claimedByUserId: owner.id,
     claimedAt: daysAgo(2),
   });
@@ -79,7 +76,6 @@ async function scenario() {
     users: { u1, u2, u3, owner },
     source,
     target,
-    syncedAt,
     dishes: { sKarahi, tKarahi, sMutton, tHaleem },
     ratings: { u1Old, u2Rating, u1New, u3Rating },
     flags: { keptFlag, dupFlag, movedFlag },
@@ -165,7 +161,7 @@ describe("RestaurantService.mergeRestaurants (docs/07 §2, test DB)", () => {
         .restaurantId,
     ).toBe(s.source.id);
 
-    // Google place and owner move; the source keeps no Google data and becomes a duplicate.
+    // The owner moves; the source becomes a duplicate; each keeps its own location.
     const [source, target] = await Promise.all([
       db.restaurant.findUniqueOrThrow({ where: { id: s.source.id } }),
       db.restaurant.findUniqueOrThrow({ where: { id: s.target.id } }),
@@ -173,20 +169,16 @@ describe("RestaurantService.mergeRestaurants (docs/07 §2, test DB)", () => {
     expect(source).toMatchObject({
       status: "DUPLICATE",
       mergedIntoId: s.target.id,
-      googlePlaceId: null,
-      lat: null,
-      lng: null,
-      googleSyncedAt: null,
+      lat: 33.7212,
+      lng: 73.0571,
       claimedByUserId: null,
     });
     expect(target).toMatchObject({
       status: "ACTIVE",
-      googlePlaceId: "ChIJ-source-place",
-      lat: 33.7212,
-      lng: 73.0571,
+      lat: 33.72,
+      lng: 73.05,
       claimedByUserId: s.users.owner.id,
     });
-    expect(target.googleSyncedAt?.toISOString()).toBe(s.syncedAt.toISOString());
 
     // After commit: recompute the kept row whose ratings changed; the old slug redirects.
     expect(recomputed).toEqual([[s.dishes.sKarahi.id]]);

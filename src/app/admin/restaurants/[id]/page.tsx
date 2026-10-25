@@ -8,14 +8,7 @@ import {
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { requirePageRole } from "@/server/auth";
-import { googleMapsUrl } from "@/server/places";
 import { getRestaurantForAdmin } from "@/server/services/restaurant.service";
-
-const dateFormat = new Intl.DateTimeFormat("en-PK", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  timeZone: "Asia/Karachi",
-});
 
 export default async function AdminRestaurantPage({
   params,
@@ -26,7 +19,7 @@ export default async function AdminRestaurantPage({
 
   const found = await getRestaurantForAdmin(user, id);
   if (!found) notFound();
-  const { restaurant: r, areas, dishes, mergedInto, googleSyncedDaysAgo: syncedDays } = found;
+  const { restaurant: r, areas, dishes, mergedInto } = found;
   const merged = r.status === "DUPLICATE";
 
   return (
@@ -61,38 +54,6 @@ export default async function AdminRestaurantPage({
         )}
       </header>
 
-      <section className="flex flex-col gap-1 text-sm" aria-label="Google">
-        <h2 className="text-lg font-semibold">Google place</h2>
-        {r.googlePlaceId ? (
-          <>
-            <p>
-              Linked (place id {r.googlePlaceId}).{" "}
-              <a
-                href={googleMapsUrl(
-                  r.googlePlaceId,
-                  [r.name, r.area?.name, r.city.name].filter(Boolean).join(" "),
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-              >
-                Open in Google Maps
-              </a>
-            </p>
-            <p>
-              {/* Google's coordinates are kept for our own use only and are not shown here. */}
-              {r.lat === null
-                ? "Location cleared (refresh failed or too old): see the review queue."
-                : "Location saved from Google"}
-              {r.googleSyncedAt &&
-                ` · from a Google call on ${dateFormat.format(r.googleSyncedAt)} (${syncedDays} days ago; refreshed after 25 days)`}
-            </p>
-          </>
-        ) : (
-          <p>Not linked to Google.</p>
-        )}
-      </section>
-
       {!merged && (
         <>
           <section className="flex flex-col gap-3" aria-label="Edit">
@@ -108,7 +69,6 @@ export default async function AdminRestaurantPage({
                 aliases: r.aliases,
                 lat: r.lat,
                 lng: r.lng,
-                googleLinked: Boolean(r.googlePlaceId),
               }}
               areas={areas.map((a) => ({ id: a.id, name: a.name }))}
             />

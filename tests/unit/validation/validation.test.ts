@@ -3,6 +3,7 @@ import { ReviewItemType } from "@/generated/prisma/enums";
 import { AppError } from "@/server/errors";
 import {
   adminRestaurantInput,
+  adminRestaurantUpdateInput,
   claimInput,
   flagInput,
   isReviewActionAllowed,
@@ -160,7 +161,6 @@ describe("restaurantSearchQuery", () => {
 describe("adminRestaurantInput", () => {
   const base = {
     name: "Butt Karahi",
-    cityId: rid,
     areaId: did,
     address: "F-7 Markaz",
     lat: 33.72,
@@ -169,12 +169,16 @@ describe("adminRestaurantInput", () => {
   it("accepts a hand-entered restaurant", () => {
     expect(ok(adminRestaurantInput, { ...base, priceBand: 2, phone: "051 1234567" })).toBe(true);
   });
-  it("needs fetchedAt with a googlePlaceId (googleSyncedAt = fetchedAt)", () => {
-    const withPlace = { ...base, googlePlaceId: "ChIJN1t_tDeuEmsRUsoyG83frY4" };
-    expect(ok(adminRestaurantInput, withPlace)).toBe(false);
-    expect(ok(adminRestaurantInput, { ...withPlace, fetchedAt: "2026-10-20T08:15:00Z" })).toBe(
-      true,
-    );
+  it("takes the city from the area, never from the client", () => {
+    expect(ok(adminRestaurantInput, { ...base, cityId: rid })).toBe(false);
+  });
+  it("makes the location optional, but lat and lng go together", () => {
+    const noLocation = { name: base.name, areaId: base.areaId, address: base.address };
+    const edit = { ...noLocation, phone: null, priceBand: null, aliases: [] };
+    expect(ok(adminRestaurantInput, noLocation)).toBe(true);
+    expect(ok(adminRestaurantInput, { ...noLocation, lat: 33.72 })).toBe(false);
+    expect(ok(adminRestaurantUpdateInput, { ...edit, lat: null, lng: null })).toBe(true);
+    expect(ok(adminRestaurantUpdateInput, { ...edit, lat: 33.72, lng: null })).toBe(false);
   });
   it("rejects a price band outside 1..4", () => {
     expect(ok(adminRestaurantInput, { ...base, priceBand: 5 })).toBe(false);
@@ -198,17 +202,6 @@ describe("reviewResolveInput", () => {
             categoryId: did,
             aliases: ["qehwa", "kahwa"],
           },
-        },
-      }),
-    ).toBe(true);
-    expect(
-      ok(reviewResolveInput, {
-        action: "relink",
-        payload: {
-          googlePlaceId: "ChIJN1t_tDeuEmsRUsoyG83frY4",
-          lat: 33.7,
-          lng: 73.0,
-          fetchedAt: "2026-10-20T08:15:00+05:00",
         },
       }),
     ).toBe(true);

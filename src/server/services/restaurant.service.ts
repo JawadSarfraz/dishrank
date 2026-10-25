@@ -6,7 +6,6 @@ import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { findAreaById, findCityWithAreasBySlug } from "@/server/repositories/geo.repo";
 import {
-  findRestaurantByGooglePlaceId,
   findRestaurantById,
   findRestaurantBySlug,
   insertRestaurant,
@@ -53,7 +52,6 @@ import type {
 } from "@/server/validation";
 import { rethrowConflict } from "./conflict";
 import { cleanText } from "./matching/normalize";
-import { ageInDays, checkFetchedAt } from "./places-policy";
 import {
   planClaimMerge,
   planDishMerge,
@@ -106,30 +104,13 @@ export function pickUniqueSlug(base: string, taken: ReadonlySet<string>): string
 
 // ---------- create ----------
 
-/** Import rows create or link this RestaurantDish (docs/07 table: Google seed = CANDIDATE, 0.4). */
-export const IMPORT_DISH = { source: "GOOGLE_SEARCH", confidence: 0.4 } as const;
+/** Dishes an admin ticks for a restaurant become this RestaurantDish (docs/07: CANDIDATE, 0.4). */
+export const ADMIN_DISH = { source: "ADMIN", confidence: 0.4 } as const;
 
-/** Inside a transaction: checks area and Google place, picks a unique slug, inserts. */
-async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx, now: Date) {
+/** Inside a transaction: checks the area, picks a unique slug, inserts. The city is the area's. */
+async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx) {
   const area = await findAreaById(input.areaId, tx);
-  if (!area || area.cityId !== input.cityId) {
-    throw new AppError("AREA_NOT_IN_CITY", "The area does not belong to this city", 400);
-  }
-  let googleSyncedAt: Date | null = null;
-  if (input.googlePlaceId) {
-    const fresh = checkFetchedAt(input.fetchedAt, now);
-    if (!fresh.ok) throw new AppError("GOOGLE_DATA_TOO_OLD", fresh.reason, 400);
-    googleSyncedAt = fresh.fetchedAt; // the time of the Google call, never the import time
-    const other = await findRestaurantByGooglePlaceId(input.googlePlaceId, tx);
-    if (other) {
-      throw new AppError(
-        "PLACE_ALREADY_LINKED",
-        `This Google place is already linked to ${other.name}`,
-        409,
-        { restaurantId: other.id, slug: other.slug },
-      );
-    }
-  }
+  if (!area) throw new AppError("AREA_NOT_FOUND", "Unknown area", 400);
   const aliases = normalizeAliases(input.aliases, input.name);
   const base = restaurantSlugBase(input.name, area.slug);
   await lockSlugBase(base, tx);
@@ -138,15 +119,13 @@ async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx, now: Date
     {
       slug,
       name: input.name,
-      cityId: input.cityId,
-      areaId: input.areaId,
+      cityId: area.cityId,
+      areaId: area.id,
       address: input.address,
-      lat: input.lat,
-      lng: input.lng,
+      lat: input.lat ?? null,
+      lng: input.lng ?? null,
       phone: input.phone ?? null,
       priceBand: input.priceBand ?? null,
-      googlePlaceId: input.googlePlaceId ?? null,
-      googleSyncedAt,
       aliases,
       searchText: buildSearchText(input.name, aliases),
     },
@@ -155,11 +134,11 @@ async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx, now: Date
 }
 
 /**
- * The (restaurant, dish) row an import creates: CANDIDATE / GOOGLE_SEARCH / 0.4 when none exists.
+ * The (restaurant, dish) row for a dish an admin ticked: CANDIDATE / ADMIN / 0.4 when none exists.
  * An existing row of any status is left as it is.
  */
-// DECISION-PENDING: docs/07 §2 "unless a stronger row exists" — an existing STALE or REMOVED row is not revived by an import.
-export async function ensureImportedDish(
+// DECISION-PENDING: docs/07 §2 "unless a stronger row exists" — an existing STALE or REMOVED row is not revived by an admin tick.
+export async function ensureAdminDish(
   restaurant: { id: string; cityId: string },
   dishId: string,
   tx: Tx,
@@ -167,32 +146,30 @@ export async function ensureImportedDish(
   const existing = await findRestaurantDish(restaurant.id, dishId, tx);
   if (existing) return { id: existing.id, status: existing.status, created: false };
   const created = await insertCandidateDish(
-    { restaurantId: restaurant.id, dishId, cityId: restaurant.cityId, ...IMPORT_DISH },
+    { restaurantId: restaurant.id, dishId, cityId: restaurant.cityId, ...ADMIN_DISH },
     tx,
   );
   return { id: created.id, status: created.status, created: true };
 }
 
-/** POST /api/v1/admin/restaurants: create by hand or from an import row (`dishId` adds its CANDIDATE row). */
+/** POST /api/v1/admin/restaurants: create a restaurant (`dishId` adds its CANDIDATE row). */
 export async function createRestaurant(
   actor: SessionUser | null,
   input: AdminRestaurantInput,
-  options: { dishId?: string; now?: Date } = {},
+  options: { dishId?: string } = {},
 ) {
   const admin = assertRole(actor, "ADMIN");
-  const now = options.now ?? new Date();
   const started = Date.now();
   const result = await inTransaction(async (tx) => {
-    const restaurant = await createRestaurantTx(input, tx, now);
+    const restaurant = await createRestaurantTx(input, tx);
     const restaurantDish = options.dishId
-      ? await ensureImportedDish(restaurant, options.dishId, tx)
+      ? await ensureAdminDish(restaurant, options.dishId, tx)
       : null;
     return { restaurant, restaurantDish };
   }).catch(rethrowConflict);
   logEvent("restaurant.create", {
     userId: admin.id,
     entityId: result.restaurant.id,
-    googlePlaceId: input.googlePlaceId ?? null,
     restaurantDishId: result.restaurantDish?.id ?? null,
     durationMs: Date.now() - started,
   });
@@ -212,7 +189,7 @@ async function loadEditable(id: string, tx?: Tx) {
   return restaurant;
 }
 
-/** Edit. The slug never changes (URLs stay stable); Google-linked coordinates are not typed. */
+/** Edit. The slug never changes (URLs stay stable). */
 export async function updateRestaurant(
   actor: SessionUser | null,
   id: string,
@@ -230,19 +207,11 @@ export async function updateRestaurant(
   }
   const data: Prisma.RestaurantUncheckedUpdateInput = {};
   if (input.lat !== undefined || input.lng !== undefined) {
-    if (restaurant.googlePlaceId) {
-      throw new AppError(
-        "COORDINATES_FROM_GOOGLE",
-        "Coordinates of a Google-linked restaurant come from Google and its daily refresh",
-        400,
-      );
-    }
     const hasLat = input.lat !== undefined && input.lat !== null;
     const hasLng = input.lng !== undefined && input.lng !== null;
     if (hasLat !== hasLng) throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
     data.lat = input.lat ?? null;
     data.lng = input.lng ?? null;
-    data.googleSyncedAt = null; // typed coordinates are our own, never due for a Google refresh
   }
   const aliases = normalizeAliases(input.aliases, input.name);
   const updated = await updateRestaurantById(id, {
@@ -333,11 +302,7 @@ export async function searchRestaurantsForAdmin(
 /** Merged restaurants point to their survivor; chains are followed this many hops at most. */
 const MAX_MERGE_HOPS = 10;
 
-/**
- * The public view of a restaurant. It carries no coordinates: for a Google-linked restaurant they
- * are Google's, which may be cached for our own use but not re-served as data (Maps Platform Terms
- * 3.2.3(a)); Phase 4 decides how maps and distance work (docs/OPEN-QUESTIONS.md).
- */
+/** The public view of a restaurant. */
 export type PublicRestaurant = {
   id: string;
   slug: string;
@@ -447,11 +412,7 @@ export async function listRestaurantsForAdmin(
   };
 }
 
-export async function getRestaurantForAdmin(
-  actor: SessionUser | null,
-  id: string,
-  now: Date = new Date(),
-) {
+export async function getRestaurantForAdmin(actor: SessionUser | null, id: string) {
   assertRole(actor, "ADMIN");
   const restaurant = await findRestaurantById(id);
   if (!restaurant) return null;
@@ -466,9 +427,6 @@ export async function getRestaurantForAdmin(
     dishes,
     mergedInto: mergedInto
       ? { id: mergedInto.id, slug: mergedInto.slug, name: mergedInto.name }
-      : null,
-    googleSyncedDaysAgo: restaurant.googleSyncedAt
-      ? Math.floor(ageInDays(restaurant.googleSyncedAt, now))
       : null,
   };
 }
@@ -488,7 +446,6 @@ export type MergeResult = {
   droppedClaims: string[];
   movedMenuUploads: number;
   movedReviewItems: number;
-  googlePlaceMoved: boolean;
   ownerMoved: boolean;
   /** Kept rows whose ratings changed: recomputeOne runs on them after commit. */
   recomputeIds: string[];
@@ -561,7 +518,6 @@ export async function mergeRestaurants(
       droppedClaims: [],
       movedMenuUploads: 0,
       movedReviewItems: 0,
-      googlePlaceMoved: false,
       ownerMoved: owner.moveToTarget,
       recomputeIds: [],
       dishSlugs: sourceDishes.map((rd) => rd.dish.slug),
@@ -634,7 +590,7 @@ export async function mergeRestaurants(
     out.movedClaims = claimPlan.move;
     out.movedReviewItems = (await moveOpenReviewItems(sourceId, targetId, tx)).count;
 
-    // Steps 5-6: Google place (the unique column is cleared on the source first), owner, status.
+    // Steps 5-6: owner, status.
     const sourceUpdate: Prisma.RestaurantUncheckedUpdateInput = {
       status: "DUPLICATE",
       mergedIntoId: targetId,
@@ -645,24 +601,6 @@ export async function mergeRestaurants(
     if (owner.moveToTarget) {
       targetUpdate.claimedByUserId = source.claimedByUserId;
       targetUpdate.claimedAt = source.claimedAt;
-    }
-    if (source.googlePlaceId) {
-      // The source keeps no Google data: its place id and coordinates go to the target or away.
-      Object.assign(sourceUpdate, {
-        googlePlaceId: null,
-        lat: null,
-        lng: null,
-        googleSyncedAt: null,
-      });
-      if (!target.googlePlaceId) {
-        Object.assign(targetUpdate, {
-          googlePlaceId: source.googlePlaceId,
-          lat: source.lat,
-          lng: source.lng,
-          googleSyncedAt: source.googleSyncedAt,
-        });
-        out.googlePlaceMoved = true;
-      }
     }
     await updateRestaurantById(sourceId, sourceUpdate, tx);
     if (Object.keys(targetUpdate).length > 0)
@@ -685,7 +623,6 @@ export async function mergeRestaurants(
     droppedClaims: result.droppedClaims,
     movedMenuUploads: result.movedMenuUploads,
     movedReviewItems: result.movedReviewItems,
-    googlePlaceMoved: result.googlePlaceMoved,
     ownerMoved: result.ownerMoved,
     durationMs: Date.now() - started,
   });

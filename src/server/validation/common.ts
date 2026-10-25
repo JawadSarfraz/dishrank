@@ -37,9 +37,6 @@ export const phone = z
   .regex(/^\+?[0-9][0-9 -]{8,18}[0-9]$/, "Invalid phone number")
   .transform((v) => v.replace(/[ -]/g, ""));
 
-/** Google Places (New) place id. */
-export const googlePlaceId = z.string().regex(/^[A-Za-z0-9_-]{10,300}$/, "Invalid Google place id");
-
 /** Parses or throws AppError VALIDATION_FAILED (400) with per-field messages (docs/06 error shape). */
 export function parseInput<T extends z.ZodType>(schema: T, input: unknown): z.output<T> {
   const result = schema.safeParse(input);
