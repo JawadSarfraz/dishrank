@@ -99,8 +99,8 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 ## Admin (role ADMIN)
 
 - `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=`
-- `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue).
-- `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, phone?, priceBand? }`.
+- `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both`, `relink`, `mark_closed`, `keep_without_coordinates` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`).
+- `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, fetchedAt?, phone?, priceBand? }`; `fetchedAt` (the CSV's Google call time) is required with `googlePlaceId`, because `googleSyncedAt = fetchedAt`.
 - `PATCH /api/v1/admin/restaurants/:id` — edit, `status`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE).
 - `PATCH /api/v1/admin/restaurant-dishes/:id` — status / confidence / tags.
 - `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules).
