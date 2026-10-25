@@ -1,4 +1,4 @@
-import type { Prisma } from "@/generated/prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 
 /** The default client or a transaction client, so seeding can run in one transaction. */
@@ -143,4 +143,57 @@ export async function listLaunchDishAliases(client: Client = db) {
     select: { alias: true, dish: { select: { slug: true } } },
   });
   return rows.map((r) => ({ alias: r.alias, dishSlug: r.dish.slug }));
+}
+
+export type DishSearchRow = {
+  id: string;
+  slug: string;
+  name: string;
+  isLaunch: boolean;
+  category: string;
+  eligibleCount: number;
+};
+
+/**
+ * GET /api/v1/dishes (docs/05, docs/06). With `text` (already cleaned: lowercase ASCII words) a dish
+ * matches when one of its spellings contains it or has trigram similarity ≥ 0.3; substring hits
+ * first, then the best similarity with launch dishes boosted. Without text: every dish, launch
+ * dishes first, then the most eligible rows. `eligibleCount` counts ranked rows (in the city).
+ */
+export async function searchDishes(input: {
+  text?: string;
+  cityId?: string;
+  launchOnly: boolean;
+  limit: number;
+}) {
+  const counts = Prisma.sql`
+    SELECT "dishId", count(*)::int AS n FROM "RestaurantDish"
+    WHERE "rankInCity" IS NOT NULL
+      ${input.cityId ? Prisma.sql`AND "cityId" = ${input.cityId}` : Prisma.empty}
+    GROUP BY "dishId"`;
+  if (!input.text) {
+    return db.$queryRaw<DishSearchRow[]>`
+      SELECT d.id, d.slug, d.name, d."isLaunch", c.name AS category, coalesce(e.n, 0)::int AS "eligibleCount"
+      FROM "Dish" d
+      JOIN "DishCategory" c ON c.id = d."categoryId"
+      LEFT JOIN (${counts}) e ON e."dishId" = d.id
+      ${input.launchOnly ? Prisma.sql`WHERE d."isLaunch"` : Prisma.empty}
+      ORDER BY d."isLaunch" DESC, "eligibleCount" DESC, d.name ASC
+      LIMIT ${input.limit}`;
+  }
+  return db.$queryRaw<DishSearchRow[]>`
+    SELECT d.id, d.slug, d.name, d."isLaunch", c.name AS category, coalesce(e.n, 0)::int AS "eligibleCount"
+    FROM "Dish" d
+    JOIN "DishCategory" c ON c.id = d."categoryId"
+    LEFT JOIN (${counts}) e ON e."dishId" = d.id
+    JOIN LATERAL (
+      SELECT max(similarity(a.alias, ${input.text})) AS sim,
+             bool_or(a.alias LIKE ${`%${input.text}%`}) AS hit
+      FROM "DishAlias" a WHERE a."dishId" = d.id
+    ) m ON true
+    WHERE (m.hit OR m.sim >= 0.3)
+      ${input.launchOnly ? Prisma.sql`AND d."isLaunch"` : Prisma.empty}
+    ORDER BY m.hit DESC, (m.sim + CASE WHEN d."isLaunch" THEN 0.1 ELSE 0 END) DESC,
+      "eligibleCount" DESC, d.name ASC
+    LIMIT ${input.limit}`;
 }

@@ -6,6 +6,7 @@ import {
   CandidateSkipReason,
   FlagReason,
   RestaurantStatus,
+  ReviewItemStatus,
   ReviewItemType,
 } from "@/generated/prisma/enums";
 import { id, latitude, longitude, optionalQuery, optionalText, phone, slug, text } from "./common";
@@ -124,6 +125,63 @@ export const rankingQuery = z
     path: ["radiusKm"],
   });
 export type RankingQuery = z.infer<typeof rankingQuery>;
+
+/** GET /api/v1/me/ratings query: newest first, cursor = the last id of the previous page. */
+export const meRatingsQuery = z.object({
+  cursor: optionalQuery(id),
+  limit: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(1).max(100).default(50),
+  ),
+});
+export type MeRatingsQuery = z.infer<typeof meRatingsQuery>;
+
+/** GET /api/v1/dishes query (docs/06): q searches every spelling in DishAlias (docs/05). */
+export const dishSearchQuery = z.object({
+  city: optionalQuery(slug),
+  q: optionalQuery(z.string().trim().max(80)),
+  launchOnly: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
+  ),
+});
+export type DishSearchQuery = z.infer<typeof dishSearchQuery>;
+
+/** /admin/users list (query string). */
+export const adminUserListQuery = z.object({
+  q: optionalQuery(z.string().trim().max(120)),
+  panel: optionalQuery(z.enum(["only"])),
+  page: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(1).max(10_000).default(1),
+  ),
+});
+export type AdminUserListQuery = z.infer<typeof adminUserListQuery>;
+
+/**
+ * PATCH /api/v1/admin/users/:id. Phase 3 changes only the panel flag; the flag is never accepted
+ * from any non-admin input (docs/09 Prompt 4).
+ */
+export const adminUserUpdateInput = z.strictObject({ isPanel: z.boolean() });
+export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateInput>;
+
+/** GET /api/v1/admin/review-queue query. */
+export const reviewQueueQuery = z.object({
+  type: optionalQuery(z.enum(ReviewItemType)),
+  status: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.enum(ReviewItemStatus).default("OPEN"),
+  ),
+  cursor: optionalQuery(id),
+  limit: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(1).max(100).default(50),
+  ),
+});
+export type ReviewQueueQuery = z.infer<typeof reviewQueueQuery>;
 
 /** GET /api/v1/restaurants/search query. */
 export const restaurantSearchQuery = z.object({

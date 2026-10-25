@@ -20,6 +20,7 @@ import {
   findRatingWithPlace,
   insertRating,
   listBurstRatings,
+  listRatingsOfUser,
   setRatingStatus,
   updateRating,
 } from "@/server/repositories/rating.repo";
@@ -32,7 +33,7 @@ import { findDishById } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { adjustRatingCounters, findRater } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
-import type { RatingInput } from "@/server/validation";
+import type { MeRatingsQuery, RatingInput } from "@/server/validation";
 import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, DAY_MS, USER_DISH } from "./ranking.constants";
@@ -403,4 +404,61 @@ export async function addRestaurantDish(
     created: row.created,
   });
   return row;
+}
+
+/** /me and GET /api/v1/me/ratings: the user's own ratings, newest first, any status. */
+export async function listMyRatings(actor: SessionUser | null, query: MeRatingsQuery) {
+  const user = assertRole(actor, SIGNED_IN);
+  const rows = await listRatingsOfUser(user.id, query.limit + 1, query.cursor);
+  const page = rows.slice(0, query.limit);
+  return {
+    data: page.map((r) => ({
+      id: r.id,
+      score: r.score,
+      taste: r.taste,
+      portion: r.portion,
+      value: r.value,
+      comment: r.comment,
+      photoPath: r.photoPath,
+      /** HELD = under review, HIDDEN = not counted (an admin's decision). */
+      status: r.status,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      restaurantDishId: r.restaurantDish.id,
+      dish: r.restaurantDish.dish,
+      restaurant: {
+        id: r.restaurantDish.restaurant.id,
+        slug: r.restaurantDish.restaurant.slug,
+        name: r.restaurantDish.restaurant.name,
+        active: r.restaurantDish.restaurant.status === "ACTIVE",
+        area: r.restaurantDish.restaurant.area?.name ?? null,
+        city: r.restaurantDish.restaurant.city,
+      },
+    })),
+    nextCursor: rows.length > query.limit ? (page.at(-1)?.id ?? null) : null,
+  };
+}
+
+/** The user's current rating of a dish at a restaurant, to prefill /rate when editing. */
+export async function findMyRating(
+  actor: SessionUser | null,
+  restaurantId: string,
+  dishId: string,
+) {
+  const user = assertRole(actor, SIGNED_IN);
+  const row = await findRestaurantDish(restaurantId, dishId);
+  if (!row) return null;
+  const rating = await findRatingOfUser(row.id, user.id);
+  return rating
+    ? {
+        id: rating.id,
+        score: rating.score,
+        taste: rating.taste,
+        portion: rating.portion,
+        value: rating.value,
+        comment: rating.comment,
+        photoPath: rating.photoPath,
+        status: rating.status,
+      }
+    : null;
 }
