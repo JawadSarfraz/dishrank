@@ -43,7 +43,7 @@ pnpm test:e2e         # playwright
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi   # writes tmp/candidates-*.csv, never the DB
+pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # writes tmp/candidates-*.csv, never the DB
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 ```
