@@ -2,7 +2,7 @@
 
 // Optional dish photo: resized to ≤ 1600 px and re-encoded in the browser (no EXIF/GPS), then sent
 // straight to storage with a 10-minute signed URL (docs/06 POST /api/v1/uploads/sign).
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { describeActionError } from "@/components/admin/action-error";
 import { preparePhoto } from "@/lib/image";
 import { signPhotoUploadAction } from "@/server/actions/rating";
@@ -17,6 +17,8 @@ export function PhotoPicker({
   onBusy: (busy: boolean) => void;
 }) {
   const inputId = useId();
+  // Cleared after every pick, so choosing the same file again (after a failure or "Remove") works.
+  const input = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(current ? "A photo is attached." : null);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +63,12 @@ export function PhotoPicker({
         id={inputId}
         type="file"
         accept="image/*"
-        onChange={(e) => void choose(e.target.files?.[0])}
+        ref={input}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          void choose(file);
+        }}
         className="min-h-11 text-base file:mr-3 file:min-h-11 file:rounded-lg file:border file:px-3"
       />
       {preview && (
@@ -77,6 +84,7 @@ export function PhotoPicker({
           onClick={() => {
             setPreview(null);
             setStatus(null);
+            if (input.current) input.current.value = "";
             onUploaded(null);
           }}
         >

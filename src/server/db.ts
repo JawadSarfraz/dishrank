@@ -5,6 +5,12 @@ import { env } from "@/env";
 // Runtime connection = DATABASE_URL (Supabase: Supavisor transaction pooler, docs/10).
 // With a driver adapter, node-postgres owns the pool; keep it small for serverless functions.
 function createClient(): PrismaClient {
+  // Without a URL node-postgres would fall back to PGHOST/PGDATABASE or localhost:5432: never guess.
+  if (!env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is missing or invalid (see the [env] warning); no database client.",
+    );
+  }
   const adapter = new PrismaPg({
     connectionString: env.DATABASE_URL,
     max: 3,

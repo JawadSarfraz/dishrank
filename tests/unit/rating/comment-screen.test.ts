@@ -10,6 +10,20 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "051-2345678 landline",
       "(051) 234 5678",
       "۰۳۰۰۱۲۳۴۵۶۷",
+      // Separators and look-alike characters people use (security review, Phase 3).
+      "Call 0300 - 1234567",
+      "0300 – 1234567",
+      "0300/1234567",
+      "0300_1234567",
+      "0300\u200B1234567",
+      "０３００１２３４５６７",
+      "WhatsApp 300 1234567",
+      "0092 300 1234567",
+      "UAN 111-222-333",
+      "042-35678901",
+      "+44 20 7946 0958",
+      "00971 50 123 4567",
+      "2 plates, call 0300 1234567",
     ]) {
       expect(screenComment(c), c).toBe("PHONE");
     }
@@ -20,6 +34,17 @@ describe("comment screening (docs/04 abuse control 5)", () => {
     expect(screenComment("www.karahi-house.pk")).toBe("LINK");
     expect(screenComment("menu on butt-karahi.pk")).toBe("LINK");
     expect(screenComment("bit.ly/abc")).toBe("LINK");
+    for (const c of [
+      "is.gd/x",
+      "rb.gy/x",
+      "tiny.cc/x",
+      "karahi.ai",
+      "bit.\u200Bly/abc",
+      "ｗｗｗ.example.com",
+    ]) {
+      expect(screenComment(c), c).toBe("LINK");
+    }
+    expect(screenComment("menu.example/abc")).toBe("LINK"); // any domain with a path
     expect(screenComment("wa.me/923001234567")).toBe("PHONE"); // the number is found first
     expect(screenComment("mail owner@karahi.pk")).toBe("EMAIL");
   });
@@ -30,6 +55,17 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "Visited 2026-10-25, 10/10 ginger",
       "Best ginger in F-7. No.1 karahi e.g. Butt's",
       "2 people, 1200 each",
+      // Dates, times, prices and scores do not start like a phone number.
+      "Visited 25.10.2026 19:30, great ginger",
+      "25/10/2026 dinner for 4, paid 3500",
+      "2026-10-25 10/10",
+      "Half 1200, full 2200, 1 kg 4400",
+      "Spice 8/10, salt 6/10",
+      "Table for 12 on 26-10-2026",
+      // A missing space after a full stop is not a link.
+      "Nice taste.Will come again",
+      "Mr.Khan recommended it",
+      "Best.Pizza in town",
       "",
     ]) {
       expect(screenComment(c), c).toBeNull();

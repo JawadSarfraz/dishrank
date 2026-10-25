@@ -49,6 +49,19 @@ export function describeEnvProblems(error: z.ZodError): string {
   return error.issues.map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`).join("\n");
 }
 
+/**
+ * Outside production: every variable that is valid on its own, so one malformed optional value
+ * never hides the others (a missing DATABASE_URL would make node-postgres guess a server).
+ */
+export function validVariables(source: Record<string, string | undefined>): Partial<Env> {
+  const valid: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(schema.shape)) {
+    const parsed = (field as z.ZodType).safeParse(blankToUndefined(source[key]));
+    if (parsed.success && parsed.data !== undefined) valid[key] = parsed.data;
+  }
+  return valid as Partial<Env>;
+}
+
 export function parseEnv(source: Record<string, string | undefined>): z.ZodSafeParseResult<Env> {
   const cleaned = Object.fromEntries(
     Object.entries(source).map(([k, v]) => [k, blankToUndefined(v)]),
@@ -66,12 +79,7 @@ function loadEnv(): Env {
     throw new Error(message);
   }
   console.warn(`[env] ${message}`);
-  const partial = schema
-    .partial()
-    .safeParse(
-      Object.fromEntries(Object.entries(process.env).map(([k, v]) => [k, blankToUndefined(v)])),
-    );
-  return (partial.success ? partial.data : {}) as Env;
+  return validVariables(process.env) as Env;
 }
 
 export const env: Env = loadEnv();

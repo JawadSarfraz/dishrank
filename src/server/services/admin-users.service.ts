@@ -4,6 +4,7 @@
 // arrives in Phase 4). Trust is read at compute time, so the user's dish rows are recomputed.
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
+import { listDishPagesOfRows } from "@/server/repositories/restaurant-dish.repo";
 import {
   findTrustStats,
   listRatedRowsOfUser,
@@ -59,5 +60,6 @@ export async function setPanel(actor: SessionUser | null, userId: string, isPane
     trustScore,
     recomputedRows: rows.length,
   });
-  return { ...updated, recomputedRows: rows.length };
+  // The public pages of those rows, for the caller to revalidate.
+  return { ...updated, recomputedRows: rows.length, dishPages: await listDishPagesOfRows(rows) };
 }

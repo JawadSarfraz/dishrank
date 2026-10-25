@@ -3,6 +3,7 @@
 // One review item with its decisions (docs/07 §6, Phase 3 types). Approve and reject for every
 // type; dish suggestions are approved by creating the dish or mapping to one, restaurant
 // suggestions by creating the restaurant (typed form) or linking to one.
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ export function ReviewItemCard({
   formCities: Cities;
   launchDishes: { slug: string; name: string }[];
 }) {
+  const router = useRouter();
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [pending, startTransition] = useTransition();
   const [mode, setMode] = useState<"idle" | "create" | "map" | "link">("idle");
@@ -49,7 +51,8 @@ export function ReviewItemCard({
     startTransition(async () => {
       let res;
       try {
-        res = await resolveReviewItemAction(item.id, input);
+        // The fingerprint says what this card shows; if the item changed since, nothing happens.
+        res = await resolveReviewItemAction(item.id, input, item.fingerprint);
       } catch {
         setMessage({ text: "The decision did not reach the server. Try again.", error: true });
         return;
@@ -59,6 +62,8 @@ export function ReviewItemCard({
           ? { text: describeActionError(res.error), error: true }
           : { text: `Done: ${res.data.resolution}.`, error: false },
       );
+      // Show the item as it is now (ITEM_CHANGED: new ratings, an edited comment, a better location).
+      if (res.error?.code === "ITEM_CHANGED") router.refresh();
     });
   }
 

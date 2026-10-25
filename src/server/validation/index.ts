@@ -9,7 +9,17 @@ import {
   ReviewItemStatus,
   ReviewItemType,
 } from "@/generated/prisma/enums";
-import { id, latitude, longitude, optionalQuery, optionalText, phone, slug, text } from "./common";
+import {
+  id,
+  latitude,
+  longitude,
+  optionalQuery,
+  optionalText,
+  parseInput,
+  phone,
+  slug,
+  text,
+} from "./common";
 
 export { parseInput } from "./common";
 
@@ -337,6 +347,21 @@ export const reviewResolveInput = z.discriminatedUnion("action", [
 ]);
 export type ReviewResolveInput = z.infer<typeof reviewResolveInput>;
 export type ReviewAction = ReviewResolveInput["action"];
+
+/** The item as the admin saw it: `fingerprint` from GET /api/v1/admin/review-queue (docs/06). */
+export const reviewFingerprint = z.string().regex(/^[a-f0-9]{32}$/, "Invalid fingerprint");
+
+/** The resolve body `{ action, payload?, fingerprint? }`: the decision and what the admin saw. */
+export function parseReviewResolveBody(body: unknown) {
+  const { fingerprint, ...decision } =
+    body !== null && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  return {
+    input: parseInput(reviewResolveInput, decision),
+    fingerprint: fingerprint === undefined ? undefined : parseInput(reviewFingerprint, fingerprint),
+  };
+}
 
 /** Which actions apply to which review item type (docs/07 §6); the review service enforces this. */
 export const REVIEW_ACTIONS: Record<ReviewItemType, readonly ReviewAction[]> = {

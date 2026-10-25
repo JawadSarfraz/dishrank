@@ -12,6 +12,7 @@ export async function listRatingsOfRestaurantDishes(restaurantDishIds: readonly 
       userId: true,
       score: true,
       comment: true,
+      photoPath: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -49,6 +50,26 @@ export async function moveRatings(ratingIds: readonly string[], restaurantDishId
 }
 
 /** One user's rating of one dish row (ratings are unique per user per row). */
+/**
+ * The user's rating of one dish row, locked for this transaction, so an admin decision committed
+ * at the same time is either seen here or waits for this write (never overwritten).
+ */
+export async function lockRatingOfUser(restaurantDishId: string, userId: string, tx: Tx) {
+  await tx.$queryRaw`
+    SELECT id FROM "Rating"
+    WHERE "restaurantDishId" = ${restaurantDishId} AND "userId" = ${userId} FOR UPDATE`;
+  return tx.rating.findUnique({
+    where: { restaurantDishId_userId: { restaurantDishId, userId } },
+  });
+}
+
+/** One rating, locked for this transaction (a delete re-checks its status under the lock). */
+export async function lockRatingById(id: string, tx: Tx) {
+  const rows = await tx.$queryRaw<{ id: string; status: RatingStatus; photoPath: string | null }[]>`
+    SELECT id, status, "photoPath" FROM "Rating" WHERE id = ${id} FOR UPDATE`;
+  return rows[0] ?? null;
+}
+
 export async function findRatingOfUser(
   restaurantDishId: string,
   userId: string,
@@ -94,24 +115,25 @@ export async function findRatingWithPlace(id: string, client: Client = db) {
 
 /**
  * docs/04 burst rule: ratings that arrived on a dish row since `since` (createdAt: an edit is not a
- * new arrival) from non-panel accounts created after `newAccountsSince`; HIDDEN ones are settled.
+ * new arrival) from non-panel accounts younger than `newAccountDays` when they rated; HIDDEN ones
+ * are settled. Oldest first.
  */
 export async function listBurstRatings(
   restaurantDishId: string,
   since: Date,
-  newAccountsSince: Date,
+  newAccountDays: number,
   tx: Tx,
 ) {
-  return tx.rating.findMany({
-    where: {
-      restaurantDishId,
-      createdAt: { gte: since },
-      status: { in: ["ACTIVE", "HELD"] },
-      user: { isPanel: false, createdAt: { gt: newAccountsSince } },
-    },
-    select: { id: true, status: true },
-    orderBy: { createdAt: "asc" },
-  });
+  // docs/04 control 3: the account's age is taken when it rated, not now.
+  return tx.$queryRaw<{ id: string; status: RatingStatus }[]>`
+    SELECT rt.id, rt.status
+    FROM "Rating" rt JOIN "User" u ON u.id = rt."userId"
+    WHERE rt."restaurantDishId" = ${restaurantDishId}
+      AND rt."createdAt" >= ${since}
+      AND rt.status IN ('ACTIVE', 'HELD')
+      AND NOT u."isPanel"
+      AND u."createdAt" > rt."createdAt" - ${newAccountDays} * interval '1 day'
+    ORDER BY rt."createdAt" ASC, rt.id ASC`;
 }
 
 /** Sets a status on ratings with plain SQL, so `updatedAt` (the decay clock) does not move. */
@@ -172,6 +194,7 @@ export async function listRatingsForReview(ids: readonly string[], client: Clien
       photoPath: true,
       status: true,
       createdAt: true,
+      updatedAt: true,
       userId: true,
       restaurantDishId: true,
       user: { select: { id: true, email: true, name: true, createdAt: true, isPanel: true } },

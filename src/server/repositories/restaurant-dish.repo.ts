@@ -99,6 +99,31 @@ export async function listDishesOfRestaurant(restaurantId: string, client: Clien
   });
 }
 
+/** The public pages that show these dish rows: each row's ranking page and restaurant page. */
+export async function listDishPagesOfRows(ids: readonly string[], client: Client = db) {
+  if (ids.length === 0) return [];
+  const rows = await client.restaurantDish.findMany({
+    where: { id: { in: [...ids] } },
+    select: {
+      dish: { select: { slug: true } },
+      restaurant: { select: { slug: true, city: { select: { slug: true } } } },
+    },
+  });
+  return rows.map((r) => ({
+    citySlug: r.restaurant.city.slug,
+    dishSlug: r.dish.slug,
+    restaurantSlug: r.restaurant.slug,
+  }));
+}
+
+/** Locks dish rows in id order (the order every writer uses, so two writers never deadlock). */
+export async function lockRestaurantDishes(ids: readonly string[], tx: Tx) {
+  if (ids.length === 0) return [];
+  const sorted = [...new Set(ids)].sort();
+  return tx.$queryRaw<{ id: string }[]>`
+    SELECT id FROM "RestaurantDish" WHERE id IN (${Prisma.join(sorted)}) ORDER BY id FOR UPDATE`;
+}
+
 export async function lockDishesOfRestaurants(restaurantIds: readonly string[], tx: Tx) {
   return tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM "RestaurantDish"

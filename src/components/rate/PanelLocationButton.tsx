@@ -31,18 +31,23 @@ export function PanelLocationButton({ restaurantId }: { restaurantId: string }) 
           });
           return;
         }
-        const res = await recordLocationAction({
-          restaurantId,
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracyM: Math.max(1, accuracyM),
-        });
-        setBusy(false);
-        setMessage(
-          res.error
-            ? { text: describeActionError(res.error), error: true }
-            : { text: `Location saved (±${accuracyM} m). Thank you!`, error: false },
-        );
+        try {
+          const res = await recordLocationAction({
+            restaurantId,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracyM: Math.max(1, accuracyM),
+          });
+          setMessage(
+            res.error
+              ? { text: describeActionError(res.error), error: true }
+              : { text: `Location saved (±${accuracyM} m). Thank you!`, error: false },
+          );
+        } catch {
+          setMessage({ text: "The location did not reach the server. Try again.", error: true });
+        } finally {
+          setBusy(false);
+        }
       },
       (err) => {
         setBusy(false);

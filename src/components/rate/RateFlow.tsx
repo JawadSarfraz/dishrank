@@ -35,6 +35,26 @@ function rateUrl(city: string, restaurant: RateRestaurant | null, dish: DishRef 
   return `/rate?${params}`;
 }
 
+type Seen = { restaurants: Map<string, RateRestaurant>; dishes: Map<string, DishRef> };
+
+function remember(seen: Seen, restaurant: RateRestaurant | null, dish: DishRef | null) {
+  if (restaurant) {
+    seen.restaurants.set(restaurant.slug, restaurant);
+    for (const d of restaurant.dishes) {
+      seen.dishes.set(d.slug, { id: d.id, slug: d.slug, name: d.name });
+    }
+  }
+  if (dish) seen.dishes.set(dish.slug, dish);
+}
+
+/** Restaurants and dishes met in this tab, so back and forward can rebuild any step from its URL. */
+function initialSeen(data: RatePageData): Seen {
+  const seen: Seen = { restaurants: new Map(), dishes: new Map() };
+  for (const d of data.launchDishes) seen.dishes.set(d.slug, d);
+  remember(seen, data.restaurant, data.dish);
+  return seen;
+}
+
 async function fetchRestaurant(slug: string): Promise<RateRestaurant | null> {
   const res = await fetch(`/api/v1/restaurants/${encodeURIComponent(slug)}`);
   if (!res.ok) return null;
@@ -71,16 +91,16 @@ export function RateFlow({ data }: { data: RatePageData }) {
   const [dish, setDish] = useState<DishRef | null>(data.dish);
   const [existing, setExisting] = useState<Existing | null>(data.existing);
   const [result, setResult] = useState<RatingResult | null>(null);
+  // While a picked restaurant's own dishes load, the dish step shows neither list, so no chip moves
+  // under the diner's finger when "On the menu here" arrives.
+  const [loadingDishes, setLoadingDishes] = useState(false);
+  const [seen] = useState(() => initialSeen(data));
   const city = data.cities.find((c) => c.slug === citySlug) ?? data.cities[0];
   const step = result ? "done" : !restaurant ? "restaurant" : !dish ? "dish" : "score";
-  const restaurantRef = useRef(restaurant);
-  useEffect(() => {
-    restaurantRef.current = restaurant;
-  }, [restaurant]);
-
   const move = useCallback(
     (next: { restaurant: RateRestaurant | null; dish: DishRef | null; city?: string }) => {
       const nextCity = next.city ?? next.restaurant?.citySlug ?? citySlug;
+      remember(seen, next.restaurant, next.dish);
       setCitySlug(nextCity);
       setRestaurant(next.restaurant);
       setDish(next.dish);
@@ -89,30 +109,42 @@ export function RateFlow({ data }: { data: RatePageData }) {
       window.history.pushState(null, "", rateUrl(nextCity, next.restaurant, next.dish));
       window.scrollTo({ top: 0 });
     },
-    [citySlug],
+    [citySlug, seen],
   );
 
-  // Browser back/forward: the URL decides the step.
+  // Browser back/forward: the URL decides the city, the restaurant and the dish.
   useEffect(() => {
     function onPop() {
       const params = new URLSearchParams(window.location.search);
+      const c = params.get("city");
       const r = params.get("r");
       const d = params.get("d");
       setResult(null);
+      setExisting(null); // the effect below loads the one for this entry
+      if (c && data.cities.some((x) => x.slug === c)) setCitySlug(c);
       if (!r) {
         setRestaurant(null);
         setDish(null);
         return;
       }
-      if (!d) setDish(null);
-      if (restaurantRef.current?.slug !== r) {
-        setRestaurant(null);
-        void fetchRestaurant(r).then((found) => setRestaurant(found));
-      }
+      const known = seen.restaurants.get(r) ?? null;
+      setRestaurant(known);
+      setDish(d ? (seen.dishes.get(d) ?? null) : null);
+      if (known) return;
+      void fetchRestaurant(r).then((found) => {
+        if (!found) return;
+        remember(seen, found, null);
+        // Only if the diner is still on that entry.
+        const now = new URLSearchParams(window.location.search);
+        if (now.get("r") !== r) return;
+        setRestaurant(found);
+        const nd = now.get("d");
+        setDish(nd ? (seen.dishes.get(nd) ?? null) : null);
+      });
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [data.cities, seen]);
 
   // A dish the user rated before is prefilled, and the button says "Update".
   useEffect(() => {
@@ -138,15 +170,22 @@ export function RateFlow({ data }: { data: RatePageData }) {
             // Show the dish step at once; the restaurant's own dishes arrive a moment later.
             const pending: RateRestaurant = { ...hit, citySlug: city?.slug ?? "", dishes: [] };
             move({ restaurant: pending, dish: null });
-            void fetchRestaurant(hit.slug).then((found) => {
-              if (found) setRestaurant((cur) => (cur?.id === found.id ? found : cur));
-            });
+            setLoadingDishes(true);
+            void fetchRestaurant(hit.slug)
+              .then((found) => {
+                if (!found) return;
+                remember(seen, found, null);
+                setRestaurant((cur) => (cur?.id === found.id ? found : cur));
+              })
+              .catch(() => {}) // offline: the launch dishes and the search still work
+              .finally(() => setLoadingDishes(false));
           }}
         />
       )}
       {step === "dish" && restaurant && (
         <DishStep
           restaurant={restaurant}
+          loading={loadingDishes}
           launchDishes={data.launchDishes}
           signedIn={data.signedIn}
           backUrl={rateUrl(citySlug, restaurant, null)}
@@ -291,6 +330,7 @@ function RestaurantStep({
 
 function DishStep({
   restaurant,
+  loading,
   launchDishes,
   signedIn,
   backUrl,
@@ -298,6 +338,7 @@ function DishStep({
   onPick,
 }: {
   restaurant: RateRestaurant;
+  loading: boolean;
   launchDishes: DishRef[];
   signedIn: boolean;
   backUrl: string;
@@ -337,35 +378,13 @@ function DishStep({
       <h2 id="step-dish" className="text-lg font-semibold">
         What did you eat?
       </h2>
-      {restaurant.dishes.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">On the menu here</h3>
-          <ul className="flex flex-wrap gap-2">
-            {restaurant.dishes.map((d) => (
-              <li key={d.id}>
-                <button type="button" className={chip} onClick={() => onPick(d)}>
-                  {d.name}
-                  <span className="ml-1 text-sm text-muted-foreground">
-                    {d.votes > 0 ? `· ${d.votes} vote${d.votes === 1 ? "" : "s"}` : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {loading ? (
+        <p role="status" className="min-h-24 text-sm text-muted-foreground">
+          Loading this restaurant&apos;s dishes…
+        </p>
+      ) : (
+        <DishChips restaurant={restaurant} popular={popular} onPick={onPick} />
       )}
-      <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-muted-foreground">Popular dishes</h3>
-        <ul className="flex flex-wrap gap-2">
-          {popular.map((d) => (
-            <li key={d.id}>
-              <button type="button" className={chip} onClick={() => onPick(d)}>
-                {d.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
       <label className="flex flex-col gap-1 text-sm font-medium">
         Search all dishes
         <input
@@ -396,6 +415,51 @@ function DishStep({
         defaultName={q.trim()}
       />
     </section>
+  );
+}
+
+/** The restaurant's own dishes first, then the launch dishes it does not list. */
+function DishChips({
+  restaurant,
+  popular,
+  onPick,
+}: {
+  restaurant: RateRestaurant;
+  popular: DishRef[];
+  onPick: (dish: DishRef) => void;
+}) {
+  return (
+    <>
+      {restaurant.dishes.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">On the menu here</h3>
+          <ul className="flex flex-wrap gap-2">
+            {restaurant.dishes.map((d) => (
+              <li key={d.id}>
+                <button type="button" className={chip} onClick={() => onPick(d)}>
+                  {d.name}
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    {d.votes > 0 ? `· ${d.votes} vote${d.votes === 1 ? "" : "s"}` : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-medium text-muted-foreground">Popular dishes</h3>
+        <ul className="flex flex-wrap gap-2">
+          {popular.map((d) => (
+            <li key={d.id}>
+              <button type="button" className={chip} onClick={() => onPick(d)}>
+                {d.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   );
 }
 
@@ -513,6 +577,9 @@ function ScoreStep({
         <p className="text-sm">
           You rated this {existing.score}/10 before; your new rating replaces it.
           {existing.status === "HELD" ? " It is under review." : ""}
+          {existing.status === "HIDDEN"
+            ? " A moderator hid it, so it does not count, and an update stays hidden."
+            : ""}
         </p>
       )}
       <fieldset className="flex flex-col gap-2">
@@ -635,7 +702,9 @@ function DoneStep({
       <p className="text-base">
         {result.dish.name} at {result.restaurant.name}
       </p>
-      {result.held ? (
+      {result.status === "HIDDEN" ? (
+        <p>Saved, but it does not count: a moderator hid your rating of this dish.</p>
+      ) : result.held ? (
         <p>Your rating is under review. It counts once a moderator has checked it.</p>
       ) : result.eligible && result.score !== null ? (
         <p className="text-xl font-semibold">

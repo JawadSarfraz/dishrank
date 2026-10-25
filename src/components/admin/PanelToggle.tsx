@@ -27,8 +27,12 @@ export function PanelToggle({
         aria-label={`${isPanel ? "Remove" : "Add"} ${name} ${isPanel ? "from" : "to"} the panel`}
         onClick={() =>
           startTransition(async () => {
-            const res = await setPanelAction(userId, { isPanel: !isPanel });
-            setError(res.error ? describeActionError(res.error) : null);
+            try {
+              const res = await setPanelAction(userId, { isPanel: !isPanel });
+              setError(res.error ? describeActionError(res.error) : null);
+            } catch {
+              setError("The request did not reach the server. Try again.");
+            }
           })
         }
       >

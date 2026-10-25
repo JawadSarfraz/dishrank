@@ -1,8 +1,9 @@
 "use server";
-// /admin/users actions: auth → rate limit → validate → service → refresh.
+// /admin/users actions: auth → rate limit → validate → service → revalidate.
 import { refresh } from "next/cache";
 import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
+import { revalidateDishPages } from "@/server/revalidate";
 import { setPanel } from "@/server/services/admin-users.service";
 import { adminUserUpdateInput, parseInput } from "@/server/validation";
 import { id } from "@/server/validation/common";
@@ -15,6 +16,8 @@ export async function setPanelAction(userId: unknown, input: unknown) {
     await assertRateLimit(`user:${actor.id}:admin-write`, RATE_LIMITS.adminWrite);
     const { isPanel } = parseInput(adminUserUpdateInput, input);
     const result = await setPanel(actor, parseInput(id, userId), isPanel);
+    // The user's trust changed: so did the scores of every row their ratings count in.
+    for (const page of result.dishPages) revalidateDishPages(page);
     refresh();
     return result;
   });

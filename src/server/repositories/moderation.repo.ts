@@ -112,7 +112,11 @@ export async function findOpenItemForDishRow(
   });
 }
 
-/** Ratings an admin released from SUSPICIOUS_RATINGS items of one dish row: never held again. */
+/**
+ * Ratings an admin released from SUSPICIOUS_RATINGS items of one dish row: never held again. Only
+ * the ids the release really set ACTIVE (`releasedRatingIds`), not ones it left HELD because
+ * another open item still listed them.
+ */
 export async function listReleasedRatingIds(restaurantDishId: string, client: Client = db) {
   const items = await client.reviewItem.findMany({
     where: {
@@ -123,7 +127,29 @@ export async function listReleasedRatingIds(restaurantDishId: string, client: Cl
     },
     select: { payload: true },
   });
-  return new Set(items.flatMap((i) => (i.payload as { ratingIds?: string[] }).ratingIds ?? []));
+  return new Set(
+    items.flatMap((i) => (i.payload as { releasedRatingIds?: string[] }).releasedRatingIds ?? []),
+  );
+}
+
+/** Every SUSPICIOUS_RATINGS item of one dish row, any status (a merge moves them to the kept row). */
+export async function listSuspiciousItemsOfRow(restaurantDishId: string, tx: Tx) {
+  return tx.reviewItem.findMany({
+    where: {
+      type: "SUSPICIOUS_RATINGS",
+      payload: { path: ["restaurantDishId"], equals: restaurantDishId },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, status: true, payload: true },
+  });
+}
+
+/** A review item as it is now, without a lock (to find what to lock before it). */
+export async function peekReviewItem(id: string, client: Client = db) {
+  return client.reviewItem.findUnique({
+    where: { id },
+    select: { id: true, type: true, status: true, payload: true, restaurantId: true },
+  });
 }
 
 /** One person's OPEN items of a type (to avoid filing the same suggestion twice). */
@@ -180,10 +206,11 @@ export async function closeReviewItem(
   data: {
     status: "RESOLVED" | "REJECTED";
     resolution: string;
-    resolvedByUserId: string;
+    resolvedByUserId?: string;
     resolvedAt: Date;
     restaurantId?: string;
     dishId?: string;
+    payload?: Prisma.InputJsonValue;
   },
   tx: Tx,
 ) {

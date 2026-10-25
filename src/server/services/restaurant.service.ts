@@ -38,16 +38,21 @@ import {
   moveRatings,
 } from "@/server/repositories/rating.repo";
 import {
+  closeReviewItem,
   deleteClaims,
   deleteFlags,
   listClaimsOfRestaurant,
   listFlagsOfRestaurantDishes,
+  listSuspiciousItemsOfRow,
   moveClaims,
   moveFlags,
   moveLocationObservations,
   moveMenuUploads,
   moveOpenReviewItems,
+  updateReviewItemPayload,
 } from "@/server/repositories/moderation.repo";
+import { listDishGroupsOfRestaurant, lockCityDishLists } from "@/server/repositories/ranking.repo";
+import { adjustRatingCounters } from "@/server/repositories/user.repo";
 import { moveCandidatesToRestaurant } from "@/server/repositories/overture.repo";
 import { findDishesBySlugs } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
@@ -527,6 +532,8 @@ export type MergeResult = {
   droppedClaims: string[];
   movedMenuUploads: number;
   movedReviewItems: number;
+  /** Held-rating review items of dropped rows, now on the kept row (or merged into its item). */
+  movedHeldRatingItems: number;
   movedCandidates: number;
   movedLocationObservations: number;
   ownerMoved: boolean;
@@ -541,6 +548,54 @@ export type MergeResult = {
 /** Step 7: recompute the kept rows whose ratings changed (each recompute re-ranks its list). */
 export async function recomputeAfterMerge(restaurantDishIds: readonly string[]): Promise<void> {
   for (const id of restaurantDishIds) await recomputeOne(id);
+}
+
+type HeldItemPayload = {
+  restaurantDishId: string;
+  ratingIds?: string[];
+  flags?: string[];
+  reason: string;
+};
+
+/**
+ * Held-rating items (SUSPICIOUS_RATINGS) follow their ratings from a dropped dish row to the kept
+ * one, so "already released" and "listed in another open item" keep working there (docs/07 §6).
+ * An open item joins the kept row's open item of the same reason; every other item, closed ones
+ * included, just points at the kept row.
+ */
+async function moveHeldRatingItems(fromRowId: string, toRowId: string, adminId: string, tx: Tx) {
+  const openOnKept = new Map<string, { id: string; payload: HeldItemPayload }>();
+  for (const item of await listSuspiciousItemsOfRow(toRowId, tx)) {
+    const payload = item.payload as HeldItemPayload;
+    if (item.status === "OPEN") openOnKept.set(payload.reason, { id: item.id, payload });
+  }
+  const items = await listSuspiciousItemsOfRow(fromRowId, tx);
+  for (const item of items) {
+    const payload = { ...(item.payload as HeldItemPayload), restaurantDishId: toRowId };
+    const into = item.status === "OPEN" ? openOnKept.get(payload.reason) : undefined;
+    if (!into) {
+      await updateReviewItemPayload(item.id, payload, tx);
+      continue;
+    }
+    into.payload = {
+      ...into.payload,
+      ratingIds: [...new Set([...(into.payload.ratingIds ?? []), ...(payload.ratingIds ?? [])])],
+      flags: [...new Set([...(into.payload.flags ?? []), ...(payload.flags ?? [])])],
+    };
+    await updateReviewItemPayload(into.id, into.payload, tx);
+    await closeReviewItem(
+      item.id,
+      {
+        status: "RESOLVED",
+        resolution: `merged into ${into.id}`,
+        resolvedByUserId: adminId,
+        resolvedAt: new Date(),
+        payload,
+      },
+      tx,
+    );
+  }
+  return items.length;
 }
 
 /** Merges `sourceId` into `targetId` in one transaction; the source becomes DUPLICATE. */
@@ -581,7 +636,15 @@ export async function mergeRestaurants(
       );
     }
 
-    // Steps 1-3: dishes, ratings, flags.
+    // Steps 1-3: dishes, ratings, flags. The (city, dish) lists first, then the rows: the order
+    // recomputeOne takes them in, so a merge never deadlocks with a recompute re-ranking a list.
+    await lockCityDishLists(
+      [
+        ...(await listDishGroupsOfRestaurant(sourceId, tx)),
+        ...(await listDishGroupsOfRestaurant(targetId, tx)),
+      ],
+      tx,
+    );
     await lockDishesOfRestaurants([sourceId, targetId], tx);
     const sourceDishes = await listDishesOfRestaurant(sourceId, tx);
     const plan = planDishMerge(sourceDishes, await listDishesOfRestaurant(targetId, tx));
@@ -598,6 +661,7 @@ export async function mergeRestaurants(
       droppedClaims: [],
       movedMenuUploads: 0,
       movedReviewItems: 0,
+      movedHeldRatingItems: 0,
       movedCandidates: 0,
       movedLocationObservations: 0,
       ownerMoved: owner.moveToTarget,
@@ -618,6 +682,7 @@ export async function mergeRestaurants(
         ratings.filter((r) => r.restaurantDishId === pair.keep.id),
         ratings.filter((r) => r.restaurantDishId === pair.drop.id),
       );
+      const photoOf = new Map(ratings.map((r) => [r.id, r.photoPath]));
       for (const { kept, older } of ratingPlan.collisions) {
         await addRatingHistory(
           {
@@ -630,6 +695,12 @@ export async function mergeRestaurants(
         );
         await moveRatingHistory(older.id, kept.id, tx);
         await deleteRating(older.id, tx);
+        // The user keeps one rating where they had two.
+        await adjustRatingCounters(
+          older.userId,
+          { ratings: -1, photos: photoOf.get(older.id) ? -1 : 0 },
+          tx,
+        );
         out.mergedRatings.push({ keptId: kept.id, droppedId: older.id });
       }
       await moveRatings(
@@ -649,6 +720,12 @@ export async function mergeRestaurants(
       out.droppedFlags.push(...flagPlan.drop);
       out.movedFlags.push(...flagPlan.move);
 
+      out.movedHeldRatingItems += await moveHeldRatingItems(
+        pair.drop.id,
+        pair.keep.id,
+        admin.id,
+        tx,
+      );
       await deleteRestaurantDish(pair.drop.id, tx);
       if (pair.keepFromSource) await moveDishToRestaurant(pair.keep.id, targetId, tx);
       await updateDishPriceAndTags(
@@ -729,6 +806,7 @@ export async function mergeRestaurants(
     droppedClaims: result.droppedClaims,
     movedMenuUploads: result.movedMenuUploads,
     movedReviewItems: result.movedReviewItems,
+    movedHeldRatingItems: result.movedHeldRatingItems,
     movedCandidates: result.movedCandidates,
     movedLocationObservations: result.movedLocationObservations,
     ownerMoved: result.ownerMoved,

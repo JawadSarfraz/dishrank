@@ -4,16 +4,13 @@
 // panel), ratings and review items. --undo removes all of it. Refuses production and any database
 // that is not on this machine.
 import "dotenv/config";
-import { db } from "@/server/db";
+import { env } from "@/env";
 import { AppError } from "@/server/errors";
-import {
-  DEMO,
-  assertLocalDatabase,
-  createDemo,
-  undoDemo,
-} from "@/server/services/dev-demo.service";
+import { assertLocalDatabase } from "@/server/services/dev-demo-guard";
 
 const USAGE = "usage: pnpm dev:demo [-- --undo] [-- --verbose]";
+/** Set once the guard passed and the database modules were loaded. */
+let connected = false;
 const KNOWN_FLAGS = ["--undo", "--verbose"];
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -22,8 +19,15 @@ async function main(argv: readonly string[]): Promise<number> {
     console.error(`unknown argument: ${unknown.join(" ")}\n${USAGE}`);
     return 1;
   }
-  const target = assertLocalDatabase(process.env);
+  // The URLs the database client will really use (src/env.ts), checked before anything connects.
+  const target = assertLocalDatabase({
+    ...process.env,
+    DATABASE_URL: env.DATABASE_URL,
+    DIRECT_URL: env.DIRECT_URL,
+  });
   console.log(`database "${target.database}" on ${target.host}`);
+  const { DEMO, createDemo, undoDemo } = await import("@/server/services/dev-demo.service");
+  connected = true;
   // The services log one JSON line per event; hundreds of them would bury the summary.
   if (!argv.includes("--verbose")) console.info = () => {};
 
@@ -93,4 +97,6 @@ main(process.argv.slice(2))
     console.error(error instanceof AppError ? error.message : error);
     process.exitCode = 1;
   })
-  .finally(() => db.$disconnect());
+  .finally(async () => {
+    if (connected) await (await import("@/server/db")).db.$disconnect();
+  });

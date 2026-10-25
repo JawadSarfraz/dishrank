@@ -62,6 +62,22 @@ export async function updateRestaurantDishAggregates(
   });
 }
 
+/**
+ * Takes the locks of several (city, dish) lists in one global order (city id, then dish id), so
+ * two transactions that each need more than one list never wait on each other in a cycle.
+ */
+export async function lockCityDishLists(
+  lists: readonly { cityId: string; dishId: string }[],
+  tx: Tx,
+) {
+  const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
+  const keys = [...new Map(lists.map((l) => [`${l.cityId}:${l.dishId}`, l])).values()].sort(
+    (a, b) => cmp(a.cityId, b.cityId) || cmp(a.dishId, b.dishId),
+  );
+  for (const l of keys) await lockCityDish(l.cityId, l.dishId, tx);
+  return keys;
+}
+
 /** Serialises re-ranking of one (city, dish) list (released at commit or rollback). */
 export async function lockCityDish(cityId: string, dishId: string, tx: Tx) {
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`rank:${cityId}:${dishId}`}))`;

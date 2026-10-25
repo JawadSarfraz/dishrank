@@ -10,6 +10,8 @@ import { logEvent } from "@/server/log";
 import {
   countRatingsOfUsers,
   deleteDemoData,
+  findConnectionTarget,
+  findCrossMerges,
   findDemoFootprint,
   findDemoRestaurantIds,
   findDishesFromDemoProposals,
@@ -33,6 +35,7 @@ import { propose } from "./proposal.service";
 import { DAY_MS, TRUST } from "./ranking.constants";
 import { recomputeOne, rerankCityDishes } from "./ranking.service";
 import { createOrReplace } from "./rating.service";
+import { assertLocalServerAddress } from "./dev-demo-guard";
 
 export const DEMO = {
   job: "dev-demo",
@@ -49,48 +52,12 @@ export const DEMO = {
 
 // ---------- guard ----------
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
-function refuse(reason: string): never {
-  throw new AppError("DEMO_REFUSED", `pnpm dev:demo refused: ${reason}`, 400);
-}
-
 /**
- * Demo data only ever goes into a database on this machine: never with NODE_ENV=production, never
- * on Vercel, and only when DATABASE_URL (and DIRECT_URL, when set) point at localhost or a local
- * socket. Returns the target for the log line (host and database name, never credentials).
+ * The connection the client really opened must reach this machine (scripts/dev-demo.ts already
+ * checked the URLs with assertLocalDatabase; this also covers anything they did not show).
  */
-export function assertLocalDatabase(env: Readonly<Record<string, string | undefined>>) {
-  if (env.NODE_ENV === "production") refuse("NODE_ENV is production");
-  if (env.VERCEL || env.VERCEL_ENV) refuse("this is a Vercel environment");
-  if (!env.DATABASE_URL) refuse("DATABASE_URL is not set");
-  let target: { host: string; database: string } | null = null;
-  for (const name of ["DATABASE_URL", "DIRECT_URL"] as const) {
-    const value = env[name];
-    if (!value) continue;
-    let url: URL;
-    try {
-      url = new URL(value);
-    } catch {
-      refuse(`${name} is not a URL`);
-    }
-    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") {
-      refuse(`${name} is not a PostgreSQL URL`);
-    }
-    // A host= parameter overrides the URL's host: it must be a local socket directory or host.
-    const hostParam = url.searchParams.get("host");
-    const hostLocal = url.hostname === "" ? hostParam !== null : LOCAL_HOSTS.has(url.hostname);
-    const paramLocal =
-      hostParam === null || hostParam.startsWith("/") || LOCAL_HOSTS.has(hostParam);
-    if (!hostLocal || !paramLocal) {
-      refuse(`${name} points at ${hostParam ?? url.hostname}, not at this machine`);
-    }
-    target ??= {
-      host: `${hostParam ?? url.hostname}:${url.port || "5432"}`,
-      database: decodeURIComponent(url.pathname.slice(1)),
-    };
-  }
-  return target!;
+async function assertLocalConnection() {
+  assertLocalServerAddress((await findConnectionTarget()).address);
 }
 
 // ---------- plan (pure) ----------
@@ -291,6 +258,7 @@ export async function createDemo(
   options: { restaurants?: number; now?: Date } = {},
 ): Promise<DemoSummary> {
   const now = options.now ?? new Date();
+  await assertLocalConnection();
   if ((await listUsersByEmailDomain(DEMO.emailDomain)).length > 0) {
     throw new AppError(
       "DEMO_EXISTS",
@@ -549,6 +517,7 @@ const restaurantIdsOf = (summary: unknown): string[] => {
  * ranked again, and real users who rated demo dishes get their counters and trust recounted.
  */
 export async function undoDemo(now: Date = new Date()) {
+  await assertLocalConnection();
   const [users, runs] = await Promise.all([
     listUsersByEmailDomain(DEMO.emailDomain),
     listJobRuns(DEMO.job),
@@ -557,7 +526,20 @@ export async function undoDemo(now: Date = new Date()) {
   const restaurantIds = await findDemoRestaurantIds(
     runs.flatMap((r) => restaurantIdsOf(r.summary)),
     userIds,
+    DEMO.nameMark,
   );
+  // A merge between a demo restaurant and a real one mixed their ratings, dishes and candidates;
+  // undo cannot tell them apart again, so it removes nothing.
+  const crossed = await findCrossMerges(restaurantIds);
+  if (crossed.length > 0) {
+    throw new AppError(
+      "DEMO_MERGED",
+      `pnpm dev:demo -- --undo refused: ${crossed
+        .map((m) => `"${m.source}" was merged into "${m.target}"`)
+        .join("; ")}. Demo and real data are mixed there; remove the demo data by hand.`,
+      409,
+    );
+  }
   const proposalDishIds = await findDishesFromDemoProposals(userIds);
   const footprint = await findDemoFootprint(userIds, restaurantIds);
   const deleted = await inTransaction((tx) =>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeEnvProblems, parseEnv } from "@/env";
+import { describeEnvProblems, parseEnv, validVariables } from "@/env";
 
 const valid = {
   NODE_ENV: "production",
@@ -32,5 +32,14 @@ describe("env schema", () => {
     expect(text).toContain("BETTER_AUTH_SECRET");
     expect(text).toContain("DATABASE_URL");
     expect(text).not.toContain("short"); // values are never echoed
+  });
+
+  it("keeps every valid variable when another one is malformed (development fallback)", () => {
+    const kept = validVariables({ ...valid, SUPABASE_S3_ENDPOINT: "not a url", CRON_SECRET: "x" });
+    expect(kept.DATABASE_URL).toBe(valid.DATABASE_URL);
+    expect(kept.BETTER_AUTH_SECRET).toBe(valid.BETTER_AUTH_SECRET);
+    expect(kept.SUPABASE_DISH_PHOTOS_BUCKET).toBe("dish-photos");
+    expect(kept).not.toHaveProperty("SUPABASE_S3_ENDPOINT");
+    expect(kept).not.toHaveProperty("CRON_SECRET");
   });
 });

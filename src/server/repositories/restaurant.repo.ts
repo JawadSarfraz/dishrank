@@ -78,6 +78,17 @@ export async function lockRestaurants(ids: readonly string[], tx: Tx) {
     SELECT id FROM "Restaurant" WHERE id IN (${Prisma.join([...ids])}) ORDER BY id FOR UPDATE`;
 }
 
+/**
+ * A rating's restaurant, share-locked until the rating commits: a merge or status change waits for
+ * it, and it sees their result (docs/04 control 1 is checked again under this lock).
+ */
+export async function lockRestaurantForRating(id: string, tx: Tx) {
+  const rows = await tx.$queryRaw<
+    { status: RestaurantStatus; claimedByUserId: string | null }[]
+  >`SELECT status, "claimedByUserId" FROM "Restaurant" WHERE id = ${id} FOR SHARE`;
+  return rows[0] ?? null;
+}
+
 export type RestaurantSearchRow = {
   id: string;
   slug: string;

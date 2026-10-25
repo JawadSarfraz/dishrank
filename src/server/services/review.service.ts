@@ -1,8 +1,10 @@
 // /admin/review (docs/07 §6) for the items Phase 3 creates: held ratings (SUSPICIOUS_RATINGS with
 // reason COMMENT or BURST), dish and restaurant suggestions, and panel location suggestions. Every
-// decision locks the item, needs it OPEN and an action allowed for its type, changes rating status
-// with plain SQL (the decay clock stays put), and recomputes the touched dish rows after commit.
-// Menu items, flags, claims and duplicates arrive with their phases.
+// decision takes the item's locks in the shared order (restaurant → dish rows → item), needs it
+// OPEN, unchanged since the admin saw it (fingerprint) and an action allowed for its type, changes
+// rating status with plain SQL (the decay clock stays put), and recomputes the touched dish rows
+// after commit. Menu items, flags, claims and duplicates arrive with their phases.
+import { createHash } from "node:crypto";
 import type { Prisma, ReviewItemType } from "@/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
@@ -13,7 +15,12 @@ import {
   listRatingIdsInOtherOpenItems,
   listReviewItemsPage,
   lockReviewItem,
+  peekReviewItem,
 } from "@/server/repositories/moderation.repo";
+import {
+  listDishPagesOfRows,
+  lockRestaurantDishes,
+} from "@/server/repositories/restaurant-dish.repo";
 import {
   listRatingsForReview,
   listRatingsOfUsers,
@@ -69,6 +76,29 @@ type RestaurantProposalPayload = {
   note: string | null;
 };
 
+/**
+ * What an admin sees of an item: its payload, its restaurant and the listed ratings' state (an edit
+ * moves `updatedAt`, a decision changes `status`). A decision sent with an older fingerprint is
+ * refused, so it never applies to ratings or a location the admin did not see.
+ */
+export function reviewFingerprint(
+  item: { payload: unknown; restaurantId: string | null },
+  ratings: readonly { id: string; status: string; updatedAt: Date }[],
+): string {
+  const state = [...ratings]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((r) => [r.id, r.status, r.updatedAt.toISOString()]);
+  return createHash("sha256")
+    .update(JSON.stringify([item.payload, item.restaurantId, state]))
+    .digest("hex")
+    .slice(0, 32);
+}
+
+const listedRatings = <T extends { id: string }>(payload: unknown, byId: Map<string, T>) =>
+  ((payload as HeldPayload).ratingIds ?? [])
+    .map((id) => byId.get(id))
+    .filter((r): r is T => Boolean(r));
+
 // ---------- list ----------
 
 export async function getReviewQueue(
@@ -115,6 +145,10 @@ export async function getReviewQueue(
       id: item.id,
       type: item.type,
       status: item.status,
+      fingerprint: reviewFingerprint(
+        item,
+        item.type === "SUSPICIOUS_RATINGS" ? listedRatings(item.payload, ratings) : [],
+      ),
       createdAt: item.createdAt,
       resolution: item.resolution,
       resolvedAt: item.resolvedAt,
@@ -130,13 +164,10 @@ export async function getReviewQueue(
       // Ratings a merge or a delete removed are simply missing here.
       ratings:
         item.type === "SUSPICIOUS_RATINGS"
-          ? ((item.payload as HeldPayload).ratingIds ?? [])
-              .map((id) => ratings.get(id))
-              .filter((r): r is NonNullable<typeof r> => Boolean(r))
-              .map((r) => ({
-                ...r,
-                accountDays: Math.floor((now.getTime() - r.user.createdAt.getTime()) / 86_400_000),
-              }))
+          ? listedRatings(item.payload, ratings).map((r) => ({
+              ...r,
+              accountDays: Math.floor((now.getTime() - r.user.createdAt.getTime()) / 86_400_000),
+            }))
           : [],
     })),
   };
@@ -158,6 +189,8 @@ type Decision = {
   invalidateAliases?: boolean;
   /** Restaurant pages to revalidate. */
   restaurantSlugs: { citySlug: string; slug: string }[];
+  /** The item's payload as it is closed (a release records which ratings it set ACTIVE). */
+  payload?: Prisma.InputJsonValue;
 };
 
 const reject = (input: ReviewResolveInput): Decision => ({
@@ -172,12 +205,12 @@ const reject = (input: ReviewResolveInput): Decision => ({
 
 async function decideHeldRatings(
   item: { id: string; payload: unknown },
+  ratings: readonly { id: string; status: string; userId: string; restaurantDishId: string }[],
   input: ReviewResolveInput,
   now: Date,
   tx: Tx,
 ): Promise<Decision> {
   const payload = item.payload as HeldPayload;
-  const ratings = await listRatingsForReview(payload.ratingIds ?? [], tx);
   const rows = [...new Set(ratings.map((r) => r.restaurantDishId))];
   const users = [...new Set(ratings.map((r) => r.userId))];
   if (input.action === "release") {
@@ -198,6 +231,8 @@ async function decideHeldRatings(
       recompute: rows,
       trustUsers: [],
       restaurantSlugs: [],
+      // Only these are "released" for the burst rule; the ones left HELD wait for their other item.
+      payload: { ...payload, releasedRatingIds: release.map((r) => r.id) },
     };
   }
   if (input.action === "hide") {
@@ -337,9 +372,9 @@ async function decideLocation(
   tx: Tx,
 ): Promise<Decision> {
   if (input.action !== "approve") return reject(input);
-  // The item's restaurantId follows merges; the payload keeps the restaurant it was filed for.
+  // The item's restaurantId follows merges; the payload keeps the restaurant it was filed for. Its
+  // row lock was taken before the item's (resolveReviewItem).
   if (!item.restaurantId) throw new AppError("NOT_FOUND", "Restaurant not found", 404);
-  await lockRestaurants([item.restaurantId], tx);
   const restaurant = await findRestaurantById(item.restaurantId, tx);
   if (!restaurant || restaurant.status === "DUPLICATE") {
     throw new AppError("NOT_FOUND", "Restaurant not found", 404);
@@ -359,18 +394,53 @@ async function decideLocation(
   };
 }
 
+const itemChanged = () =>
+  new AppError(
+    "ITEM_CHANGED",
+    "This item changed after you opened it. Reload to see it as it is now.",
+    409,
+  );
+
+/**
+ * Takes the locks that come before an item's own (restaurant → dish rows → item, the order rating
+ * writes, merges and panel locations use): the dish rows of a held-ratings item, the restaurant of
+ * a location suggestion. Returns what it locked, to check after the item lock.
+ */
+async function lockItemParents(
+  item: { type: ReviewItemType; payload: unknown; restaurantId: string | null },
+  tx: Tx,
+) {
+  if (item.type === "SUSPICIOUS_RATINGS") {
+    const payload = item.payload as HeldPayload;
+    const ratings = await listRatingsForReview(payload.ratingIds ?? [], tx);
+    const rows = [payload.restaurantDishId, ...ratings.map((r) => r.restaurantDishId)];
+    await lockRestaurantDishes(rows, tx);
+    return { rows: new Set(rows), restaurantId: null };
+  }
+  if (item.type === "LOCATION_SUGGESTION" && item.restaurantId) {
+    await lockRestaurants([item.restaurantId], tx);
+    return { rows: new Set<string>(), restaurantId: item.restaurantId };
+  }
+  return { rows: new Set<string>(), restaurantId: null };
+}
+
 /** POST /api/v1/admin/review-queue/:id/resolve. */
 export async function resolveReviewItem(
   actor: SessionUser | null,
   itemId: string,
   input: ReviewResolveInput,
   now: Date = new Date(),
+  /** The fingerprint the admin saw (getReviewQueue); without one the item is decided as it is. */
+  fingerprint?: string,
 ) {
   const admin = assertRole(actor, "ADMIN");
   const decision = await inTransaction(async (tx) => {
+    const peek = await peekReviewItem(itemId, tx);
+    if (!peek) throw new AppError("NOT_FOUND", "Review item not found", 404);
+    const locked = peek.status === "OPEN" ? await lockItemParents(peek, tx) : null;
     const item = await lockReviewItem(itemId, tx);
     if (!item) throw new AppError("NOT_FOUND", "Review item not found", 404);
-    if (item.status !== "OPEN") {
+    if (item.status !== "OPEN" || !locked) {
       throw new AppError("ITEM_CLOSED", "This item was already decided", 409);
     }
     if (!(PHASE3_REVIEW_TYPES as readonly ReviewItemType[]).includes(item.type)) {
@@ -379,9 +449,28 @@ export async function resolveReviewItem(
     if (!isReviewActionAllowed(item.type, input.action)) {
       throw new AppError("ACTION_NOT_ALLOWED", "That action does not fit this item", 400);
     }
+    // Under the locks: the item's ratings and restaurant must be the ones locked (a merge that
+    // committed in between moves them), and the item must be what the admin saw.
+    const ratings =
+      item.type === "SUSPICIOUS_RATINGS"
+        ? await listRatingsForReview((item.payload as HeldPayload).ratingIds ?? [], tx)
+        : [];
+    if (
+      (item.type === "SUSPICIOUS_RATINGS" &&
+        ![
+          (item.payload as HeldPayload).restaurantDishId,
+          ...ratings.map((r) => r.restaurantDishId),
+        ].every((row) => locked.rows.has(row))) ||
+      (item.type === "LOCATION_SUGGESTION" && item.restaurantId !== locked.restaurantId)
+    ) {
+      throw itemChanged();
+    }
+    if (fingerprint !== undefined && fingerprint !== reviewFingerprint(item, ratings)) {
+      throw itemChanged();
+    }
     const d =
       item.type === "SUSPICIOUS_RATINGS"
-        ? await decideHeldRatings(item, input, now, tx)
+        ? await decideHeldRatings(item, ratings, input, now, tx)
         : item.type === "DISH_PROPOSAL"
           ? await decideDishProposal(input, tx)
           : item.type === "RESTAURANT_PROPOSAL"
@@ -396,6 +485,7 @@ export async function resolveReviewItem(
         resolvedAt: now,
         ...(d.restaurantId ? { restaurantId: d.restaurantId } : {}),
         ...(d.dishId ? { dishId: d.dishId } : {}),
+        ...(d.payload !== undefined ? { payload: d.payload } : {}),
       },
       tx,
     );
@@ -420,5 +510,7 @@ export async function resolveReviewItem(
     status: decision.status,
     resolution: decision.resolution,
     restaurantSlugs: decision.restaurantSlugs,
+    /** Ranking and restaurant pages whose scores or ranks may have changed. */
+    dishPages: await listDishPagesOfRows([...rows]),
   };
 }

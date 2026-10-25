@@ -11,6 +11,7 @@ import {
   listCountedRatings,
   listDishGroupsOfRestaurant,
   lockCityDish,
+  lockCityDishLists,
   lockRestaurantDish,
   rerankCityDish,
   updateRestaurantDishAggregates,
@@ -256,8 +257,8 @@ async function rerankLists(
   now: Date,
   tx: Tx,
 ) {
-  for (const g of lists) {
-    await lockCityDish(g.cityId, g.dishId, tx);
+  // All locks first, in the global order, then the re-ranks.
+  for (const g of await lockCityDishLists(lists, tx)) {
     const city = await findCityLaunch(g.cityId, tx);
     await rerank(g.cityId, g.dishId, thresholdsFor(city?.launchedAt ?? null, now), tx);
   }

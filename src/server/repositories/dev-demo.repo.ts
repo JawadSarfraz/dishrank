@@ -81,15 +81,30 @@ export async function countRatingsOfUsers(userIds: readonly string[]) {
   return { total, held };
 }
 
-/** Restaurants that came from demo data: recorded by a run, created from a candidate a demo user
- * reviewed, or created from a suggestion a demo user filed. Only ones that still exist. */
+/** The database and server address of the live connection (NULL address: a Unix socket). */
+export async function findConnectionTarget() {
+  const [row] = await db.$queryRaw<{ database: string; address: string | null }[]>`
+    SELECT current_database() AS database, host(inet_server_addr()) AS address`;
+  return row!;
+}
+
+/**
+ * Restaurants that came from demo data: recorded by a run, created from a suggestion a demo user
+ * filed, or (when a run died before recording) created from a candidate the demo admin reviewed
+ * and still named with the demo mark. A merge moves candidates to the surviving restaurant, so a
+ * real restaurant can point back at a demo candidate: the mark keeps it out. Only ones that exist.
+ */
 export async function findDemoRestaurantIds(
   recorded: readonly string[],
   demoUserIds: readonly string[],
+  nameMark: string,
 ) {
   const [fromCandidates, fromSuggestions] = await Promise.all([
     db.overtureCandidate.findMany({
-      where: { reviewedByUserId: { in: [...demoUserIds] }, restaurantId: { not: null } },
+      where: {
+        reviewedByUserId: { in: [...demoUserIds] },
+        restaurant: { name: { endsWith: nameMark } },
+      },
       select: { restaurantId: true },
     }),
     db.reviewItem.findMany({
@@ -112,6 +127,24 @@ export async function findDemoRestaurantIds(
     select: { id: true },
   });
   return existing.map((r) => r.id);
+}
+
+/**
+ * Merges between a demo restaurant and one that is not: a demo restaurant merged into a real one,
+ * or a real one merged into a demo restaurant. Merges among demo restaurants are fine.
+ */
+export async function findCrossMerges(demoRestaurantIds: readonly string[]) {
+  const ids = [...demoRestaurantIds];
+  const rows = await db.restaurant.findMany({
+    where: {
+      OR: [
+        { id: { in: ids }, mergedIntoId: { not: null, notIn: ids } },
+        { id: { notIn: ids }, mergedIntoId: { in: ids } },
+      ],
+    },
+    select: { name: true, mergedInto: { select: { name: true } } },
+  });
+  return rows.map((r) => ({ source: r.name, target: r.mergedInto?.name ?? "?" }));
 }
 
 /** Dishes an admin created from a demo user's dish proposal. */
@@ -182,9 +215,14 @@ export async function deleteDemoData(
   const userIds = [...input.userIds];
   const restaurantIds = [...input.restaurantIds];
   const onDemoRestaurant = { restaurantDish: { restaurantId: { in: restaurantIds } } };
+  // Candidates of the demo restaurants go back to NEW; a demo candidate that a merge moved to a
+  // real restaurant stays with it (only its reviewer, a demo user, goes: SET NULL).
   const candidates = await tx.overtureCandidate.updateMany({
     where: {
-      OR: [{ restaurantId: { in: restaurantIds } }, { reviewedByUserId: { in: userIds } }],
+      OR: [
+        { restaurantId: { in: restaurantIds } },
+        { reviewedByUserId: { in: userIds }, restaurantId: null },
+      ],
     },
     data: {
       status: "NEW",

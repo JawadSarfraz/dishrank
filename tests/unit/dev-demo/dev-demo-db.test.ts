@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
+import { assertLocalDatabase, assertLocalServerAddress } from "@/server/services/dev-demo-guard";
 import {
   DEMO,
-  assertLocalDatabase,
   createDemo,
   pickDemoCandidates,
   planRatings,
@@ -11,6 +11,7 @@ import {
   undoDemo,
 } from "@/server/services/dev-demo.service";
 import { createOrReplace } from "@/server/services/rating.service";
+import { mergeRestaurants } from "@/server/services/restaurant.service";
 import { resolveReviewItem } from "@/server/services/review.service";
 import { resetAppData } from "../../setup/db-reset";
 import {
@@ -43,6 +44,18 @@ describe("pnpm dev:demo guard", () => {
     expect(assertLocalDatabase({ DATABASE_URL: LOCAL, DIRECT_URL: LOCAL }).database).toBe(
       "dishrank",
     );
+    // node-postgres uses the last host= parameter: every one must be local, the last is shown.
+    expect(
+      assertLocalDatabase({ DATABASE_URL: "postgresql://u@localhost/x?host=/tmp&host=localhost" })
+        .host,
+    ).toBe("localhost:5432");
+  });
+
+  it("checks the address of the live connection: a Unix socket or loopback only", () => {
+    expect(() => assertLocalServerAddress(null)).not.toThrow();
+    expect(() => assertLocalServerAddress("127.0.0.1")).not.toThrow();
+    expect(() => assertLocalServerAddress("::1")).not.toThrow();
+    expect(() => assertLocalServerAddress("10.0.0.5")).toThrow(/10\.0\.0\.5/);
   });
 
   it.each([
@@ -56,6 +69,10 @@ describe("pnpm dev:demo guard", () => {
       /DIRECT_URL points at aws-0/,
     ],
     [{ DATABASE_URL: "postgresql://localhost/x?host=db.example.com" }, /db\.example\.com/],
+    [
+      { DATABASE_URL: "postgresql://u@localhost:5433/x?host=/tmp&host=db.example.com" },
+      /db\.example\.com/,
+    ],
     [{ DATABASE_URL: "mysql://localhost/x" }, /not a PostgreSQL URL/],
     [{ DATABASE_URL: "not a url" }, /not a URL/],
   ])("refuses %j", (env, message) => {
@@ -289,5 +306,32 @@ describe("pnpm dev:demo create and undo (test DB)", () => {
     });
     // Nothing left to remove: a second undo is harmless.
     expect(await undoDemo()).toMatchObject({ restaurants: 0, users: 0, ratings: 0 });
+  }, 120_000);
+
+  it("undo removes demo restaurants merged into each other", async () => {
+    await stage("Pizza Uno", "f-7", "pizza_restaurant", 0.99);
+    await stage("Pizza Due", "f-6", "pizza_restaurant", 0.97);
+    await stage("Pizza Tre", "blue-area", "pizza_restaurant", 0.96);
+    const { restaurants } = await createDemo({ restaurants: 3 });
+    const admin = actorOf(await makeUser("Real Admin", { role: "ADMIN" }));
+    await mergeRestaurants(admin, restaurants[1].id, restaurants[0].id);
+    expect(await undoDemo()).toMatchObject({ restaurants: 3, users: 13 });
+    expect(await db.restaurant.count()).toBe(0);
+    expect(await db.overtureCandidate.count({ where: { status: { not: "NEW" } } })).toBe(0);
+  }, 120_000);
+
+  it("undo refuses, and removes nothing, when a demo restaurant was merged with a real one", async () => {
+    await stage("Pizza Uno", "f-7", "pizza_restaurant", 0.99);
+    await stage("Pizza Due", "f-6", "pizza_restaurant", 0.97);
+    await stage("Pizza Tre", "blue-area", "pizza_restaurant", 0.96);
+    const { restaurants } = await createDemo({ restaurants: 3 });
+    const admin = actorOf(await makeUser("Real Admin", { role: "ADMIN" }));
+    const real = await makeRestaurant("Real Pizza House");
+    await mergeRestaurants(admin, restaurants[2].id, real.id);
+    await expect(undoDemo()).rejects.toMatchObject({ code: "DEMO_MERGED" });
+    expect(await db.user.count({ where: { email: { endsWith: `@${DEMO.emailDomain}` } } })).toBe(
+      13,
+    );
+    expect(await db.restaurant.count()).toBe(4);
   }, 120_000);
 });

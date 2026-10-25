@@ -413,7 +413,7 @@ model Rating {
   portion          Int? // 1..5
   value            Int? // 1..5
   comment          String? // <= 280 chars
-  photoPath        String? // storage path
+  photoPath        String?      @unique // storage path; one photo belongs to one rating (docs/06)
   status           RatingStatus @default(ACTIVE)
   weight           Float        @default(1) // rater's trustScore at write time, for the record only; scores use trust at compute time (docs/04)
   ipHash           String?

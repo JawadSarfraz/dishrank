@@ -20,9 +20,13 @@ export function DeleteRatingButton({ ratingId, label }: { ratingId: string; labe
         onClick={() => {
           if (!window.confirm(`Delete your rating of ${label}?`)) return;
           startTransition(async () => {
-            const res = await deleteRatingAction(ratingId);
-            if (res.error) setError(describeActionError(res.error));
-            else router.refresh();
+            try {
+              const res = await deleteRatingAction(ratingId);
+              if (res.error) setError(describeActionError(res.error));
+              else router.refresh();
+            } catch {
+              setError("The request did not reach the server. Try again.");
+            }
           });
         }}
       >
