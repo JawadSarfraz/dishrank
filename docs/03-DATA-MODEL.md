@@ -316,6 +316,8 @@ model Restaurant {
 
   @@index([cityId, status])
   @@index([cityId, areaId])
+  // Trigram index, created by the raw SQL migration after pg_trgm exists; declared here so Prisma does not drop it.
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "restaurants_search_trgm")
 }
 
 // ---------- Dish taxonomy ----------
@@ -355,6 +357,8 @@ model DishAlias {
   dish Dish @relation(fields: [dishId], references: [id], onDelete: Cascade)
 
   @@index([dishId])
+  // Trigram index, created by the raw SQL migration after pg_trgm exists; declared here so Prisma does not drop it.
+  @@index([alias(ops: raw("gin_trgm_ops"))], type: Gin, map: "dish_alias_trgm")
 }
 
 // ---------- The core join: restaurant serves dish ----------

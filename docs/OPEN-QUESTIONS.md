@@ -20,6 +20,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
 - [ ] Q (Phase 0): Services check the passed user with `assertRole(actor, roles)`, the session-free form of `requireRole()`, so they also work outside a request (scripts, crons). | Default taken: as built.
 - [ ] Q (Phase 0): Required env vars (src/env.ts) are DATABASE_URL, DIRECT_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID/SECRET and CRON_SECRET; Supabase, Places and Anthropic vars stay optional until their phase. `next build` never fails on env; `next start` exits with code 1 when a required one is missing. | Default taken: as built; make each optional var required in the phase that starts using it.
 - [ ] Q (Phase 0): shadcn 4.22 (base-nova preset, Base UI primitives) uses its `cn` package instead of the approved clsx + tailwind-merge, and adds `shadcn` itself as a dependency for its CSS. ESLint 10 works, but plugins inside eslint-config-next 16.4 still declare peer ESLint ≤ 9 (pnpm prints a peer warning). | Default taken: keep both as generated; revisit if lint breaks on an upgrade.
+- [ ] Q (Phase 1, 2026-10-25): docs/03 created the two GIN trigram indexes only in raw SQL; Prisma Migrate treats indexes missing from schema.prisma as drift and would DROP them in the next generated migration. | Default taken: both indexes are also declared in the docs/03 schema (`type: Gin`, `ops: raw("gin_trgm_ops")`, same names), and the raw SQL migration creates the extensions first, then the indexes. `prisma migrate diff` against the database is empty.
 
 ## Decided
 
