@@ -123,7 +123,7 @@ export async function findDishesBySlugs(slugs: readonly string[], client: Client
 export async function listDishesForPicker(client: Client = db) {
   return client.dish.findMany({
     orderBy: [{ isLaunch: "desc" }, { name: "asc" }],
-    select: { slug: true, name: true, isLaunch: true },
+    select: { id: true, slug: true, name: true, isLaunch: true },
   });
 }
 
@@ -196,4 +196,39 @@ export async function searchDishes(input: {
     ORDER BY m.hit DESC, (m.sim + CASE WHEN d."isLaunch" THEN 0.1 ELSE 0 END) DESC,
       "eligibleCount" DESC, d.name ASC
     LIMIT ${input.limit}`;
+}
+
+/** Aliases among `aliases` that already belong to a dish. */
+export async function findTakenAliases(aliases: readonly string[], client: Client = db) {
+  if (aliases.length === 0) return [];
+  return client.dishAlias.findMany({
+    where: { alias: { in: [...aliases] } },
+    select: { alias: true, dish: { select: { slug: true } } },
+  });
+}
+
+/** A new dish and its spellings (each stored normalised, docs/05), as a review decision makes it. */
+export async function insertDishWithAliases(
+  data: { slug: string; name: string; categoryId: string; aliases: readonly string[] },
+  tx: Prisma.TransactionClient,
+) {
+  const dish = await tx.dish.create({
+    data: { slug: data.slug, name: data.name, categoryId: data.categoryId, isLaunch: false },
+    select: { id: true, slug: true, name: true },
+  });
+  await tx.dishAlias.createMany({
+    data: data.aliases.map((alias) => ({ alias, dishId: dish.id })),
+  });
+  return dish;
+}
+
+export async function findDishCategory(id: string, client: Client = db) {
+  return client.dishCategory.findUnique({ where: { id }, select: { id: true } });
+}
+
+export async function listDishCategories(client: Client = db) {
+  return client.dishCategory.findMany({
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: { id: true, name: true },
+  });
 }

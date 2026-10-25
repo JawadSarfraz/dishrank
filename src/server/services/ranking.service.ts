@@ -84,6 +84,37 @@ export function ratingsNeeded(
   return Math.max(0, raters, weight);
 }
 
+export type TrustStats = {
+  isPanel: boolean;
+  activeRatings: number;
+  activePhotoRatings: number;
+  hiddenRatings: number;
+  /** Upheld flags against the user's ratings. */
+  upheldFlags: number;
+};
+
+/**
+ * docs/04 trust table, in this order: panel 1.3 (fixed) → ≥ 2 ratings hidden by an admin 0.3 →
+ * ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2 → ≥ 3 active and ≥ 1 with a photo 1.0 → 0.6.
+ */
+// DECISION-PENDING: docs/04 gives no order for overlapping rows; this one puts penalties first.
+export function trustFor(s: TrustStats): number {
+  if (s.isPanel) return TRUST.panel;
+  if (s.hiddenRatings >= TRUST.penalised.minHidden) return TRUST.penalised.trust;
+  const { trusted, established } = TRUST;
+  if (
+    s.activeRatings >= trusted.minActive &&
+    s.upheldFlags === 0 &&
+    s.activePhotoRatings / s.activeRatings >= trusted.minPhotoShare
+  ) {
+    return trusted.trust;
+  }
+  if (s.activeRatings >= established.minActive && s.activePhotoRatings >= established.minPhotos) {
+    return established.trust;
+  }
+  return TRUST.newAccount;
+}
+
 export type CountedRating = { userId: string; score: number; updatedAt: Date; trust: number };
 
 /** The docs/04 sums over the counted (active, not banned) ratings of one dish row. */

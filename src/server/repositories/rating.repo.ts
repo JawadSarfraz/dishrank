@@ -159,3 +159,31 @@ export async function listRatingsOfUser(userId: string, take: number, cursor?: s
     },
   });
 }
+
+/** Ratings by id for the review queue, with their rater and current dish row. */
+export async function listRatingsForReview(ids: readonly string[], client: Client = db) {
+  if (ids.length === 0) return [];
+  return client.rating.findMany({
+    where: { id: { in: [...ids] } },
+    select: {
+      id: true,
+      score: true,
+      comment: true,
+      photoPath: true,
+      status: true,
+      createdAt: true,
+      userId: true,
+      restaurantDishId: true,
+      user: { select: { id: true, email: true, name: true, createdAt: true, isPanel: true } },
+    },
+  });
+}
+
+/** Every rating of these users (for a ban: all of them are hidden). */
+export async function listRatingsOfUsers(userIds: readonly string[], tx: Tx) {
+  if (userIds.length === 0) return [];
+  return tx.rating.findMany({
+    where: { userId: { in: [...userIds] } },
+    select: { id: true, restaurantDishId: true, status: true },
+  });
+}

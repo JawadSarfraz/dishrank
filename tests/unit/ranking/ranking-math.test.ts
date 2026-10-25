@@ -8,6 +8,7 @@ import {
   ratingWeight,
   ratingsNeeded,
   thresholdsFor,
+  trustFor,
 } from "@/server/services/ranking.service";
 
 const NOW = new Date("2026-10-25T12:00:00Z");
@@ -85,5 +86,27 @@ describe("ranking math (docs/04)", () => {
       rawMean: null,
       lastRatedAt: null,
     });
+  });
+
+  it("trust follows the docs/04 table: panel first, then the 2-hidden penalty, then 1.2, 1.0, 0.6", () => {
+    const base = {
+      isPanel: false,
+      activeRatings: 0,
+      activePhotoRatings: 0,
+      hiddenRatings: 0,
+      upheldFlags: 0,
+    };
+    expect(trustFor(base)).toBe(0.6);
+    expect(trustFor({ ...base, activeRatings: 3, activePhotoRatings: 1 })).toBe(1.0);
+    expect(trustFor({ ...base, activeRatings: 3, activePhotoRatings: 0 })).toBe(0.6);
+    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 6 })).toBe(1.2);
+    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 5 })).toBe(1.0); // 25% < 30%
+    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 6, upheldFlags: 1 })).toBe(
+      1.0,
+    );
+    expect(trustFor({ ...base, activeRatings: 40, activePhotoRatings: 40, hiddenRatings: 2 })).toBe(
+      0.3,
+    );
+    expect(trustFor({ ...base, isPanel: true, hiddenRatings: 5 })).toBe(1.3);
   });
 });

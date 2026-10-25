@@ -296,7 +296,9 @@ export async function createOrReplace(
     }
 
     let heldReason: HoldReason | null = null;
-    if (flag && status === "HELD" && previous?.status !== "HELD") {
+    // A flagged comment always joins the row's COMMENT item, also on a rating already held (e.g. by
+    // the burst rule), so releasing the burst can never publish it unreviewed.
+    if (flag && status === "HELD") {
       heldReason = "COMMENT";
       await openHoldItem(
         {

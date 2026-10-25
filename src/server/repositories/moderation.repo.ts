@@ -153,3 +153,90 @@ export async function resolveOpenReviewItems(
     data: { status: "RESOLVED", resolution, resolvedAt: at },
   });
 }
+
+/** Locks one review item for a decision (released at commit or rollback). */
+export async function lockReviewItem(id: string, tx: Tx) {
+  await tx.$queryRaw`SELECT id FROM "ReviewItem" WHERE id = ${id} FOR UPDATE`;
+  return tx.reviewItem.findUnique({ where: { id } });
+}
+
+export async function closeReviewItem(
+  id: string,
+  data: {
+    status: "RESOLVED" | "REJECTED";
+    resolution: string;
+    resolvedByUserId: string;
+    resolvedAt: Date;
+    restaurantId?: string;
+    dishId?: string;
+  },
+  tx: Tx,
+) {
+  return tx.reviewItem.update({ where: { id }, data, select: { id: true } });
+}
+
+/** Rating ids listed in the other OPEN SUSPICIOUS_RATINGS items of a dish row. */
+export async function listRatingIdsInOtherOpenItems(
+  restaurantDishId: string,
+  exceptItemId: string,
+  tx: Tx,
+) {
+  const items = await tx.reviewItem.findMany({
+    where: {
+      type: "SUSPICIOUS_RATINGS",
+      status: "OPEN",
+      id: { not: exceptItemId },
+      payload: { path: ["restaurantDishId"], equals: restaurantDishId },
+    },
+    select: { payload: true },
+  });
+  return new Set(items.flatMap((i) => (i.payload as { ratingIds?: string[] }).ratingIds ?? []));
+}
+
+/** /admin/review: newest first, cursor = the last id of the previous page. */
+export async function listReviewItemsPage(input: {
+  type?: ReviewItemType;
+  types: readonly ReviewItemType[];
+  status: "OPEN" | "RESOLVED" | "REJECTED";
+  take: number;
+  cursor?: string;
+}) {
+  return db.reviewItem.findMany({
+    where: {
+      status: input.status,
+      type: input.type ? input.type : { in: [...input.types] },
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: input.take,
+    ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
+    include: {
+      createdBy: { select: { id: true, email: true, name: true } },
+      resolvedBy: { select: { id: true, email: true } },
+      restaurant: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          status: true,
+          lat: true,
+          lng: true,
+          locationSource: true,
+          area: { select: { name: true } },
+          city: { select: { id: true, slug: true, name: true } },
+        },
+      },
+      dish: { select: { id: true, slug: true, name: true } },
+    },
+  });
+}
+
+export async function countOpenReviewItems(types: readonly ReviewItemType[]) {
+  const rows = await db.reviewItem.groupBy({
+    by: ["type"],
+    where: { status: "OPEN", type: { in: [...types] } },
+    _count: { _all: true },
+  });
+  return Object.fromEntries(rows.map((r) => [r.type, r._count._all])) as Partial<
+    Record<ReviewItemType, number>
+  >;
+}
