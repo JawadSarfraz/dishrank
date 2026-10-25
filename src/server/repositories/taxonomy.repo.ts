@@ -97,3 +97,17 @@ export async function findTrigramMatches(text: string, threshold: number, limit:
       LIMIT ${limit}`;
   });
 }
+
+export async function findDishBySlug(slug: string, client: Client = db) {
+  return client.dish.findUnique({
+    where: { slug },
+    select: { id: true, slug: true, name: true, category: { select: { slug: true } } },
+  });
+}
+
+export async function findDishesBySlugs(slugs: readonly string[], client: Client = db) {
+  return client.dish.findMany({
+    where: { slug: { in: [...slugs] } },
+    select: { id: true, slug: true, name: true },
+  });
+}

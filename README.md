@@ -60,7 +60,7 @@ pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi   # Phase 2
+pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # tmp/candidates-*.csv
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # Phase 4
 ```

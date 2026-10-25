@@ -13,19 +13,23 @@ How restaurants and (restaurant, dish) links get into the system. Four sources, 
 
 **Purpose**: a starting list of restaurants per dish per area so the panel knows where to go and the rate flow has restaurants to pick. It never ranks anything.
 
-`scripts/seed-places.ts --city=islamabad --dish=chicken-karahi [--areas=f-7,f-8]`
+`scripts/seed-places.ts --city=islamabad --dish=chicken-karahi [--areas=f-7,f-8] [--dry-run] [--max-calls=150]`
+
+- `--dry-run` prints the planned queries and the maximum number of calls, makes no Google call and writes no file (no API key needed).
+- `--max-calls` (default 150) caps HTTP requests, retries included: the client refuses the request that would go over, and the run keeps the rows it has.
+- A missing `GOOGLE_PLACES_API_KEY` stops the run before any call. 429 and 5xx are retried with exponential backoff (3 attempts). A 4xx on an area's first page (bad key, API disabled, invalid request) stops the run, because every other area would fail the same way.
 
 1. Load city + areas from DB.
 2. For each area: `POST https://places.googleapis.com/v1/places:searchText`
-   - body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant", locationBias: { circle: { center: { latitude: <area lat>, longitude: <area lng> }, radius: 2500.0 } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`
+   - body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant" (omitted for dishes in the categories breakfast, drinks, desserts and street-food), locationBias: { circle: { center: { latitude: <area lat>, longitude: <area lng> }, radius: 2500.0 } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`
    - header `X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,nextPageToken`. `nextPageToken` must be in the mask, otherwise the response carries no token and only page 1 comes back.
    - next page: resend the same body plus `pageToken: "<nextPageToken>"`; stop after 3 pages (Text Search returns at most 60 results).
-   - `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. `radius` is in meters (0–50,000).
+   - `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. The bias still pushes other venues down the list, so chai, halwa puri, dessert and street-food searches send no type: tea stalls and breakfast shops are often typed `cafe`, `tea_house`, `bakery` or nothing. `radius` is in meters (0–50,000).
    - billing: `places.id` and `nextPageToken` alone are Text Search Essentials (IDs Only); `displayName`, `formattedAddress`, `location` and `primaryType` make every call Text Search Pro.
 3. Dedupe by `places.id`. Write `tmp/candidates-<city>-<dish>-<date>.csv` with columns: `googlePlaceId, displayName, formattedAddress, lat, lng, primaryType, queryArea, dishSlug, fetchedAt`. `fetchedAt` is the UTC ISO time of the Google response that returned that row (per page, not the script start).
-4. Print a summary (areas × results, cost estimate). Never touch the DB.
+4. Print per-area counts (pages, results, new places) and the calls used; every call is a billable Text Search Pro request. Never write to the DB (it only reads the city, areas and dish). A file from an earlier run on the same day is never overwritten: the new one gets a `-2` suffix.
 
-Budget: ~20 areas × ≤3 pages ≈ 60 calls per dish. 19 dishes ≈ 1,140 Text Search Pro calls — inside the 5,000/month free cap. Reuse the same restaurant across dishes: the import UI dedupes by place ID.
+Budget: at most 3 pages per area, so ≤ 60 calls per dish for Islamabad (20 areas) and ≤ 30 for Rawalpindi (10 areas). All 19 launch dishes in both cities ≤ 19 × 90 = 1,710 Text Search Pro calls before retries — inside the 5,000/month free cap. Reuse the same restaurant across dishes: the import UI dedupes by place ID.
 
 **Policy notes (keep these in the import UI copy)**
 - We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials tier, 10,000 free/month).
