@@ -13,7 +13,15 @@
       "Bash(* .env.local)",
       "Bash(* .env.local *)",
       "Bash(* ./.env.local)",
-      "Bash(* ./.env.local *)"
+      "Bash(* ./.env.local *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(gh)",
+      "Bash(gh *)",
+      "Bash(git remote)",
+      "Bash(git remote *)",
+      "Bash(git config)",
+      "Bash(git config *)"
     ]
   }
 }
