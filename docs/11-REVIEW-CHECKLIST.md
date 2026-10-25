@@ -24,7 +24,10 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] `googleSyncedAt` is the time of the Google call (the search response on Create/Link, or a refresh), never the import time; Google data older than 30 days cannot be saved
 - [ ] refresh-places runs daily; `NOT_FOUND` or a failure at 28+ days sets `lat/lng` to NULL and opens a `PLACE_REFRESH_FAILED` review item (test by backdating a row)
 - [ ] No scraping code anywhere (grep for `cheerio`, `puppeteer`, `playwright` outside tests, `foodpanda`)
-- [ ] Official Google Maps logo (unmodified) shown where Google data is displayed (admin import only)
+- [ ] Official Google Maps logo (unmodified) and the data-provider attributions shown with Google data (admin import only), apart from our own data
+- [ ] `next.config.ts` keeps `experimental.serverComponentsHmrCache: false` and `logging.serverFunctions: false`, so `next dev` neither caches nor prints Google data
+- [ ] Public responses and pages carry no Google coordinates; Google errors are kept as status codes only
+- [ ] `/terms` carries Google's Maps notice if any Google content reaches end users (Maps Platform Terms 3.2.2(a)(i))
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
 - [ ] Privacy page states what we store (email, ratings, photos) and how to delete
 

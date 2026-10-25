@@ -43,7 +43,7 @@
 
 ### Diner
 - D1. As a diner I can pick a city and a dish and see restaurants ranked for that dish, with score, number of votes, area and price band.
-- D2. I can filter by area and sort by score / votes / price, and see distance if I share location.
+- D2. I can filter by area and sort by score / votes / price. Distance when I share my location is (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates).
 - D3. I can open a restaurant page and see all its dishes with scores, best dish first.
 - D4. I can search a restaurant (Roman Urdu tolerant) and rate a dish there in under 30 seconds on my phone.
 - D5. If the dish I ate is not listed for that restaurant, I can add it from the dish list (never free text).

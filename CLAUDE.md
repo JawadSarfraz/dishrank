@@ -26,7 +26,7 @@ Roman-Urdu-tolerant search (karahi / kadai / karhai all work).
 - Better Auth with Google sign-in, Prisma adapter and database sessions; roles `USER | OWNER | ADMIN` enforced by `requireUser()` / `requireRole()` (ADR-11)
 - Supabase Storage for photos (menu photos, dish photos)
 - Anthropic API (Claude) for menu-photo → JSON and as the last-resort dish matcher
-- Google Places API (New) for **seeding candidates only**
+- Google Places API (New) **only** to find candidates (live admin search, planning tool) and for the daily coordinate refresh
 - Zod for all input validation
 - Vitest (unit), Playwright (e2e), ESLint + Prettier, pnpm
 - Deploy on Vercel; scheduled jobs via `vercel.json` crons hitting `/api/cron/*`

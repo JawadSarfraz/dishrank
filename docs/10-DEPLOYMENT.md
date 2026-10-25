@@ -7,7 +7,7 @@
 | GitHub | repo + CI | private repo |
 | Vercel | hosting, crons, analytics | Hobby is for non-commercial use; move to Pro ($20/mo) the month you charge a restaurant. Hobby crons run at most once per day — our schedule fits. |
 | Supabase | Postgres + Storage | Two projects: preview and production (Free allows 2). Region: ap-south-1 (Mumbai) for lowest latency from Pakistan. Free project pauses after ~1 week of inactivity; the daily cron keeps it alive, but a paused DB on launch day is a risk — upgrade to Pro ($25/mo) before launch marketing. |
-| Google Cloud | Places API (New) key, OAuth client | Restrict the Places key by API + server IP/referrer; restrict OAuth to your domains. |
+| Google Cloud | Places API (New) key, OAuth client | Restrict the Places key to the Places API (New) (an IP restriction is impossible for Vercel functions: KICKOFF-REVIEW OP-31); restrict OAuth to your domains. |
 | Anthropic Console | API key for vision + matcher | Set a monthly spend limit (e.g. $20). |
 | Domain | e.g. dishrank.pk / .com | Point to Vercel; set `NEXT_PUBLIC_SITE_URL`. |
 
@@ -32,7 +32,7 @@ SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
 SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
 SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
 
-# Google Places (seeding + daily location refresh of rows older than 25 days only); required from Phase 2
+# Google Places: /admin/import live search, pnpm seed:places (planning) and the daily refresh-places cron; required from Phase 2
 GOOGLE_PLACES_API_KEY=
 
 # Anthropic
@@ -44,7 +44,7 @@ ANTHROPIC_MATCH_MODEL=             # a small/fast Claude model id, e.g. claude-h
 NEXT_PUBLIC_SITE_URL=https://dishrank.pk
 CRON_SECRET=                       # openssl rand -hex 32
 ADMIN_EMAIL=                       # first admin: a Better Auth user-create hook gives this email role ADMIN on first sign-in
-NODE_ENV=development
+# NODE_ENV is set by Next.js itself; do not put it in .env
 ```
 
 ## Environments

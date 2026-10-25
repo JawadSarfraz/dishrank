@@ -56,13 +56,13 @@ Acceptance
 ## Phase 4 — Ranking pages + SEO (8–10 h)
 
 Tasks
-- `RankingService.getRanking` (eligible/insufficient split, bootstrap mode, filters, distance)
-- `/[city]/best-[dish]`: list, browser-side filter bar (area, sort, distance; ranks stay city-wide), "Not enough votes yet" section, eligibility note, share button
+- `RankingService.getRanking` (eligible/insufficient split, bootstrap mode, filters; distance (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates))
+- `/[city]/best-[dish]`: list, browser-side filter bar (area, sort; ranks stay city-wide; distance on hold, see docs/OPEN-QUESTIONS.md), "Not enough votes yet" section, eligibility note, share button
 - `/[city]/r/[slug]`: restaurant page with dish scores + "Rate" buttons + "Upload menu photo"
 - `/`, `/[city]`: dish grids with eligible counts
 - Metadata: title/description per page, canonical, OpenGraph, JSON-LD `ItemList` + `Restaurant`; `sitemap.ts`, `robots.ts`
 - ISR 3600s + `revalidatePath` after rating writes
-- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms`
+- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (`/terms` carries Google's Maps notice if any Google content reaches end users: Maps Platform Terms 3.2.2(a)(i), docs/OPEN-QUESTIONS.md)
 - `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`, DishStat, stale, snapshot, JobRun)
 
 Acceptance

@@ -21,7 +21,7 @@ flowchart LR
   App --> DB[("PostgreSQL<br/>Supabase")]
   App --> Store[("Object storage<br/>Supabase Storage")]
   App -->|OAuth sign-in| GAuth["Google OAuth"]
-  App -->|seed candidates only| Places["Google Places API (New)"]
+  App -->|find candidates, daily location refresh| Places["Google Places API (New)"]
   App -->|menu photo to JSON, matcher fallback| LLM["Anthropic API"]
   Cron["Vercel Cron"] -->|nightly recompute, daily Places refresh| App
 ```
@@ -219,7 +219,7 @@ dishrank/
 │   │   ├── restaurant/    # RestaurantHeader, DishScoreList
 │   │   ├── layout/        # Nav, Footer, CityPicker
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
-│   │   └── admin/         # import preview, restaurant forms, merge dialog (admin pages only)
+│   │   └── admin/         # live import results, Create form, restaurant forms, merge dialog (admin pages only)
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
@@ -256,8 +256,8 @@ dishrank/
 | Auth | Better Auth (ADR-11): Google sign-in, Prisma adapter, database sessions. The session cookie cache stays off, so every check reads the session and `User.role` from the DB and role changes apply at once. `role` is a Better Auth additional field with `input: false`, so no client can set it. `requireUser()` / `requireRole(role)` in `src/server/auth.ts` wrap `auth.api.getSession({ headers })` and throw `AppError` 401/403; actions and handlers call them first. Admin/owner services take the current user (`actor`) as their first argument and call `requireRole` themselves, so a page that forgets its check still cannot read admin data. Layouts and every page under `admin/` and `owner/` call `requirePageRole(role)`: signed-out visitors are redirected to `/sign-in?callbackUrl=…`; signed-in users without the role see the `Forbidden` component (HTTP 200, `noindex`) and no admin data is fetched. Next.js `forbidden()` is not used because it is still experimental (`authInterrupts`). |
 | Validation | Zod schemas in `src/server/validation`, shared by actions and API. |
 | Rate limiting | `rate_limit_buckets` table, sliding window per `(key, action)`. Limits in docs/06. |
-| Caching | Public pages `revalidate = 3600`; `revalidatePath` after rating write for the affected ranking + restaurant pages. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter, sort and distance in the browser and city-wide rank numbers. |
-| Geo | `lat/lng` columns; distance via haversine SQL expression; no PostGIS in v1 (ADR-5). |
+| Caching | Public pages `revalidate = 3600`; `revalidatePath` after rating write for the affected ranking + restaurant pages. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter and sort in the browser and city-wide rank numbers; distance is (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates). |
+| Geo | `lat/lng` columns. For a Google-linked restaurant they are Google's: kept at most 30 days for our own use (refresh, map link), never re-served in public responses and never an input for derived data. Distance features are on hold (docs/OPEN-QUESTIONS.md, Phase 4). No PostGIS in v1 (ADR-5). |
 | Search | `pg_trgm` GIN indexes on `restaurants.name`, `restaurants.search_text` and `dish_alias.alias` (one row per dish spelling; matched one alias at a time, docs/05). |
 | Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. Two scheduled crons: recompute (with stale marking) and the daily Places refresh. |
 | Env | `src/env.ts` parses `process.env` with Zod. `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
@@ -273,7 +273,7 @@ dishrank/
 | ADR-2 | Postgres + Prisma on Supabase | Relational data, trigram search, free tier, storage included | > 500 MB DB or need PostGIS |
 | ADR-3 | TypeScript only in v1 (no Python) | One language, one toolchain | Heavy NLP batch work |
 | ADR-4 | Google Places only to find candidates (shown, never saved); we keep just the place id and a ≤ 30-day location; humans type name and address | Policy compliance + data we own | Never |
-| ADR-5 | No PostGIS; haversine on lat/lng | City-scale data, simpler Prisma | Multi-city nearby search at scale |
+| ADR-5 | No PostGIS; haversine only on coordinates we own (not Google's; see the Phase 4 open question) | City-scale data, simpler Prisma | Multi-city nearby search at scale |
 | ADR-6 | Ratings 1–10 + Bayesian score; pairwise votes deferred | Simple to explain, enough signal early | Phase 7 (pairwise/Bradley-Terry blend) |
 | ADR-7 | Precomputed aggregates on `restaurant_dishes` | Ranking page is one indexed query | Need per-user personalised ranking |
 | ADR-8 | ISR public pages + on-demand revalidation | SEO + speed on 3G | Real-time needs |

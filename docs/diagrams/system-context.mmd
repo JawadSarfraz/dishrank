@@ -6,6 +6,6 @@ flowchart LR
   App --> DB[("PostgreSQL<br/>Supabase")]
   App --> Store[("Object storage<br/>Supabase Storage")]
   App -->|OAuth sign-in| GAuth["Google OAuth"]
-  App -->|seed candidates only| Places["Google Places API (New)"]
+  App -->|find candidates, daily location refresh| Places["Google Places API (New)"]
   App -->|menu photo to JSON, matcher fallback| LLM["Anthropic API"]
   Cron["Vercel Cron"] -->|nightly recompute, daily Places refresh| App

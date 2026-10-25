@@ -32,9 +32,11 @@ All eight are fixed. The owner set up the laptop (Node 24, pnpm 12.14, PostgreSQ
 6. **Import never sets googleSyncedAt** (PL-22)
    - Problem: A NULL googleSyncedAt never matches "older than 25 days", so imported coordinates are never refreshed; phone/priceBand prefill is not in the field mask; CSV age is unbounded.
    - Fix: CSV carries `fetchedAt`; Create/Link sets `googleSyncedAt = fetchedAt`; refresh treats NULL as due; import refuses CSVs older than 30 days; drop phone/priceBand from the prefill.
+   - Superseded 2026-10-25 by the live search (ST-16): no CSV and no prefill; `googleSyncedAt` = the search response time; Create and Link accept results at most 24 hours old.
 7. **Places Text Search request body is invalid** (ST-15)
    - Problem: docs/07 sends `circle.center: {lat, lng}`; Places API (New) requires `{ latitude, longitude }`, so the Phase 2 seed script gets INVALID_ARGUMENT.
    - Fix: Fix docs/07 §1 step 2 to `center: { latitude, longitude }`.
+   - Superseded 2026-10-25: Text Search now sends `locationRestriction` (a rectangle), not a circle bias.
 8. **Restaurant merge collides with unique constraints** (AP-18, PL-19)
    - Problem: Merging two restaurants that serve the same dish, or that one user rated at both, violates `@@unique([restaurantId, dishId])` and `@@unique([restaurantDishId, userId])`; Prompt 3 ships merge in Phase 2.
    - Fix: One transaction: keep the stronger RD status, min price, union tags; on a rater collision keep the newer rating and log the other in RatingHistory; recompute; mark B DUPLICATE.
@@ -59,9 +61,9 @@ All eight are fixed. The owner set up the laptop (Node 24, pnpm 12.14, PostgreSQ
   Default: Add `aliases String[] @default([])` to Restaurant, include it in adminRestaurantInput and the /admin/restaurants edit form, and recompute searchText on write.
   Where: docs/05-DISH-TAXONOMY.md § Restaurant search (Roman Urdu tolerant); docs/03-DATA-MODEL.md § Prisma schema — model Restaurant; docs/06-API-SPEC.md § Admin (role ADMIN).
 - **OP-31** (minor) Google Places assumptions need re-verification: free-cap numbers may be stale, IP-restricting the key is impossible for Vercel functions and a laptop script, and the cost line assumes caps hold.
-  Where: docs/07-DATA-PIPELINES.md § 1. Candidate seeding with Google Places (New); docs/07-DATA-PIPELINES.md § 1. Candidate seeding with Google Places (New); docs/10-DEPLOYMENT.md § Accounts to create.
+  Where: docs/07-DATA-PIPELINES.md § 1. Finding candidates with Google Places (New); docs/07-DATA-PIPELINES.md § 1. Finding candidates with Google Places (New); docs/10-DEPLOYMENT.md § Accounts to create.
 - **PL-32** (minor) Places budget math counts Islamabad only (~20 areas) while the seed has 30 areas across two cities; re-runs can exceed the Text Search Pro free tier.
-  Where: docs/07-DATA-PIPELINES.md § 1. Candidate seeding with Google Places (New); seed/areas.json § areas (islamabad: 20, rawalpindi: 10); docs/10-DEPLOYMENT.md § Cost estimate (first 6 months).
+  Where: docs/07-DATA-PIPELINES.md § 1. Finding candidates with Google Places (New); seed/areas.json § areas (islamabad: 20, rawalpindi: 10); docs/10-DEPLOYMENT.md § Cost estimate (first 6 months).
 
 ### Phase 3
 

@@ -142,9 +142,9 @@ Commit as: feat(rating): rating flow, abuse controls, incremental ranking
 ```
 Implement Phase 4 from docs/08 using docs/04 (query, eligibility, recomputeAll) and docs/01 (screens, copy guidelines).
 
-1. RankingService.getRanking({ citySlug, dishSlug, areaSlug?, sort, lat?, lng?, radiusKm?, limit }) → { eligible, insufficient, mode, thresholds, computedAt } using the SQL in docs/04 and splitting by thresholds (bootstrap mode while City.launchedAt is NULL or within 60 days of it). The page calls it with city and dish only; areaSlug, sort and lat/lng serve GET /api/v1/rankings. Ranks are always city-wide. Distance via haversine in SQL when lat/lng provided (API only).
+1. RankingService.getRanking({ citySlug, dishSlug, areaSlug?, sort, lat?, lng?, radiusKm?, limit }) → { eligible, insufficient, mode, thresholds, computedAt } using the SQL in docs/04 and splitting by thresholds (bootstrap mode while City.launchedAt is NULL or within 60 days of it). The page calls it with city and dish only; areaSlug, sort and lat/lng serve GET /api/v1/rankings. Ranks are always city-wide. Distance (lat/lng/radiusKm): DO NOT BUILD until the owner decides the Phase 4 open question on distance and Google coordinates (docs/OPEN-QUESTIONS.md).
 2. Pages (RSC, export const revalidate = 3600):
-   - /[city]/best-[dish]: H1 "Best <Dish> in <City>", intro line with counts and mode label ("Early rankings" in bootstrap), FilterBar (client component: area select, sort by score/votes/price, distance once the browser shares its location; it filters and sorts the cached rows in the browser and never renumbers ranks; the server page never reads searchParams), RankingList rows: rank, restaurant name (link), area, score "8.3 · 23 votes", price if present, variant tags, "Rate this" button; then "Not enough votes yet" list; EligibilityNote linking to /how-rankings-work; share button (Web Share API fallback copy link).
+   - /[city]/best-[dish]: H1 "Best <Dish> in <City>", intro line with counts and mode label ("Early rankings" in bootstrap), FilterBar (client component: area select, sort by score/votes/price (no distance until that open question is decided); it filters and sorts the cached rows in the browser and never renumbers ranks; the server page never reads searchParams), RankingList rows: rank, restaurant name (link), area, score "8.3 · 23 votes", price if present, variant tags, "Rate this" button; then "Not enough votes yet" list; EligibilityNote linking to /how-rankings-work; share button (Web Share API fallback copy link).
    - /[city]/r/[slug]: header (name, area, address, price band, map link to Google Maps by lat/lng), dishes sorted eligible-by-score then by votes, each with score/votes/rank and "Rate" link, "Upload menu photo" (signed-in), "Report a problem" (flags). Show "Claimed" badge if claimed.
    - / and /[city]: city picker, launch dish grid with eligible counts, "Rate a dish" CTA.
    - Static pages: /how-rankings-work (plain-language version of docs/04 + trust rules from docs/01), /dispute (form → ReviewItem FLAG with reason OTHER + email to ADMIN_EMAIL env), /about, /privacy, /terms (placeholders I will edit).
@@ -174,7 +174,7 @@ Implement Phase 5 from docs/08 using docs/07 §3 and §6 and docs/05.
 4. /admin/review: tabs by type, open items first, each with a resolve panel implementing every action in docs/07 §6; resolution writes resolvedBy/resolution/resolvedAt; triggers recomputeOne when ratings change. Keyboard-friendly (j/k, enter) is a nice-to-have, not required.
 5. /admin/menu-uploads/[id]: image preview + items grouped matched / needs review / ignored; one-click assign for suggestions.
 6. Flags: "Report a problem" on restaurant page → POST /api/v1/flags; one OPEN FLAG review item per (RD, reason). Upheld NOT_SERVED ×3 → RD REMOVED; RESTAURANT_CLOSED upheld → restaurant CLOSED.
-7. Proposals: DISH_PROPOSAL resolve → create dish (slug, name, category) and its DishAlias rows (normalised); RESTAURANT_PROPOSAL resolve → create restaurant via the same confirm form as import.
+7. Proposals: DISH_PROPOSAL resolve → create dish (slug, name, category) and its DishAlias rows (normalised); RESTAURANT_PROPOSAL resolve → find the place with the live search on /admin/import and Create or Link it there (the admin types name and address; RestaurantCreateFields), or create it without a Google place from typed coordinates (adminRestaurantInput).
 
 Acceptance:
 - Parsing a real desi menu photo auto-matches ≥ 80% of items; the rest show in the queue with suggestions and can be assigned in one click.
@@ -216,7 +216,7 @@ Act as a reviewer who has not seen this code before. Read CLAUDE.md and docs/11-
 2. Where does the code persist Google Places fields other than place ID and lat/lng? (Grep the places module and import UI.)
 3. Can any user create a Dish row outside the admin resolve flow?
 4. Can an RD get a rank number while below thresholds? Trace getRanking and the page.
-5. What happens if ANTHROPIC_API_KEY or GOOGLE_PLACES_API_KEY is missing? (Should degrade gracefully.)
+5. What happens if ANTHROPIC_API_KEY is missing? (Should degrade gracefully.) GOOGLE_PLACES_API_KEY is required in production (src/env.ts); in development the import answers PLACES_KEY_MISSING and the refresh counts due rows as failures.
 6. Any N+1 queries on ranking or restaurant pages? Any client components that could be server components?
 7. Any TODOs without an entry in docs/OPEN-QUESTIONS.md?
 
