@@ -11,7 +11,7 @@ function files(dir: string): string[] {
   return fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((entry) => {
     const rel = path.join(dir, entry.name);
     if (entry.isDirectory()) return entry.name === "generated" ? [] : files(rel);
-    return /\.(ts|tsx|json|mjs|mts)$/.test(entry.name) ? [rel] : [];
+    return /\.(ts|tsx|json|mjs|mts|prisma)$/.test(entry.name) ? [rel] : []; // not the migration history
   });
 }
 
