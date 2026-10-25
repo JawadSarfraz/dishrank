@@ -1,5 +1,5 @@
-// Flags, owner claims, menu uploads and review items: the moves a restaurant merge needs, and the
-// review items the Places refresh opens and resolves.
+// Flags, owner claims, menu uploads, location observations and review items: the moves a
+// restaurant merge needs, and review item helpers.
 import type { Prisma, ReviewItemType } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Client, Tx } from "./transaction";
@@ -38,6 +38,18 @@ export async function deleteClaims(ids: readonly string[], tx: Tx) {
 
 export async function moveMenuUploads(fromRestaurantId: string, toRestaurantId: string, tx: Tx) {
   return tx.menuUpload.updateMany({
+    where: { restaurantId: fromRestaurantId },
+    data: { restaurantId: toRestaurantId },
+  });
+}
+
+/** Panel members' on-site locations describe the place, so they follow it into a merge. */
+export async function moveLocationObservations(
+  fromRestaurantId: string,
+  toRestaurantId: string,
+  tx: Tx,
+) {
+  return tx.locationObservation.updateMany({
     where: { restaurantId: fromRestaurantId },
     data: { restaurantId: toRestaurantId },
   });

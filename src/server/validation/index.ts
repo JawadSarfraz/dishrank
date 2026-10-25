@@ -279,6 +279,8 @@ export const REVIEW_ACTIONS: Record<ReviewItemType, readonly ReviewAction[]> = {
   SUSPICIOUS_RATINGS: ["release", "hide", "ban_users"],
   OWNER_CLAIM: ["approve", "reject"],
   DUPLICATE_RESTAURANT: ["merge", "keep_both"],
+  // A panel member's on-site location for a restaurant without one, or far from it (docs/07 §7).
+  LOCATION_SUGGESTION: ["approve", "reject"],
 };
 
 export function isReviewActionAllowed(type: ReviewItemType, action: ReviewAction): boolean {

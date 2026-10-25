@@ -71,6 +71,7 @@ enum ReviewItemType {
   SUSPICIOUS_RATINGS
   OWNER_CLAIM
   DUPLICATE_RESTAURANT
+  LOCATION_SUGGESTION
 }
 
 enum ReviewItemStatus {
@@ -99,10 +100,11 @@ enum RestaurantSource {
   MANUAL
 }
 
-/// Where a restaurant's lat/lng came from (PANEL_GPS arrives with panel visits).
+/// Where a restaurant's lat/lng came from.
 enum LocationSource {
   OVERTURE
   ADMIN
+  PANEL_GPS // an admin accepted a panel member's on-site location (docs/07 §7)
 }
 
 /// Review state of an Overture place (docs/07 §2).
@@ -140,16 +142,17 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts           Account[]
-  sessions           Session[]
-  ratings            Rating[]
-  flags              Flag[]
-  claims             OwnerClaim[]
-  menuUploads        MenuUpload[]
-  resolvedItems      ReviewItem[]        @relation("resolver")
-  createdItems       ReviewItem[]        @relation("creator")
-  claimedRestaurants Restaurant[]
-  reviewedCandidates OvertureCandidate[]
+  accounts             Account[]
+  sessions             Session[]
+  ratings              Rating[]
+  flags                Flag[]
+  claims               OwnerClaim[]
+  menuUploads          MenuUpload[]
+  resolvedItems        ReviewItem[]          @relation("resolver")
+  createdItems         ReviewItem[]          @relation("creator")
+  claimedRestaurants   Restaurant[]
+  reviewedCandidates   OvertureCandidate[]
+  locationObservations LocationObservation[]
 }
 
 model Account {
@@ -250,16 +253,17 @@ model Restaurant {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  city        City                @relation(fields: [cityId], references: [id])
-  mergedInto  Restaurant?         @relation("merge", fields: [mergedIntoId], references: [id])
-  mergedFrom  Restaurant[]        @relation("merge")
-  area        Area?               @relation(fields: [areaId], references: [id])
-  claimedBy   User?               @relation(fields: [claimedByUserId], references: [id])
-  dishes      RestaurantDish[]
-  menuUploads MenuUpload[]
-  claims      OwnerClaim[]
-  reviewItems ReviewItem[]
-  candidates  OvertureCandidate[]
+  city                 City                  @relation(fields: [cityId], references: [id])
+  mergedInto           Restaurant?           @relation("merge", fields: [mergedIntoId], references: [id])
+  mergedFrom           Restaurant[]          @relation("merge")
+  area                 Area?                 @relation(fields: [areaId], references: [id])
+  claimedBy            User?                 @relation(fields: [claimedByUserId], references: [id])
+  dishes               RestaurantDish[]
+  menuUploads          MenuUpload[]
+  claims               OwnerClaim[]
+  reviewItems          ReviewItem[]
+  candidates           OvertureCandidate[]
+  locationObservations LocationObservation[]
 
   @@index([cityId, status])
   @@index([cityId, areaId])
@@ -303,6 +307,24 @@ model OvertureCandidate {
 
   @@index([cityId, status, suggestedAreaId])
   @@index([restaurantId])
+}
+
+// A panel member's browser location while rating at a restaurant (docs/07 §7). Kept apart from the
+// rating, and only when the browser reports an accuracy of 50 m or better. Restaurants without a
+// location, or far from it, get a LOCATION_SUGGESTION review item; accepting it sets PANEL_GPS.
+model LocationObservation {
+  id           String   @id @default(cuid())
+  restaurantId String
+  userId       String
+  lat          Float
+  lng          Float
+  accuracyM    Float // browser-reported accuracy radius in metres (≤ 50)
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
 }
 
 // ---------- Dish taxonomy ----------

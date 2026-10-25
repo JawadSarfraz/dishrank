@@ -44,6 +44,7 @@ import {
   listFlagsOfRestaurantDishes,
   moveClaims,
   moveFlags,
+  moveLocationObservations,
   moveMenuUploads,
   moveOpenReviewItems,
 } from "@/server/repositories/moderation.repo";
@@ -58,6 +59,7 @@ import type {
   RestaurantSearchQuery,
 } from "@/server/validation";
 import { rethrowConflict } from "./conflict";
+import { recomputeOne, rerankRestaurant } from "./ranking.service";
 import { cleanText } from "./matching/normalize";
 import {
   planClaimMerge,
@@ -305,6 +307,8 @@ export async function setRestaurantStatus(
   const restaurant = await loadEditable(id);
   if (restaurant.status !== status) {
     await updateRestaurantById(id, { status });
+    // Only ACTIVE restaurants rank (docs/04): its dish rows gain or lose their rank numbers now.
+    await rerankRestaurant(id);
     logEvent("restaurant.status", {
       userId: admin.id,
       entityId: id,
@@ -524,6 +528,7 @@ export type MergeResult = {
   movedMenuUploads: number;
   movedReviewItems: number;
   movedCandidates: number;
+  movedLocationObservations: number;
   ownerMoved: boolean;
   overtureIdMoved: boolean;
   locationMoved: boolean;
@@ -533,14 +538,9 @@ export type MergeResult = {
   dishSlugs: string[];
 };
 
-/**
- * Step 7 hook. RankingService.recomputeOne arrives in Phase 3 (no ratings exist before it).
- */
-// DECISION-PENDING: until Phase 3 the merge only logs the rows to recompute; Phase 3 wires recomputeOne here.
+/** Step 7: recompute the kept rows whose ratings changed (each recompute re-ranks its list). */
 export async function recomputeAfterMerge(restaurantDishIds: readonly string[]): Promise<void> {
-  if (restaurantDishIds.length > 0) {
-    logEvent("restaurant.merge.recompute_pending", { restaurantDishIds }, "warn");
-  }
+  for (const id of restaurantDishIds) await recomputeOne(id);
 }
 
 /** Merges `sourceId` into `targetId` in one transaction; the source becomes DUPLICATE. */
@@ -599,6 +599,7 @@ export async function mergeRestaurants(
       movedMenuUploads: 0,
       movedReviewItems: 0,
       movedCandidates: 0,
+      movedLocationObservations: 0,
       ownerMoved: owner.moveToTarget,
       overtureIdMoved: false,
       locationMoved: false,
@@ -673,6 +674,7 @@ export async function mergeRestaurants(
     out.movedClaims = claimPlan.move;
     out.movedReviewItems = (await moveOpenReviewItems(sourceId, targetId, tx)).count;
     out.movedCandidates = (await moveCandidatesToRestaurant(sourceId, targetId, tx)).count;
+    out.movedLocationObservations = (await moveLocationObservations(sourceId, targetId, tx)).count;
 
     // Steps 5-6: Overture id and location (the target keeps its own; it takes the source's only
     // when it has none; the unique overtureId is cleared on the source first), owner, status.
@@ -711,6 +713,8 @@ export async function mergeRestaurants(
   }, 60_000).catch(rethrowConflict);
 
   await afterCommit(result.recomputeIds);
+  // The target now holds the source's dish rows: re-rank its lists (names break ties).
+  await rerankRestaurant(targetId);
   logEvent("restaurant.merge", {
     userId: admin.id,
     sourceId,
@@ -726,6 +730,7 @@ export async function mergeRestaurants(
     movedMenuUploads: result.movedMenuUploads,
     movedReviewItems: result.movedReviewItems,
     movedCandidates: result.movedCandidates,
+    movedLocationObservations: result.movedLocationObservations,
     ownerMoved: result.ownerMoved,
     overtureIdMoved: result.overtureIdMoved,
     locationMoved: result.locationMoved,

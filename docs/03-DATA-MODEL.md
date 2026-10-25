@@ -27,6 +27,8 @@ erDiagram
   CITY ||--o{ OVERTURE_CANDIDATE : stages
   AREA o|--o{ OVERTURE_CANDIDATE : suggested_for
   RESTAURANT o|--o{ OVERTURE_CANDIDATE : created_from_or_linked
+  RESTAURANT ||--o{ LOCATION_OBSERVATION : observed_at
+  USER ||--o{ LOCATION_OBSERVATION : records
 
   RESTAURANT {
     string id PK
@@ -191,6 +193,7 @@ enum ReviewItemType {
   SUSPICIOUS_RATINGS
   OWNER_CLAIM
   DUPLICATE_RESTAURANT
+  LOCATION_SUGGESTION
 }
 
 enum ReviewItemStatus {
@@ -219,10 +222,11 @@ enum RestaurantSource {
   MANUAL
 }
 
-/// Where a restaurant's lat/lng came from (PANEL_GPS arrives with panel visits).
+/// Where a restaurant's lat/lng came from.
 enum LocationSource {
   OVERTURE
   ADMIN
+  PANEL_GPS // an admin accepted a panel member's on-site location (docs/07 §7)
 }
 
 /// Review state of an Overture place (docs/07 §2).
@@ -260,16 +264,17 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts           Account[]
-  sessions           Session[]
-  ratings            Rating[]
-  flags              Flag[]
-  claims             OwnerClaim[]
-  menuUploads        MenuUpload[]
-  resolvedItems      ReviewItem[]        @relation("resolver")
-  createdItems       ReviewItem[]        @relation("creator")
-  claimedRestaurants Restaurant[]
-  reviewedCandidates OvertureCandidate[]
+  accounts             Account[]
+  sessions             Session[]
+  ratings              Rating[]
+  flags                Flag[]
+  claims               OwnerClaim[]
+  menuUploads          MenuUpload[]
+  resolvedItems        ReviewItem[]          @relation("resolver")
+  createdItems         ReviewItem[]          @relation("creator")
+  claimedRestaurants   Restaurant[]
+  reviewedCandidates   OvertureCandidate[]
+  locationObservations LocationObservation[]
 }
 
 model Account {
@@ -370,16 +375,17 @@ model Restaurant {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  city        City                @relation(fields: [cityId], references: [id])
-  mergedInto  Restaurant?         @relation("merge", fields: [mergedIntoId], references: [id])
-  mergedFrom  Restaurant[]        @relation("merge")
-  area        Area?               @relation(fields: [areaId], references: [id])
-  claimedBy   User?               @relation(fields: [claimedByUserId], references: [id])
-  dishes      RestaurantDish[]
-  menuUploads MenuUpload[]
-  claims      OwnerClaim[]
-  reviewItems ReviewItem[]
-  candidates  OvertureCandidate[]
+  city                 City                  @relation(fields: [cityId], references: [id])
+  mergedInto           Restaurant?           @relation("merge", fields: [mergedIntoId], references: [id])
+  mergedFrom           Restaurant[]          @relation("merge")
+  area                 Area?                 @relation(fields: [areaId], references: [id])
+  claimedBy            User?                 @relation(fields: [claimedByUserId], references: [id])
+  dishes               RestaurantDish[]
+  menuUploads          MenuUpload[]
+  claims               OwnerClaim[]
+  reviewItems          ReviewItem[]
+  candidates           OvertureCandidate[]
+  locationObservations LocationObservation[]
 
   @@index([cityId, status])
   @@index([cityId, areaId])
@@ -423,6 +429,24 @@ model OvertureCandidate {
 
   @@index([cityId, status, suggestedAreaId])
   @@index([restaurantId])
+}
+
+// A panel member's browser location while rating at a restaurant (docs/07 §7). Kept apart from the
+// rating, and only when the browser reports an accuracy of 50 m or better. Restaurants without a
+// location, or far from it, get a LOCATION_SUGGESTION review item; accepting it sets PANEL_GPS.
+model LocationObservation {
+  id           String   @id @default(cuid())
+  restaurantId String
+  userId       String
+  lat          Float
+  lng          Float
+  accuracyM    Float // browser-reported accuracy radius in metres (≤ 50)
+  createdAt    DateTime @default(now())
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId, createdAt])
 }
 
 // ---------- Dish taxonomy ----------
@@ -694,7 +718,9 @@ CREATE INDEX IF NOT EXISTS dish_alias_trgm ON "DishAlias" USING gin ("alias" gin
 5. `User.trustScore` ∈ [0.3, 1.5].
 6. A `Restaurant` with `status != ACTIVE` never appears in rankings or search.
 6a. `Restaurant.mergedIntoId` is set if and only if `status = DUPLICATE`.
-6b. `Restaurant.lat`, `lng` and `locationSource` are all NULL or all set. Coordinates are our own: from Overture (`OVERTURE`, only when the place is not on a placeholder point) or typed by an admin (`ADMIN`). No Google data is stored anywhere (ADR-13).
+6b. `Restaurant.lat`, `lng` and `locationSource` are all NULL or all set. Coordinates are our own: from Overture (`OVERTURE`, only when the place is not on a placeholder point), typed by an admin (`ADMIN`), or a panel member's on-site location an admin accepted (`PANEL_GPS`). No Google data is stored anywhere (ADR-13).
+6e. `LocationObservation` rows come only from panel members (checked on the server) with a browser accuracy of 50 m or better; they never sit on a `Rating`.
+6f. `RestaurantDish.rankInCity` is set only by RankingService's re-rank (SQL eligibility, docs/04), which runs after every recompute, restaurant status change and merge.
 6c. `Restaurant.source` never changes after creation. `OVERTURE` restaurants come from an `OvertureCandidate` reviewed on /admin/import; `MANUAL` ones were typed by an admin.
 6d. `OvertureCandidate` rows are only added by `pnpm overture:sync` (one per GERS id, Meta and Microsoft records only, no Google links in `address` or `website`). A sync never changes an existing row except `lastSeenRelease`; review actions change only `status`, `skipReason`, `restaurantId`, `reviewedByUserId` and `reviewedAt`, and only from `NEW` (Reopen: `SKIPPED` → `NEW`).
 7. `User.isPanel = true` implies `trustScore = 1.3`; only admins change `isPanel`.

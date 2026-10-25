@@ -28,9 +28,16 @@ export async function dishId(slug: string) {
   return (await db.dish.findUniqueOrThrow({ where: { slug } })).id;
 }
 
-export async function makeUser(name = "Rater") {
-  return db.user.create({ data: { email: `${uid()}@test.local`, name } });
+export async function makeUser(
+  name = "Rater",
+  over: Partial<Prisma.UserUncheckedCreateInput> = {},
+) {
+  return db.user.create({ data: { email: `${uid()}@test.local`, name, ...over } });
 }
+
+/** The service-layer view of a user row (role from the row, never from the client). */
+export const actorOf = (user: { id: string; email: string; name: string; role: string }) =>
+  ({ id: user.id, email: user.email, name: user.name, role: user.role }) as SessionUser;
 
 export async function makeRestaurant(
   name: string,
