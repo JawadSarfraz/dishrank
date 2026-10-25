@@ -6,6 +6,15 @@ export async function startJobRun(name: string, startedAt: Date) {
   return db.jobRun.create({ data: { name, startedAt }, select: { id: true } });
 }
 
+/** Every run of one job, oldest first. */
+export async function listJobRuns(name: string) {
+  return db.jobRun.findMany({
+    where: { name },
+    orderBy: { startedAt: "asc" },
+    select: { id: true, startedAt: true, ok: true, summary: true },
+  });
+}
+
 /** Successful runs of one job, oldest first. */
 export async function listSuccessfulJobRuns(name: string) {
   return db.jobRun.findMany({

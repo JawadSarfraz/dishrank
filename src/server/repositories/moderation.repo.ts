@@ -43,6 +43,21 @@ export async function moveMenuUploads(fromRestaurantId: string, toRestaurantId: 
   });
 }
 
+/** A panel member's on-site location (docs/07 §7); never stored on the rating. */
+export async function insertLocationObservation(
+  data: {
+    restaurantId: string;
+    userId: string;
+    lat: number;
+    lng: number;
+    accuracyM: number;
+    createdAt: Date;
+  },
+  tx: Tx,
+) {
+  return tx.locationObservation.create({ data, select: { id: true } });
+}
+
 /** Panel members' on-site locations describe the place, so they follow it into a merge. */
 export async function moveLocationObservations(
   fromRestaurantId: string,

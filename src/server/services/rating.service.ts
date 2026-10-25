@@ -22,6 +22,7 @@ import {
   findRatingWithPlace,
   insertRating,
   listBurstRatings,
+  deleteRating,
   listRatingsOfUser,
   setRatingStatus,
   updateRating,
@@ -29,6 +30,7 @@ import {
 import {
   ensureRestaurantDish,
   findRestaurantDish,
+  reviveRestaurantDish,
 } from "@/server/repositories/restaurant-dish.repo";
 import { findRestaurantById } from "@/server/repositories/restaurant.repo";
 import { findDishById } from "@/server/repositories/taxonomy.repo";
@@ -315,10 +317,7 @@ export async function createOrReplace(
 
     // docs/02 lifecycle: a new rating revives a STALE row.
     if (rd.status === "STALE" && status === "ACTIVE") {
-      await tx.restaurantDish.update({
-        where: { id: rd.id },
-        data: { status: "USER_CONFIRMED", lastVerifiedAt: now },
-      });
+      await reviveRestaurantDish(rd.id, now, tx);
     }
 
     const burstHeld = await applyBurstRule(rd, now, tx);
@@ -394,7 +393,7 @@ export async function deleteOwn(
   }
   await assertRateLimit(`user:${user.id}:rating-delete`, RATE_LIMITS.ratingDelete, now);
   await inTransaction(async (tx) => {
-    await tx.rating.delete({ where: { id: rating.id } }); // its history goes with it (cascade)
+    await deleteRating(rating.id, tx); // its history goes with it (cascade)
     await adjustRatingCounters(user.id, { ratings: -1, photos: rating.photoPath ? -1 : 0 }, tx);
   });
   await recomputeOne(rating.restaurantDishId, now);

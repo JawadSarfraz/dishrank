@@ -58,6 +58,15 @@ export async function ensureRestaurantDish(
 }
 
 /** Which of these (restaurant, dish) pairs already exist, for the import preview. */
+/** docs/02 lifecycle: a STALE row that gets a new rating is confirmed again. */
+export async function reviveRestaurantDish(id: string, now: Date, tx: Tx) {
+  await tx.restaurantDish.update({
+    where: { id },
+    data: { status: "USER_CONFIRMED", lastVerifiedAt: now },
+    select: { id: true },
+  });
+}
+
 export async function listRestaurantDishPairs(
   restaurantIds: readonly string[],
   dishIds: readonly string[],

@@ -25,6 +25,7 @@ import {
   updateRestaurantById,
 } from "@/server/repositories/restaurant.repo";
 import {
+  findDishById,
   findDishBySlug,
   findDishCategory,
   findTakenAliases,
@@ -267,10 +268,7 @@ async function decideDishProposal(input: ReviewResolveInput, tx: Tx): Promise<De
     };
   }
   if (input.action === "map_to_dish") {
-    const dish = await tx.dish.findUnique({
-      where: { id: input.payload.dishId },
-      select: { id: true, slug: true },
-    });
+    const dish = await findDishById(input.payload.dishId, tx);
     if (!dish) throw new AppError("NOT_FOUND", "Dish not found", 404);
     return {
       status: "RESOLVED",

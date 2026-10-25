@@ -2,6 +2,19 @@
 import { Prisma } from "@/generated/prisma/client";
 import type { Tx } from "./transaction";
 
+/** The (city, dish) list a dish row belongs to; neither ever changes. */
+export async function findRestaurantDishList(id: string, tx: Tx) {
+  return tx.restaurantDish.findUnique({ where: { id }, select: { cityId: true, dishId: true } });
+}
+
+export async function findRestaurantStatus(restaurantId: string, tx: Tx) {
+  return tx.restaurant.findUnique({ where: { id: restaurantId }, select: { status: true } });
+}
+
+export async function findRankInCity(id: string, tx: Tx) {
+  return tx.restaurantDish.findUniqueOrThrow({ where: { id }, select: { rankInCity: true } });
+}
+
 /** Locks the dish row for one recompute, so two recomputes of it never interleave. */
 export async function lockRestaurantDish(id: string, tx: Tx) {
   const rows = await tx.$queryRaw<

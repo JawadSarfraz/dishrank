@@ -9,6 +9,7 @@ import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
   createReviewItem,
   findOpenReviewItem,
+  insertLocationObservation,
   updateReviewItemPayload,
 } from "@/server/repositories/moderation.repo";
 import { findRestaurantById } from "@/server/repositories/restaurant.repo";
@@ -64,8 +65,8 @@ export async function recordLocationObservation(
   const distanceM = distanceTo(input);
 
   const result = await inTransaction(async (tx) => {
-    const observation = await tx.locationObservation.create({
-      data: {
+    const observation = await insertLocationObservation(
+      {
         restaurantId: restaurant.id,
         userId: rater.id,
         lat: input.lat,
@@ -73,8 +74,8 @@ export async function recordLocationObservation(
         accuracyM: input.accuracyM,
         createdAt: now,
       },
-      select: { id: true },
-    });
+      tx,
+    );
     const needsSuggestion = distanceM === null || distanceM > LOCATION_RULES.farM;
     const open = await findOpenReviewItem("LOCATION_SUGGESTION", restaurant.id, tx);
     if (!needsSuggestion && !open)

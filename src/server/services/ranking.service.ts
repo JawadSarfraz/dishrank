@@ -5,6 +5,9 @@ import { logEvent } from "@/server/log";
 import {
   findCityLaunch,
   findDishStat,
+  findRankInCity,
+  findRestaurantDishList,
+  findRestaurantStatus,
   listCountedRatings,
   listDishGroupsOfRestaurant,
   lockCityDish,
@@ -183,20 +186,16 @@ export async function recomputeOne(
   const started = Date.now();
   const result = await inTransaction(async (tx) => {
     // Lock order: the (city, dish) list first, then the row. A row's city and dish never change.
-    const head = await tx.restaurantDish.findUnique({
-      where: { id: restaurantDishId },
-      select: { cityId: true, dishId: true },
-    });
+    const head = await findRestaurantDishList(restaurantDishId, tx);
     if (!head) return null;
     await lockCityDish(head.cityId, head.dishId, tx);
     const rd = await lockRestaurantDish(restaurantDishId, tx);
     if (!rd) return null;
-    const [ratings, stat, city, restaurant] = await Promise.all([
-      listCountedRatings(rd.id, tx),
-      findDishStat(rd.cityId, rd.dishId, tx),
-      findCityLaunch(rd.cityId, tx),
-      tx.restaurant.findUnique({ where: { id: rd.restaurantId }, select: { status: true } }),
-    ]);
+    // One after another: a transaction is one connection, and pg refuses overlapping queries on it.
+    const ratings = await listCountedRatings(rd.id, tx);
+    const stat = await findDishStat(rd.cityId, rd.dishId, tx);
+    const city = await findCityLaunch(rd.cityId, tx);
+    const restaurant = await findRestaurantStatus(rd.restaurantId, tx);
     const agg = aggregateRatings(ratings, now);
     const score =
       agg.rawMean === null ? null : round3(bayesScore(agg.weightSum, agg.rawMean, cityPrior(stat)));
@@ -217,10 +216,7 @@ export async function recomputeOne(
     );
     const t = thresholdsFor(city?.launchedAt ?? null, now);
     await rerank(rd.cityId, rd.dishId, t, tx);
-    const ranked = await tx.restaurantDish.findUniqueOrThrow({
-      where: { id: rd.id },
-      select: { rankInCity: true },
-    });
+    const ranked = await findRankInCity(rd.id, tx);
     const row = {
       status: updated.status,
       distinctRaters: agg.distinctRaters,
@@ -255,14 +251,29 @@ export async function recomputeOne(
   return result;
 }
 
+async function rerankLists(
+  lists: readonly { cityId: string; dishId: string }[],
+  now: Date,
+  tx: Tx,
+) {
+  for (const g of lists) {
+    await lockCityDish(g.cityId, g.dishId, tx);
+    const city = await findCityLaunch(g.cityId, tx);
+    await rerank(g.cityId, g.dishId, thresholdsFor(city?.launchedAt ?? null, now), tx);
+  }
+}
+
 /** Re-ranks every (city, dish) list a restaurant appears in (after a status change or merge). */
 export async function rerankRestaurant(restaurantId: string, now: Date = new Date()) {
-  await inTransaction(async (tx) => {
-    const groups = await listDishGroupsOfRestaurant(restaurantId, tx);
-    for (const g of groups) {
-      await lockCityDish(g.cityId, g.dishId, tx);
-      const city = await findCityLaunch(g.cityId, tx);
-      await rerank(g.cityId, g.dishId, thresholdsFor(city?.launchedAt ?? null, now), tx);
-    }
-  });
+  await inTransaction(async (tx) =>
+    rerankLists(await listDishGroupsOfRestaurant(restaurantId, tx), now, tx),
+  );
+}
+
+/** Re-ranks the given (city, dish) lists, e.g. after rows were deleted from them. */
+export async function rerankCityDishes(
+  lists: readonly { cityId: string; dishId: string }[],
+  now: Date = new Date(),
+) {
+  await inTransaction(async (tx) => rerankLists(lists, now, tx));
 }

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:demo": "tsx scripts/dev-demo.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
