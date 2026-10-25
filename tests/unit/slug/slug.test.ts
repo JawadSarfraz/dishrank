@@ -5,8 +5,8 @@ describe("slugify", () => {
   it.each([
     [["Butt Karahi", "F-7"], "butt-karahi-f-7"],
     [["Chicken Karahi"], "chicken-karahi"],
-    [["Café Déjà Vu"], "cafe-deja-vu"],
-    [["  Savour Foods  (Blue Area) "], "savour-foods-blue-area"],
+    [["Café Fixturé"], "cafe-fixture"],
+    [["  Fixture Foods  (Blue Area) "], "fixture-foods-blue-area"],
     [["Kabab & Grill"], "kabab-and-grill"],
     [["Bahria Town (Phase 1-8)"], "bahria-town-phase-1-8"],
     [["کڑاہی"], ""],
@@ -15,7 +15,7 @@ describe("slugify", () => {
   });
 
   it("produces valid slugs", () => {
-    expect(isSlug(slugify("Monal", "Pir Sohawa"))).toBe(true);
+    expect(isSlug(slugify("Fixture Grill", "Pir Sohawa"))).toBe(true);
     expect(isSlug("Bad Slug")).toBe(false);
     expect(isSlug("trailing-")).toBe(false);
   });

@@ -18,14 +18,14 @@ import {
 describe("restaurant slugs", () => {
   it("adds the area as a suffix", () => {
     expect(restaurantSlugBase("Butt Karahi", "f-7")).toBe("butt-karahi-f-7");
-    expect(restaurantSlugBase("Café Déjà Vu & Grill", "blue-area")).toBe(
-      "cafe-deja-vu-and-grill-blue-area",
+    expect(restaurantSlugBase("Café Fixturé & Grill", "blue-area")).toBe(
+      "cafe-fixture-and-grill-blue-area",
     );
   });
 
   it("does not repeat an area the name already ends with", () => {
-    expect(restaurantSlugBase("Savour Foods Blue Area", "blue-area")).toBe(
-      "savour-foods-blue-area",
+    expect(restaurantSlugBase("Fixture Foods Blue Area", "blue-area")).toBe(
+      "fixture-foods-blue-area",
     );
     expect(restaurantSlugBase("F-7", "f-7")).toBe("f-7");
   });
@@ -51,15 +51,18 @@ describe("restaurant slugs", () => {
 
 describe("search text and aliases", () => {
   it("cleans the name and other names into one trigram string", () => {
-    expect(buildSearchText("Butt Karahi (Lakshmi Chowk)", ["But Karahi", "Butt's"])).toBe(
-      "butt karahi lakshmi chowk but karahi butt s",
+    expect(buildSearchText("Fixture Karahi (Testpur Chowk)", ["Fixtur Karahi", "Fixture's"])).toBe(
+      "fixture karahi testpur chowk fixtur karahi fixture s",
     );
   });
 
   it("drops blank, repeated and name-copy aliases", () => {
     expect(
-      normalizeAliases([" but karahi ", "BUT KARAHI", "", "Butt Karahi", "Lakshmi"], "Butt Karahi"),
-    ).toEqual(["but karahi", "Lakshmi"]);
+      normalizeAliases(
+        [" fixtur karahi ", "FIXTUR KARAHI", "", "Fixture Karahi", "Testpur"],
+        "Fixture Karahi",
+      ),
+    ).toEqual(["fixtur karahi", "Testpur"]);
   });
 });
 

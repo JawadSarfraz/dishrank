@@ -16,8 +16,8 @@ async function scenario() {
     await makeUser("owner"),
   ];
   const syncedAt = daysAgo(5);
-  const target = await makeRestaurant("Butt Karahi", { lat: 33.72, lng: 73.05 });
-  const source = await makeRestaurant("Butt Karahi Markaz", {
+  const target = await makeRestaurant("Fixture Karahi", { lat: 33.72, lng: 73.05 });
+  const source = await makeRestaurant("Fixture Karahi Markaz", {
     googlePlaceId: "ChIJ-source-place",
     lat: 33.7212,
     lng: 73.0571,

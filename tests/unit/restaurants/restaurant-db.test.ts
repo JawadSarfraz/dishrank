@@ -16,7 +16,7 @@ async function input(name: string, over: Record<string, unknown> = {}) {
     name,
     cityId: city.id,
     areaId: area.id,
-    address: "F-7 Markaz, Islamabad",
+    address: "Plot 1, Fixture Market",
     lat: 33.7215,
     lng: 73.0569,
     ...over,
@@ -38,14 +38,14 @@ describe("RestaurantService (test DB)", () => {
 
   it("gives every restaurant a unique slug with the area suffix", async () => {
     const created = await Promise.all(
-      ["Butt Karahi", "Butt Karahi", "Butt Karahi"].map(async (name) =>
+      ["Fixture Karahi", "Fixture Karahi", "Fixture Karahi"].map(async (name) =>
         createRestaurant(ADMIN, await input(name)),
       ),
     );
     expect(created.map((c) => c.restaurant.slug).sort()).toEqual([
-      "butt-karahi-f-7",
-      "butt-karahi-f-7-2",
-      "butt-karahi-f-7-3",
+      "fixture-karahi-f-7",
+      "fixture-karahi-f-7-2",
+      "fixture-karahi-f-7-3",
     ]);
   });
 
@@ -53,8 +53,8 @@ describe("RestaurantService (test DB)", () => {
     const fetchedAt = daysAgo(3);
     const { restaurant } = await createRestaurant(
       ADMIN,
-      await input("Savour Foods", {
-        googlePlaceId: "ChIJ-savour-0001",
+      await input("Fixture Pulao House", {
+        googlePlaceId: "ChIJ-fixture-0001",
         fetchedAt: fetchedAt.toISOString(),
       }),
     );
@@ -73,8 +73,8 @@ describe("RestaurantService (test DB)", () => {
     await expect(
       createRestaurant(
         ADMIN,
-        await input("Savour Again", {
-          googlePlaceId: "ChIJ-savour-0001",
+        await input("Fixture Again", {
+          googlePlaceId: "ChIJ-fixture-0001",
           fetchedAt: fetchedAt.toISOString(),
         }),
       ),
@@ -92,22 +92,22 @@ describe("RestaurantService (test DB)", () => {
 
   it('search "but karahi" finds "Butt Karahi" (typo, trigram ≥ 0.3), only ACTIVE, only in the city', async () => {
     await makeRestaurant("Butt Karahi");
-    await makeRestaurant("Butt Karahi Tikka", { status: "CLOSED" });
+    await makeRestaurant("Butt Karahi Fixture Closed", { status: "CLOSED" });
     await makeRestaurant("Butt Karahi", { citySlug: "rawalpindi", areaSlug: "saddar" });
-    await makeRestaurant("Monal");
+    await makeRestaurant("Fixture Grill");
     const hits = await searchRestaurants({ city: "islamabad", q: "but karahi" });
     expect(hits.map((h) => [h.name, h.area])).toEqual([["Butt Karahi", "F-7"]]);
   });
 
   it("finds a word inside a long name through the ILIKE fallback and other names through aliases", async () => {
-    await makeRestaurant("Kabul Restaurant Afghani Pulao and Tikka House");
-    await makeRestaurant("Usmania", { aliases: ["Usmania Lakshmi Chowk"] });
+    await makeRestaurant("Fixture Afghani Pulao and Tikka House Restaurant");
+    await makeRestaurant("Fixture Biryani", { aliases: ["Fixture Biryani Testpur Chowk"] });
     expect((await searchRestaurants({ city: "islamabad", q: "pulao" })).map((h) => h.name)).toEqual(
-      ["Kabul Restaurant Afghani Pulao and Tikka House"],
+      ["Fixture Afghani Pulao and Tikka House Restaurant"],
     );
     expect(
-      (await searchRestaurants({ city: "islamabad", q: "lakshmi" })).map((h) => h.name),
-    ).toEqual(["Usmania"]);
+      (await searchRestaurants({ city: "islamabad", q: "testpur" })).map((h) => h.name),
+    ).toEqual(["Fixture Biryani"]);
     expect(await searchRestaurants({ city: "islamabad", q: "!!!" })).toEqual([]);
     await expect(searchRestaurants({ city: "lahore", q: "x" })).rejects.toMatchObject({
       code: "CITY_NOT_FOUND",
@@ -116,23 +116,23 @@ describe("RestaurantService (test DB)", () => {
 
   it("edits a restaurant: new search text, same slug; Google coordinates cannot be typed", async () => {
     const { area } = await place("islamabad", "f-6");
-    const r = await makeRestaurant("Chaaye Khana", { googlePlaceId: "ChIJ-chaaye-001" });
+    const r = await makeRestaurant("Fixture Chai Corner", { googlePlaceId: "ChIJ-fixturechai1" });
     const edit = {
-      name: "Chaaye Khana F-6",
+      name: "Fixture Chai Corner F-6",
       areaId: area.id,
-      address: "Super Market",
+      address: "Plot 12, Fixture Market",
       phone: "0300 1234567",
       priceBand: 2,
-      aliases: ["chai khana"],
+      aliases: ["fixture chai"],
     };
     const out = await updateRestaurant(ADMIN, r.id, edit);
     expect(out.slug).toBe(r.slug);
     const row = await db.restaurant.findUniqueOrThrow({ where: { id: r.id } });
     expect(row).toMatchObject({
-      name: "Chaaye Khana F-6",
+      name: "Fixture Chai Corner F-6",
       phone: "0300 1234567", // services get validated input; Zod normalises phones before this
-      aliases: ["chai khana"],
-      searchText: "chaaye khana f 6 chai khana",
+      aliases: ["fixture chai"],
+      searchText: "fixture chai corner f 6 fixture chai",
     });
     await expect(
       updateRestaurant(ADMIN, r.id, { ...edit, lat: 33.7, lng: 73.1 }),
@@ -142,9 +142,9 @@ describe("RestaurantService (test DB)", () => {
   });
 
   it("changes status; a CLOSED restaurant leaves search and its page", async () => {
-    const r = await makeRestaurant("Cafe Aylanto");
+    const r = await makeRestaurant("Fixture Cafe");
     await setRestaurantStatus(ADMIN, r.id, "CLOSED");
-    expect(await searchRestaurants({ city: "islamabad", q: "aylanto" })).toEqual([]);
+    expect(await searchRestaurants({ city: "islamabad", q: "fixture cafe" })).toEqual([]);
     expect(await getPublicRestaurant(r.slug)).toEqual({ kind: "not_found" });
     await setRestaurantStatus(ADMIN, r.id, "ACTIVE");
     expect((await getPublicRestaurant(r.slug)).kind).toBe("found");

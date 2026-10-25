@@ -15,12 +15,18 @@ describe("restaurant API (docs/06, test DB)", () => {
   afterAll(() => db.$disconnect());
 
   it('GET /restaurants/search?q=but karahi returns "Butt Karahi"', async () => {
-    const butt = await makeRestaurant("Butt Karahi", { address: "F-7 Markaz" });
+    const butt = await makeRestaurant("Butt Karahi", { address: "Plot 5, Fixture Market" });
     const res = await search(get("/api/v1/restaurants/search?city=islamabad&q=but%20karahi"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       data: [
-        { id: butt.id, slug: butt.slug, name: "Butt Karahi", area: "F-7", address: "F-7 Markaz" },
+        {
+          id: butt.id,
+          slug: butt.slug,
+          name: "Butt Karahi",
+          area: "F-7",
+          address: "Plot 5, Fixture Market",
+        },
       ],
     });
   });
@@ -50,7 +56,7 @@ describe("restaurant API (docs/06, test DB)", () => {
   });
 
   it("GET /restaurants/:slug returns the restaurant with its dishes", async () => {
-    const r = await makeRestaurant("Savour Foods");
+    const r = await makeRestaurant("Fixture Pulao House");
     await makeDish(r, "chicken-pulao", { distinctRaters: 2 });
     await makeDish(r, "chicken-karahi", { status: "USER_CONFIRMED", rankInCity: 3, score: 8.1 });
     await makeDish(r, "haleem", { status: "REMOVED" });
@@ -59,7 +65,7 @@ describe("restaurant API (docs/06, test DB)", () => {
     const body = await res.json();
     expect(body.data.restaurant).toMatchObject({
       id: r.id,
-      name: "Savour Foods",
+      name: "Fixture Pulao House",
       area: { slug: "f-7" },
     });
     expect(body.data.claimed).toBe(false);
