@@ -76,9 +76,24 @@ export function isGoogleLink(token: string): boolean {
   return host !== null && GOOGLE_HOST.test(host);
 }
 
+/**
+ * One space between words. Overture's freeform text sometimes carries literal "\n" escapes, and a
+ * link can be glued to the word before it ("Arcade\nhttps://…"); both become word breaks.
+ */
+export function tidyText(text: string | null): string | null {
+  return (
+    (text ?? "")
+      .replace(/\\[nrt]/g, " ")
+      .replace(/(?=https?:\/\/)/gi, " ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" ") || null
+  );
+}
+
 /** The text without Google links (tidied only when one was removed); null when nothing is left. */
 export function stripGoogleLinks(text: string | null): string | null {
-  const tokens = (text ?? "").split(/\s+/).filter(Boolean);
+  const tokens = (tidyText(text) ?? "").split(" ").filter(Boolean);
   if (!tokens.some(isGoogleLink)) return tokens.join(" ") || null;
   const kept = tokens
     .filter((t) => !isGoogleLink(t))
@@ -232,7 +247,7 @@ export function buildCandidates(
     }
     const unknown = placeholders.has(pointKey(p));
     if (unknown) stats.locationUnknown++;
-    const rawAddress = (p.address ?? "").split(/\s+/).filter(Boolean).join(" ") || null;
+    const rawAddress = tidyText(p.address);
     const address = stripGoogleLinks(rawAddress);
     if (address !== rawAddress || p.websites.some(isGoogleLink)) stats.googleLinksRemoved++;
     drafts.push({

@@ -150,6 +150,11 @@ describe("Overture filters (docs/07 §1)", () => {
     expect(stripGoogleLinks("https://maps.app.goo.gl/AbC123, Islamabad")).toBe("Islamabad");
     expect(stripGoogleLinks("https://goo.gl/maps/xyz")).toBeNull();
     expect(stripGoogleLinks("Plot 7,  F-7 Markaz ")).toBe("Plot 7, F-7 Markaz"); // spaces only
+    // A literal "\n" escape glued to the link, as in one real record.
+    expect(stripGoogleLinks("Fixture Arcade\\nhttps://maps.app.goo.gl/AbC123")).toBe(
+      "Fixture Arcade",
+    );
+    expect(stripGoogleLinks("Fixture Arcadehttps://maps.app.goo.gl/AbC123")).toBe("Fixture Arcade");
     expect(
       pickWebsite([
         "https://www.google.com/maps/place/x",
