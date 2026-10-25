@@ -44,7 +44,8 @@ production `pnpm start` exits with code 1 and names every missing variable.
 | `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
 | `CRON_SECRET` | output of `openssl rand -hex 32` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (needed from Phase 3; local storage uses the preview project) |
-| `GOOGLE_PLACES_API_KEY`, `ANTHROPIC_*` | needed from Phases 1, 2 and 5 |
+| `GOOGLE_PLACES_API_KEY` | required from Phase 2 (seed script and the daily refresh cron): a Places API (New) key |
+| `ANTHROPIC_*` | optional; used from Phases 1 and 5 |
 
 Commands (same as `CLAUDE.md`):
 

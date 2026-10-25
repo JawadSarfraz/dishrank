@@ -32,7 +32,7 @@ SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
 SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
 SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
 
-# Google Places (seeding + daily location refresh of rows older than 25 days only)
+# Google Places (seeding + daily location refresh of rows older than 25 days only); required from Phase 2
 GOOGLE_PLACES_API_KEY=
 
 # Anthropic

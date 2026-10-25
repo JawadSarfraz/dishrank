@@ -24,6 +24,8 @@ const schema = z.object({
   ADMIN_EMAIL: z.email().optional(),
 
   CRON_SECRET: z.string().min(32, "must be at least 32 characters"),
+  // Phase 2: seed script and the daily refresh-places cron (docs/07).
+  GOOGLE_PLACES_API_KEY: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
 
   // Needed from later phases; optional until the code that uses them exists.
@@ -31,7 +33,6 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(), // Phase 3
   SUPABASE_DISH_PHOTOS_BUCKET: z.string().default("dish-photos"),
   SUPABASE_MENUS_BUCKET: z.string().default("menus"),
-  GOOGLE_PLACES_API_KEY: z.string().optional(), // Phase 2
   ANTHROPIC_API_KEY: z.string().optional(), // Phase 1 matcher skips the LLM step without it
   ANTHROPIC_VISION_MODEL: z.string().optional(), // Phase 5
   ANTHROPIC_MATCH_MODEL: z.string().optional(), // Phase 1
