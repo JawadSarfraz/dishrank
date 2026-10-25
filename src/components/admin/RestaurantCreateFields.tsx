@@ -18,7 +18,8 @@ export type CreateFieldsValues = {
 
 /**
  * The Create form for one search result (docs/07 §2). Name and address always start empty: the
- * admin types them from the signboard, the restaurant's own page or a visit. This component never
+ * admin types the name as on the signboard or the restaurant's own page, and a short address in
+ * their own words ("Jinnah Super, F-7 Markaz"). This component never
  * receives a Google name or address, so it cannot prefill one (CLAUDE.md rule 2).
  */
 export function RestaurantCreateFields({
@@ -62,8 +63,9 @@ export function RestaurantCreateFields({
   return (
     <form onSubmit={submit} className="flex flex-col gap-3 rounded-md bg-muted/40 p-3">
       <p className="text-xs font-medium">
-        Type the name and address yourself, from the signboard, the restaurant&apos;s own page or a
-        visit; nothing here is copied from Google.
+        Type the name as on the signboard or the restaurant&apos;s own page, and a short address in
+        your own words (e.g. &quot;Jinnah Super, F-7 Markaz&quot;); nothing here is copied from
+        Google.
       </p>
       <label htmlFor={fieldId("name")} className="flex flex-col gap-1 text-sm">
         Name

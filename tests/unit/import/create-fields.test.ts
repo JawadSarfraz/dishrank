@@ -41,7 +41,10 @@ describe("Create form (docs/07 §2)", () => {
     expect(html).toMatch(
       /<optgroup label="Rawalpindi"><option value="a3">Saddar<\/option><\/optgroup>/,
     );
-    expect(html).toContain("Type the name and address yourself");
+    expect(html).toContain("Type the name as on the signboard or the restaurant");
+    expect(html).toContain(
+      "a short address in your own words (e.g. &quot;Jinnah Super, F-7 Markaz&quot;)",
+    );
     expect(html).toContain("nothing here is copied from Google");
   });
 });
