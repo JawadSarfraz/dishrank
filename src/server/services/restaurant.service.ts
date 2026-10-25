@@ -52,7 +52,7 @@ import type {
   RestaurantSearchQuery,
 } from "@/server/validation";
 import { cleanText } from "./matching/normalize";
-import { checkFetchedAt } from "./places-policy";
+import { ageInDays, checkFetchedAt } from "./places-policy";
 import {
   planClaimMerge,
   planDishMerge,
@@ -252,6 +252,7 @@ export async function updateRestaurant(
     if (hasLat !== hasLng) throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
     data.lat = input.lat ?? null;
     data.lng = input.lng ?? null;
+    data.googleSyncedAt = null; // typed coordinates are our own, never due for a Google refresh
   }
   const aliases = normalizeAliases(input.aliases, input.name);
   const updated = await updateRestaurantById(id, {
@@ -455,7 +456,11 @@ export async function listRestaurantsForAdmin(
   };
 }
 
-export async function getRestaurantForAdmin(actor: SessionUser | null, id: string) {
+export async function getRestaurantForAdmin(
+  actor: SessionUser | null,
+  id: string,
+  now: Date = new Date(),
+) {
   assertRole(actor, "ADMIN");
   const restaurant = await findRestaurantById(id);
   if (!restaurant) return null;
@@ -470,6 +475,9 @@ export async function getRestaurantForAdmin(actor: SessionUser | null, id: strin
     dishes,
     mergedInto: mergedInto
       ? { id: mergedInto.id, slug: mergedInto.slug, name: mergedInto.name }
+      : null,
+    googleSyncedDaysAgo: restaurant.googleSyncedAt
+      ? Math.floor(ageInDays(restaurant.googleSyncedAt, now))
       : null,
   };
 }

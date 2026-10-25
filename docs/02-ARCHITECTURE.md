@@ -218,7 +218,8 @@ dishrank/
 │   │   ├── rating/        # RestaurantSearch, DishPicker, ScoreInput, PhotoUpload
 │   │   ├── restaurant/    # RestaurantHeader, DishScoreList
 │   │   ├── layout/        # Nav, Footer, CityPicker
-│   │   └── auth/          # Forbidden (shown to signed-in users without the role)
+│   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
+│   │   └── admin/         # import preview, restaurant forms, merge dialog (admin pages only)
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter

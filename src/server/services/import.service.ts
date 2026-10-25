@@ -6,7 +6,7 @@ import { haversineKm } from "@/lib/geo";
 import { similarity } from "@/lib/trigram";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
-import { findCityWithAreasById } from "@/server/repositories/geo.repo";
+import { findCityWithAreasById, listCitiesWithAreas } from "@/server/repositories/geo.repo";
 import {
   findRestaurantByGooglePlaceId,
   findRestaurantById,
@@ -276,6 +276,7 @@ export type LinkResult =
   | {
       outcome: "linked";
       restaurant: { id: string; slug: string; name: string };
+      citySlug: string;
       placeLinked: boolean;
       restaurantDish: { id: string; status: string; created: boolean };
     }
@@ -340,7 +341,13 @@ export async function importLink(
       placeLinked = true;
     }
     const restaurantDish = await ensureImportedDish(restaurant, dish.id, tx);
-    return { outcome: "linked", restaurant: summary, placeLinked, restaurantDish };
+    return {
+      outcome: "linked",
+      restaurant: summary,
+      citySlug: restaurant.city.slug,
+      placeLinked,
+      restaurantDish,
+    };
   });
 
   logEvent("import.link", {
@@ -354,4 +361,11 @@ export async function importLink(
       : {}),
   });
   return result;
+}
+
+/** Cities with their areas for the upload form. */
+export async function getImportCities(actor: SessionUser | null) {
+  assertRole(actor, "ADMIN");
+  const cities = await listCitiesWithAreas();
+  return cities.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
 }

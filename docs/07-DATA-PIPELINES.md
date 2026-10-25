@@ -35,7 +35,7 @@ Budget: at most 3 pages per area, so ≤ 60 calls per dish for Islamabad (20 are
 - We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials tier, 10,000 free/month).
 - Request shapes and field masks were checked against the Places API (New) Text Search, Place Details and Place IDs docs on 2026-10-22 (pages last updated 2026-10-21).
 - The CSV is a scratch file. On import, the admin **types/confirms** the name and address (from the signboard, the restaurant's own page, or a visit). What we save is our record.
-- Where Google data is shown in the admin import UI, show the Google logo attribution.
+- Where Google data is shown in the admin import UI (and nowhere else), show the Google Maps attribution. The Places policies (checked 2026-10-25) ask for the Google Maps logo where it fits and allow the text **Google Maps** (unchanged, one line, not translated, Roboto/sans-serif 400, 12–16 px, #5E5E5E or white) where it does not; v1 shows the text form (`src/components/admin/GoogleMapsAttribution.tsx`).
 
 ## 2. Admin import (`/admin/import`)
 
