@@ -16,4 +16,6 @@ export async function resetAppData(): Promise<void> {
   );
   // Seeded cities stay; a test that launched one must not change thresholds for the next file.
   await db.city.updateMany({ data: { launchedAt: null } });
+  // Dishes a test creates (slug "fixture-…") go; the seeded taxonomy stays.
+  await db.dish.deleteMany({ where: { slug: { startsWith: "fixture-" } } });
 }

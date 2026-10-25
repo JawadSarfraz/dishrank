@@ -127,7 +127,7 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
 
     // A burst-held rating whose author then adds a phone number stays held after the burst release.
     const r2 = await makeRestaurant("Fixture Burst Comment");
-    const users = [];
+    const users: Awaited<ReturnType<typeof young>>[] = [];
     for (let i = 0; i < 5; i++) {
       const u = await young(10 + i);
       users.push(u);
@@ -155,15 +155,15 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
     const user = await oldUser();
     const r = await makeRestaurant("Fixture Dish Ideas");
     const category = await db.dishCategory.findFirstOrThrow();
-    await propose(actorOf(user), { type: "DISH", name: "Lahori Fish", restaurantId: r.id });
+    await propose(actorOf(user), { type: "DISH", name: "Fixture Lahori Fish", restaurantId: r.id });
     const item = await openItem("DISH_PROPOSAL");
     await expect(
       resolveReviewItem(admin, item.id, {
         action: "create_dish",
         payload: {
           dish: {
-            slug: "lahori-fish",
-            name: "Lahori Fish",
+            slug: "fixture-lahori-fish",
+            name: "Fixture Lahori Fish",
             categoryId: category.id,
             aliases: ["chicken karahi"],
           },
@@ -182,19 +182,22 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
       action: "create_dish",
       payload: {
         dish: {
-          slug: "lahori-fish",
-          name: "Lahori Fish",
+          slug: "fixture-lahori-fish",
+          name: "Fixture Lahori Fish",
           categoryId: category.id,
-          aliases: ["Lahori Machli", "lahori fish"],
+          aliases: ["Fixture Lahori Machli", "FIXTURE  lahori fish!"], // a copy of the name, normalised away
         },
       },
     });
     const dish = await db.dish.findUniqueOrThrow({
-      where: { slug: "lahori-fish" },
+      where: { slug: "fixture-lahori-fish" },
       include: { aliases: true },
     });
     expect(dish.isLaunch).toBe(false);
-    expect(dish.aliases.map((a) => a.alias).sort()).toEqual(["lahori fish", "lahori machli"]);
+    expect(dish.aliases.map((a) => a.alias).sort()).toEqual([
+      "fixture lahori fish",
+      "fixture lahori machli",
+    ]);
     expect(await db.reviewItem.findUniqueOrThrow({ where: { id: item.id } })).toMatchObject({
       status: "RESOLVED",
       dishId: dish.id,
