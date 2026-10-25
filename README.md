@@ -44,7 +44,7 @@ production `pnpm start` exits with code 1 and names every missing variable.
 | `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
 | `CRON_SECRET` | output of `openssl rand -hex 32` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (needed from Phase 3; local storage uses the preview project) |
-| `GOOGLE_PLACES_API_KEY` | required from Phase 2 (seed script and the daily refresh cron): a Places API (New) key |
+| `GOOGLE_PLACES_API_KEY` | required from Phase 2 (/admin/import live search, the planning script and the daily refresh cron): a Places API (New) key |
 | `ANTHROPIC_*` | optional; used from Phases 1 and 5 |
 
 Commands (same as `CLAUDE.md`):
@@ -61,7 +61,7 @@ pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # tmp/candidates-*.csv
+pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # planning: counts and call estimates, no file
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # Phase 4
 ```

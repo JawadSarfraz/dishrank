@@ -87,21 +87,21 @@ Commit as: feat(data): schema, seed and dish matching
 ## Prompt 3 — Phase 2: Google Places seeding + admin import + restaurants
 
 ```
-Implement Phase 2 from docs/08 following docs/07 §1 and §2 and CLAUDE.md rules 1–2 (no scraping; persist only googlePlaceId + lat/lng from Google).
+Implement Phase 2 from docs/08 following docs/07 §1 and §2 and CLAUDE.md rules 1–2 (no scraping; persist only googlePlaceId + lat/lng + fetch time from Google, and only on an admin Create or Link; Google names and addresses are shown, never saved, logged, cached or prefilled). Revised 2026-10-25: live search replaces the CSV import.
 
-1. src/server/places/textSearch.ts and placeDetails.ts using fetch against Places API (New) with request bodies and X-Goog-FieldMask exactly as docs/07 §1 and §5 (center uses latitude/longitude; the Text Search mask includes nextPageToken; Place Details mask is `location`). NOT_FOUND from Place Details is a distinct result, not a thrown error. Env GOOGLE_PLACES_API_KEY. Retry 429/5xx with backoff. Unit-test the request builder (no network).
-2. scripts/seed-places.ts (run with tsx): args --city --dish [--areas] [--dry-run] [--max-calls=150] (dry-run makes no call; max-calls counts retries and stops before going over; dishes in breakfast, drinks, desserts and street-food search without includedType); writes tmp/candidates-<city>-<dish>-<yyyy-mm-dd>.csv with a fetchedAt column (UTC time of the Google response for that row); prints per-area counts and estimated billable calls. tmp/ is gitignored.
+1. src/server/places/textSearch.ts and placeDetails.ts using fetch (cache: "no-store") against Places API (New) with request bodies and X-Goog-FieldMask exactly as docs/07 §1 and §5 (locationRestriction rectangle around the area; the Text Search masks include nextPageToken; Place Details mask is `location`). NOT_FOUND from Place Details is a distinct result, not a thrown error. Errors keep only status codes outside the CLI. Env GOOGLE_PLACES_API_KEY. Retry 429/5xx with backoff. Unit-test the request builder (no network).
+2. scripts/seed-places.ts (run with tsx): planning tool only. Args --city --dish [--areas] [--dry-run] [--max-calls=150]; ids-only field mask (free); prints per-area counts, unique places, calls used and the live-import estimate; writes no file and never writes the DB.
 3. src/server/services/restaurant.service.ts + repositories: create, update, setStatus, merge(sourceId, targetId) exactly as docs/07 §2 "Merging duplicate restaurants" (one transaction, mergedIntoId, googlePlaceId moved after clearing the source, recompute after commit), search(city, q) via trigram + ILIKE fallback, slug generation with area suffix and uniqueness.
-4. /admin/import: upload CSV → preview with dedupe (by googlePlaceId, then trigram ≥ 0.6 on name within area) → rows with fetchedAt missing or older than 30 days are rejected → per-row Create (form prefilled with name, area, address; admin types phone and priceBand and must click Confirm) / Link / Skip → sets googleSyncedAt = fetchedAt (never the import time) → creates RestaurantDish CANDIDATE source GOOGLE_SEARCH confidence 0.4 for the CSV's dishSlug. Show the Google Maps attribution (the logo, or the text form the Places policies allow) on this admin page only.
+4. /admin/import: pick dish + area → live Text Search page (name, address, "Open in Google Maps" link from the place id; display only) with "Load more" → dedupe (by googlePlaceId, then trigram ≥ 0.6 on name within the searched area) → per-result Create (empty form: the admin types name and address; area defaults to the searched area) / Link / Skip → sets googleSyncedAt = the search response time (never the import time) → creates RestaurantDish CANDIDATE source GOOGLE_SEARCH confidence 0.4. Show the official Google Maps logo on this admin page only.
 5. /admin/restaurants: paginated list with search, edit form, status change, merge dialog. A merged restaurant's page /[city]/r/[slug] redirects permanently to the surviving restaurant (permanentRedirect, HTTP 308; the JSON endpoint answers 301).
 6. GET /api/v1/restaurants/search and GET /api/v1/restaurants/:slug (dishes list will be empty-ish for now).
 7. /api/cron/refresh-places (daily): exactly as docs/07 §5 "Places coordinate refresh": catch-up nulling past 29 days, rows with googleSyncedAt NULL or older than 25 days, NOT_FOUND or a failure at 28+ days → lat/lng NULL + PLACE_REFRESH_FAILED review item, 250 s time budget, JobRun.summary with call counts.
 
 Acceptance:
-- pnpm seed:places -- --city=islamabad --dish=chicken-karahi produces a CSV (I will supply the API key).
-- Importing it creates restaurants with areas; duplicates are flagged; search "but karahi" finds "Butt Karahi".
-- No Google displayName/address is written to the DB without passing through the Confirm form.
-- Imported restaurants have googleSyncedAt equal to the CSV fetchedAt; a CSV row older than 30 days cannot be imported.
+- pnpm seed:places -- --city=islamabad --dish=chicken-karahi --dry-run prints the plan; a real run prints per-area counts and call estimates and writes no file.
+- Importing from the live search creates restaurants with areas; duplicates are flagged; search "but karahi" finds "Butt Karahi".
+- No Google name, address or error text reaches the DB, a file or a log (tests/unit/import/google-data-guard.test.ts); no Google response is cached.
+- Imported restaurants have googleSyncedAt equal to the search response time; Google data older than 30 days cannot be saved.
 - Merging two restaurants that share a dish and a rater succeeds, keeps one rating per user (the older one in RatingHistory), and the old restaurant URL redirects to the survivor.
 - refresh-places with a stubbed NOT_FOUND nulls lat/lng and opens one PLACE_REFRESH_FAILED review item.
 

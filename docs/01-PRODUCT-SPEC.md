@@ -62,7 +62,7 @@
 - O3. I can see my dish ranks and vote counts (basic report). Paid report comes later.
 
 ### Admin
-- A1. I can import Places candidates from a CSV, review, and create restaurants.
+- A1. I can search Google Places candidates live by dish and area, review them, and create restaurants by typing their name and address (Google data is shown, never saved).
 - A2. I can resolve the review queue: unmatched menu items, dish proposals, flags, suspicious bursts, claims.
 - A3. I can set user trust, hide ratings, merge duplicate restaurants, mark closed.
 - A4. I can trigger a full ranking recompute.

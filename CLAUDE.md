@@ -43,7 +43,7 @@ pnpm test:e2e         # playwright
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # writes tmp/candidates-*.csv, never the DB
+pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # planning only: counts and call estimates; no file, never the DB
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 ```
@@ -51,7 +51,7 @@ pnpm rankings:recompute                                       # full recompute (
 ## Non-negotiable rules
 
 1. **No scraping.** Never scrape Google Maps, foodpanda, Instagram, or any site. The only Google data source is the official Places API (New) called from `src/server/places/*`.
-2. **Google data policy.** From Places we persist only `googlePlaceId` (indefinitely) and `lat/lng` (refreshed within 30 days). Restaurant `name`, `address`, `phone` in our DB are entered/confirmed by a human (panel, owner, admin) and are our own records. Seed scripts write CSVs to `tmp/`, never straight into the DB.
+2. **Google data policy.** From Places we persist only `googlePlaceId` (indefinitely) and `lat/lng` with their fetch time (refreshed within 30 days), and only when an admin creates or links a restaurant. Google names and addresses are never saved anywhere (DB, files, fixtures, logs, caches) and never prefill a form: restaurant `name`, `address`, `phone` are typed by a human (panel, owner, admin) and are our own records. Google responses are never cached, and Google coordinates are never used to derive other data (Maps Platform Terms 3.2.3(a)(iii), 3.2.3(b), 3.2.3(c)(iv)). `pnpm seed:places` is a planning tool (place ids only, writes no file).
 3. **Rankings use only our own ratings.** No imported scores from anywhere.
 4. **Thin data never ranks.** Eligibility rules in `docs/04-RANKING.md` are enforced in the query, not just in the UI.
 5. **No free-text dish creation by users.** Users pick from `dishes`. Unknown names become a `ReviewItem` for admin.

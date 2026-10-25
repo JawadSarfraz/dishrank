@@ -7,42 +7,50 @@ How restaurants and (restaurant, dish) links get into the system. Four sources, 
 | Owner (claimed) | RestaurantDish | 1.0 | OWNER_VERIFIED |
 | Menu photo → vision → matching | RestaurantDish | 0.85–1.0 auto, else review | MENU_VERIFIED |
 | User rating / "add dish" | RestaurantDish | 0.5 | CANDIDATE → USER_CONFIRMED at 3 raters |
-| Google Places text search (seed) | CSV candidates only | 0.4 | CANDIDATE after admin import |
+| Google Places Text Search (live, /admin/import) | RestaurantDish, only after an admin Create or Link | 0.4 | CANDIDATE |
 
-## 1. Candidate seeding with Google Places (New)
+## 1. Finding candidates with Google Places (New)
 
 **Purpose**: a starting list of restaurants per dish per area so the panel knows where to go and the rate flow has restaurants to pick. It never ranks anything.
 
+**Google data rule** (owner decision 2026-10-25; Google Maps Platform Terms 3.2.3(a)(iii), 3.2.3(b) and 3.2.3(c)(iv), and the Places API Service Specific Terms):
+- We save only `googlePlaceId` (indefinitely) and `lat/lng` with the time of the Google call (`googleSyncedAt`, at most 30 days, refreshed daily: §5), and only when an admin creates or links a restaurant (§2).
+- Google names and addresses are shown to the admin during the search and nowhere else. They are never saved (DB, files, fixtures, logs, caches) and never prefill a form: the admin types name and address.
+- Google responses are never cached: every request is sent with `cache: "no-store"`; no `unstable_cache` or `"use cache"`.
+- Google coordinates are never an input for deriving data (no area suggestion, distance check or point-in-polygon from them).
+- Google errors are stored and logged as status codes only (`404 NOT_FOUND`), never Google's error text.
+- Guard tests: `tests/unit/import/google-data-guard.test.ts` (canary names, addresses and error text must not reach the DB, any file or any log) and `tests/unit/places/google-data-static.test.ts`.
+
+**The query** (`src/server/services/places-query.ts`; the live search and the planning tool send exactly the same one per dish × area):
+- `POST https://places.googleapis.com/v1/places:searchText`
+- body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant" (omitted for dishes in the categories breakfast, drinks, desserts and street-food), locationRestriction: { rectangle: { low: { latitude, longitude }, high: { latitude, longitude } } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`. The rectangle reaches 3 km north, south, east and west of our own area centre (`seed/areas.json`), so far-away places (a Lahore branch) never come back. `locationRestriction` accepts only a rectangle and cannot be combined with `locationBias`.
+- `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. The bias still pushes other venues down the list, so chai, halwa puri, dessert and street-food searches send no type: tea stalls and breakfast shops are often typed `cafe`, `tea_house`, `bakery` or nothing.
+- next page: resend the same body plus `pageToken: "<nextPageToken>"`; at most 3 pages (Text Search returns at most 60 results). `nextPageToken` must be in the field mask, otherwise the response carries no token and only page 1 comes back.
+- field masks: /admin/import `places.id,places.displayName,places.formattedAddress,places.location,nextPageToken` (Text Search Pro: 5,000 free per month, then $32 per 1,000); planning tool `places.id,nextPageToken` (Text Search Essentials IDs Only: no charge).
+
+### Planning tool: `pnpm seed:places`
+
 `scripts/seed-places.ts --city=islamabad --dish=chicken-karahi [--areas=f-7,f-8] [--dry-run] [--max-calls=150]`
 
-- `--dry-run` prints the planned queries and the maximum number of calls, makes no Google call and writes no file (no API key needed).
-- `--max-calls` (default 150) caps HTTP requests, retries included: the client refuses the request that would go over, and the run keeps the rows it has.
-- A missing `GOOGLE_PLACES_API_KEY` stops the run before any call. 429 and 5xx are retried with exponential backoff (3 attempts). A 4xx on an area's first page (bad key, API disabled, invalid request) stops the run, because every other area would fail the same way.
+- Runs the query for each area with the ids-only field mask, up to 3 pages, and prints per area the pages, results and new places (not returned for an earlier area); then the unique places, the calls used and the live-import estimate: the Text Search Pro calls /admin/import needs to load every page of those areas. It never requests names or addresses, writes no file and never writes the DB (it only reads the city, areas and dish).
+- `--dry-run` prints the planned queries, their rectangles and the maximum number of calls; no Google call, no API key needed.
+- `--max-calls` (default 150) caps HTTP requests, retries included: the client refuses the request that would go over. A missing `GOOGLE_PLACES_API_KEY` stops the run before any call. 429 and 5xx are retried with exponential backoff (3 attempts). A 4xx on an area's first page (bad key, API disabled, invalid request) stops the run, because every other area would fail the same way. Google's error text is printed to the operator's terminal only.
 
-1. Load city + areas from DB.
-2. For each area: `POST https://places.googleapis.com/v1/places:searchText`
-   - body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant" (omitted for dishes in the categories breakfast, drinks, desserts and street-food), locationBias: { circle: { center: { latitude: <area lat>, longitude: <area lng> }, radius: 2500.0 } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`
-   - header `X-Goog-FieldMask: places.id,places.displayName,places.formattedAddress,places.location,places.primaryType,nextPageToken`. `nextPageToken` must be in the mask, otherwise the response carries no token and only page 1 comes back.
-   - next page: resend the same body plus `pageToken: "<nextPageToken>"`; stop after 3 pages (Text Search returns at most 60 results).
-   - `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. The bias still pushes other venues down the list, so chai, halwa puri, dessert and street-food searches send no type: tea stalls and breakfast shops are often typed `cafe`, `tea_house`, `bakery` or nothing. `radius` is in meters (0–50,000).
-   - billing: `places.id` and `nextPageToken` alone are Text Search Essentials (IDs Only); `displayName`, `formattedAddress`, `location` and `primaryType` make every call Text Search Pro.
-3. Dedupe by `places.id`. Write `tmp/candidates-<city>-<dish>-<date>.csv` with columns: `googlePlaceId, displayName, formattedAddress, lat, lng, primaryType, queryArea, dishSlug, fetchedAt`. `fetchedAt` is the UTC ISO time of the Google response that returned that row (per page, not the script start).
-4. Print per-area counts (pages, results, new places) and the calls used; every call is a billable Text Search Pro request. Never write to the DB (it only reads the city, areas and dish). A file from an earlier run on the same day is never overwritten: the new one gets a `-2` suffix.
-
-Budget: at most 3 pages per area, so ≤ 60 calls per dish for Islamabad (20 areas) and ≤ 30 for Rawalpindi (10 areas). All 19 launch dishes in both cities ≤ 19 × 90 = 1,710 Text Search Pro calls before retries — inside the 5,000/month free cap. Reuse the same restaurant across dishes: the import UI dedupes by place ID.
+Budget for a full live import: at most 3 pages per area, so ≤ 60 Text Search Pro calls per dish for Islamabad (20 areas) and ≤ 30 for Rawalpindi (10 areas); all 19 launch dishes in both cities ≤ 1,710 calls, inside the 5,000 free per month. The limit `user:{id}:places-search` (150 per day) keeps a month under that cap. The planning tool's ids-only calls cost nothing.
 
 **Policy notes (keep these in the import UI copy)**
-- We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials tier, 10,000 free/month).
-- Request shapes and field masks were checked against the Places API (New) Text Search, Place Details and Place IDs docs on 2026-10-22 (pages last updated 2026-10-21).
-- The CSV is a scratch file. On import, the admin **types/confirms** the name and address (from the signboard, the restaurant's own page, or a visit). What we save is our record.
-- Where Google data is shown in the admin import UI (and nowhere else), show the Google Maps attribution. The Places policies (checked 2026-10-25) ask for the Google Maps logo where it fits and allow the text **Google Maps** (unchanged, one line, not translated, Roboto/sans-serif 400, 12–16 px, #5E5E5E or white) where it does not; v1 shows the text form (`src/components/admin/GoogleMapsAttribution.tsx`).
+- We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials, 10,000 free per month).
+- Request shapes, field masks, prices and the attribution rules were checked against the Places API (New) Text Search, Place Details, Google Maps URLs, pricing and Places policies pages on 2026-10-25 (pages last updated 2026-10-23).
+- Attribution: where Google data is shown (/admin/import only), the official Google Maps logo sits at the top of the results container: Google's gray non-outlined logo from `Google_Maps_Attribution_Assets.zip`, unmodified (`public/attribution/google-maps-logo-gray.svg`), 18 px high (policy: 16–19 dp), clear space of 10 px left, right and top and 5 px at the bottom, alt text "Google Maps".
+- "Open in Google Maps" links are built from the place id (Google Maps URLs `search` action with `query_place_id`); the required `query` is our own text (dish, area, city), never a Google name.
 
 ## 2. Admin import (`/admin/import`)
 
-1. Upload CSV (and pick its city; the file name suggests it) → preview table. Rows whose `fetchedAt` is missing, unparseable, in the future or older than 30 days are rejected: shown greyed out, not importable; re-run `pnpm seed:places` for fresh data. Rows with an unknown dish, a `queryArea` outside the chosen city, or a place already on an earlier line are rejected too. Each remaining row gets a suggested area: the area whose centre is nearest to the row's lat/lng (Text Search only biases to the query area), with a warning when that centre is more than 10 km away. Then: match existing restaurant by `googlePlaceId` ("already imported"), else by trigram on name (or another name) within the suggested area (similarity ≥ 0.6) → mark "possible duplicate". The preview writes nothing.
-2. Admin actions per row: **Create** (opens a form prefilled with name, area and address from the CSV; the admin types priceBand and phone, which the field mask never fetches, and confirms) / **Link to existing** / **Skip**.
-3. On Create, or on Link to a restaurant without a `googlePlaceId`: save `googlePlaceId`, `lat/lng` from the CSV and `googleSyncedAt = fetchedAt` (the time of the Google call, never the import time). Linking to a restaurant that already has a different `googlePlaceId` changes nothing and marks the row "possible duplicate". Then create `RestaurantDish(restaurant, dishSlug)` with `status CANDIDATE, source GOOGLE_SEARCH, confidence 0.4` unless a row for that dish already exists: an import never changes an existing row, so it cannot downgrade a stronger one or revive a STALE or REMOVED one.
-4. Log counts; leave the CSV in `tmp/`.
+1. Search: the admin picks a dish and an area (city, then area) and clicks Search. The server sends the §1 query for that dish and area and returns one page of up to 20 results, each with Google's name and address (display only), an "Open in Google Maps" link and the fetch time of that page. "Load more" sends the same query with the page token (at most 3 pages). Each page is one billable Text Search Pro call, limited by `user:{id}:places-search` (150 per day). Searching saves nothing.
+2. Dedupe per result: a restaurant with the same `googlePlaceId` → "already imported" (with "Add <dish> to it" when it lacks the dish); else our restaurants in the searched area whose name or another name has trigram similarity ≥ 0.6 with the result's name → "possible duplicate" (with Link buttons); else "new". The Google name is compared in memory only.
+3. Admin actions per result: **Create** opens an empty form, which says so: the admin types the name and address from the signboard, the restaurant's own page or a visit; the area defaults to the searched area and can be changed; phone, price band and other names are optional. Nothing is prefilled from Google. / **Link to existing** (a possible duplicate, or any restaurant found by name) / **Skip** (no write).
+4. On Create, or on Link to a restaurant without a `googlePlaceId`: save `googlePlaceId`, the result's `lat/lng` and `googleSyncedAt` = the page's fetch time (the time of the Google call, never the import time; refused when older than 30 days, e.g. a stale browser tab). Linking to a restaurant that already has a different `googlePlaceId` changes nothing and the result stays a possible duplicate. Then create `RestaurantDish(restaurant, dish)` with `status CANDIDATE, source GOOGLE_SEARCH, confidence 0.4` unless a row for that dish already exists: an import never changes an existing row, so it cannot downgrade a stronger one or revive a STALE or REMOVED one.
+5. Logs carry ids and counts only (dish, area, results by status, place ids), never a Google name, address or error text.
 
 A restaurant with a `googlePlaceId` and no `googleSyncedAt` counts as due for the next refresh (§5).
 
@@ -95,7 +103,7 @@ CLAUDE.md rule 2 allows Google `lat/lng` for at most 30 days. The job runs daily
 2. Select restaurants with a `googlePlaceId` whose `googleSyncedAt` is NULL or older than 25 days.
 3. For each: `GET https://places.googleapis.com/v1/places/{googlePlaceId}` with header `X-Goog-FieldMask: location` (no `places.` prefix for Place Details; Essentials). Success → update `lat/lng`, `googleSyncedAt = now()`.
 4. `NOT_FOUND` means the place ID is obsolete: set `lat/lng = NULL` at once and open a `PLACE_REFRESH_FAILED` review item. Any other error (after retries with backoff): keep the coordinates and retry on the next run, unless `googleSyncedAt` is already 28 days old or more; then set `lat/lng = NULL` and open the review item. Coordinates therefore stay under 30 days old as long as the job runs once a day.
-5. One OPEN review item per restaurant; a later successful refresh resolves it automatically.
+5. One OPEN review item per restaurant; a later successful refresh resolves it automatically. Review items and logs record only the status (`404 NOT_FOUND`, `503 UNAVAILABLE`), never Google's error text.
 6. Stop before the function time limit (250 s: no new call once 235 s have passed, keeping room for one slow call with retries) and leave the rest for the next run. `JobRun.summary` records `{ selected, calls, ok, notFound, errors, nulled, caughtUp, reviewItems, resolvedReviewItems, skippedForTime, error? }`.
 7. A row nulled by the catch-up is still due, so the same run refreshes it: success restores its coordinates and resolves the item. A failure on a row whose `googleSyncedAt` is NULL (unknown age) counts as 28+ days. Without `GOOGLE_PLACES_API_KEY` the catch-up still runs and every due row counts as a failure (so the 28-day rule still holds); the run is then marked failed (`JobRun.ok = false`, HTTP 500).
 
@@ -120,7 +128,7 @@ A restaurant with NULL `lat/lng` stays listed; it only loses the map link and di
 | `SUSPICIOUS_RATINGS` | `{ restaurantDishId, ratingIds[], reason }` | release (ratings ACTIVE) · hide (HIDDEN, lower trust) · ban users |
 | `OWNER_CLAIM` | `{ claimId, phone, proofNote }` | approve · reject |
 | `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A (rules in §2) · keep both |
-| `PLACE_REFRESH_FAILED` | `{ restaurantId, googlePlaceId, error, googleSyncedAt }` | re-link (new `googlePlaceId` from a fresh seed CSV row; `lat/lng` and `googleSyncedAt = fetchedAt` from that row) · mark restaurant CLOSED · keep without coordinates (clears `googlePlaceId`) |
+| `PLACE_REFRESH_FAILED` | `{ restaurantId, googlePlaceId, error (status code only), googleSyncedAt }` | re-link (new `googlePlaceId` from a live search result on /admin/import; `lat/lng` and `googleSyncedAt` = that result's fetch time) · mark restaurant CLOSED · keep without coordinates (clears `googlePlaceId`) |
 
 Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed.
 

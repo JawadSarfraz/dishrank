@@ -28,18 +28,18 @@ Acceptance
 - `pnpm db:migrate && pnpm db:seed` yields 2 cities, 30 areas, 12 categories, ~80 dishes
 - All matching test cases and seed tests pass; `normalize("Chicken White Karahi Full 1kg Rs 2400")` → `"chicken white karahi"`, and `matchDish` on it → `chicken-karahi`, tags `["white"]`, ALIAS 1.0
 
-## Phase 2 — Restaurants: seeding script + admin import (6–8 h)
+## Phase 2 — Restaurants: live Places search + admin import (6–8 h)
 
 Tasks
-- `src/server/places/textSearch.ts` (field mask incl. `nextPageToken`, pagination, regionCode PK), `placeDetails.ts` (location only)
-- `scripts/seed-places.ts` → CSV in `tmp/` with `fetchedAt`
-- `/admin/import`: CSV upload, 30-day age check, dedupe preview, create/link/skip, `googleSyncedAt = fetchedAt`, RD CANDIDATE creation
+- `src/server/places/textSearch.ts` (field masks incl. `nextPageToken`, `locationRestriction` rectangle, pagination, regionCode PK, never cached), `placeDetails.ts` (location only)
+- `scripts/seed-places.ts`: planning tool only (place ids, per-area counts and call estimates, no file)
+- `/admin/import`: live Text Search by dish and area (Google name and address shown, never saved; Load more), dedupe, Create (admin types name and address) / Link / Skip, `googleSyncedAt` = the search's fetch time, RD CANDIDATE creation, Google Maps logo
 - `/admin/restaurants`: list/search/edit/merge/status; merge per docs/07 §2 with redirect of merged URLs
 - `/api/cron/refresh-places`: daily refresh with failure handling per docs/07 §5
 - `RestaurantService`, `restaurant.repo.ts`, trigram search endpoint
 
 Acceptance
-- Run seed script for 2 dishes; import ≥ 40 restaurants in Islamabad with areas; `/api/v1/restaurants/search?q=but karahi` returns Butt Karahi.
+- Search 2 dishes live in /admin/import and import ≥ 40 restaurants in Islamabad with areas, typing each name and address; `/api/v1/restaurants/search?q=but karahi` returns Butt Karahi; the Google-data guard tests pass (no Google name, address or error text in the DB, files or logs; no Google response cached).
 
 ## Phase 3 — Rating flow (8–10 h)
 

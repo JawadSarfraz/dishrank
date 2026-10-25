@@ -19,11 +19,12 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Dev-only scripts refuse to run when `NODE_ENV=production`
 
 ## Data policy
-- [ ] Only `googlePlaceId` and `lat/lng` (refreshed ≤ 30 days) persisted from Google; names/addresses pass through the admin Confirm form
-- [ ] `googleSyncedAt` is the time of the Google call (CSV `fetchedAt` or refresh), never the import time; CSV rows older than 30 days cannot be imported
+- [ ] Only `googlePlaceId` and `lat/lng` with their fetch time (refreshed ≤ 30 days) persisted from Google, and only on an admin Create or Link; Google names and addresses are never saved, logged, cached or prefilled (admins type them); `tests/unit/import/google-data-guard.test.ts` passes
+- [ ] No Google response is cached (`cache: "no-store"`; no `unstable_cache` or `"use cache"`), and Google coordinates are never used to derive data (no area or distance computed from them)
+- [ ] `googleSyncedAt` is the time of the Google call (the search response on Create/Link, or a refresh), never the import time; Google data older than 30 days cannot be saved
 - [ ] refresh-places runs daily; `NOT_FOUND` or a failure at 28+ days sets `lat/lng` to NULL and opens a `PLACE_REFRESH_FAILED` review item (test by backdating a row)
 - [ ] No scraping code anywhere (grep for `cheerio`, `puppeteer`, `playwright` outside tests, `foodpanda`)
-- [ ] Google attribution shown where Google data is displayed (admin import only)
+- [ ] Official Google Maps logo (unmodified) shown where Google data is displayed (admin import only)
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
 - [ ] Privacy page states what we store (email, ratings, photos) and how to delete
 

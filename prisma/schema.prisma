@@ -211,7 +211,7 @@ model Restaurant {
   phone           String?
   priceBand       Int? // 1..4
   googlePlaceId   String?          @unique
-  googleSyncedAt  DateTime? // time of the Google call behind lat/lng (CSV fetchedAt or refresh); NULL with a googlePlaceId = due
+  googleSyncedAt  DateTime? // time of the Google call behind lat/lng (search result on Create/Link, or refresh); NULL with a googlePlaceId = due
   status          RestaurantStatus @default(ACTIVE)
   aliases         String[]         @default([]) // other names typed by an admin ("but karahi"), docs/05
   searchText      String           @default("") // cleaned name + aliases, maintained by RestaurantService, for pg_trgm

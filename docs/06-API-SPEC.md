@@ -21,6 +21,7 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `user:{id}:upload` | 20 / day |
 | `ip:{hash}:search` | 120 / min |
 | `ip:{hash}:api` | 600 / hour (public GETs) |
+| `user:{id}:places-search` | 150 / day (each live Places search page on /admin/import is a billable Google call) |
 | `user:{id}:admin-write` | 600 / hour (every admin write: import create/link, edit, status, merge) |
 
 Exceeding → `429 { error: { code: "RATE_LIMITED" } }`.
@@ -101,7 +102,7 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 
 - `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=`
 - `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both`, `relink`, `mark_closed`, `keep_without_coordinates` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`).
-- `POST /api/v1/admin/restaurants` — create from import row `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, fetchedAt?, phone?, priceBand?, aliases? }`; `fetchedAt` (the CSV's Google call time) is required with `googlePlaceId`, because `googleSyncedAt = fetchedAt`. The slug is `<name>-<area slug>` (area not repeated when the name ends with it), then `-2`, `-3`… when taken; it never changes afterwards.
+- `POST /api/v1/admin/restaurants` — create from a live search result `{ name, cityId, areaId, address, lat, lng, googlePlaceId?, fetchedAt?, phone?, priceBand?, aliases? }`; `fetchedAt` (the time of the Google response that showed the place) is required with `googlePlaceId`, because `googleSyncedAt = fetchedAt`. The slug is `<name>-<area slug>` (area not repeated when the name ends with it), then `-2`, `-3`… when taken; it never changes afterwards.
 - `PATCH /api/v1/admin/restaurants/:id` — edit `{ name, areaId, address, phone|null, priceBand|null, aliases, lat?, lng? }` (lat/lng only for a restaurant without a `googlePlaceId`), `{ status: ACTIVE|CLOSED|HIDDEN }`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE). In v1 these admin operations are server actions on /admin pages (`src/server/actions/admin-*.ts`) calling the same services; the JSON routes are not built yet (KICKOFF-REVIEW AP-07).
 - `PATCH /api/v1/admin/restaurant-dishes/:id` — status / confidence / tags.
 - `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules).
@@ -109,7 +110,7 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 - `POST /api/v1/admin/menu-uploads/:id/parse` — run vision + matching now.
 - `POST /api/v1/admin/rankings/recompute` — `RankingService.recomputeAll()` (async, returns JobRun id).
 - `POST /api/v1/admin/cities/:slug/launch` — sets `City.launchedAt = now()` once (launch day); bootstrap mode applies while it is NULL and for 60 days after.
-- `POST /api/v1/admin/import/candidates` — multipart CSV from `scripts/seed-places.ts` → preview rows (dedupe by googlePlaceId/name+area; rows with `fetchedAt` missing or older than 30 days are rejected) → admin confirms per row; Create/Link sets `googleSyncedAt = fetchedAt`.
+- `/admin/import` live search (server actions in `src/server/actions/admin-import.ts`; no JSON route yet): `searchPlacesAction { dishSlug, areaId, pageToken? }` → one Text Search page `{ dish, area, city, fetchedAt, results: [{ googlePlaceId, displayName, formattedAddress, lat, lng, mapsUrl, status: new|imported|possible_duplicate, existing, duplicates }], nextPageToken }` (docs/07 §1–2). Names and addresses are display only: never saved, logged, cached or prefilled. Create `{ name, address (typed by the admin), cityId, areaId, lat, lng, googlePlaceId, fetchedAt, phone?, priceBand?, aliases?, dishSlug }` and Link `{ restaurantId, googlePlaceId, lat, lng, fetchedAt, dishSlug }` save only the place id, lat/lng and `googleSyncedAt = fetchedAt` from Google; fetch times older than 30 days are refused.
 
 ## Cron (Bearer CRON_SECRET)
 

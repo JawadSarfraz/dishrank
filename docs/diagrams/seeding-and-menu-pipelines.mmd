@@ -1,8 +1,7 @@
 flowchart LR
-  subgraph Seed["Candidate seeding (never writes DB)"]
-    S["scripts/seed-places.ts<br/>--city --dish"] --> Q["Per area: Places Text Search<br/>'chicken karahi F-7 Islamabad'"]
-    Q --> CSV["tmp/candidates-*.csv"]
-    CSV --> Imp["/admin/import<br/>admin confirms name/address"]
+  subgraph Seed["Candidate search (Google data shown, never saved)"]
+    S["/admin/import<br/>dish + area"] --> Q["Places Text Search (live)<br/>'chicken karahi F-7 Islamabad'"]
+    Q --> Imp["Admin types name/address (Create)<br/>or links; saves place id + location"]
     Imp --> RD0["RestaurantDish CANDIDATE<br/>source GOOGLE_SEARCH conf 0.4"]
   end
   subgraph Menu["Menu ingestion"]

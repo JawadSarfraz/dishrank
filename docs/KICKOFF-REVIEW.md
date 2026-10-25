@@ -7,8 +7,8 @@ Triage: one pass by Claude on 2026-10-22, no sub-agents. Every finding is marked
 | Mark | Findings |
 |---|---|
 | Blocker for Phases 0–2 | 15 in 8 groups, all fixed on 2026-10-22 |
-| Later | 111 |
-| Drop | 62 (54 resolved, 8 not worth acting on) |
+| Later | 110 |
+| Drop | 63 (55 resolved, 8 not worth acting on) |
 
 ## Blockers for Phases 0–2
 
@@ -54,10 +54,6 @@ All eight are fixed. The owner set up the laptop (Node 24, pnpm 12.14, PostgreSQ
 
 ### Phase 2 (not blocking)
 
-- **ST-16** (major) Places terms allow storing only place IDs (indefinitely) and lat/lng (30 days); the seed CSV persists displayName/formattedAddress and the OPEN-QUESTIONS default assumes 30-day name/address prefill.
-  Claim: Google's Places policies forbid pre-fetching, caching or storing Places content beyond the listed exceptions; the Service Specific Terms grant exactly two exceptions (place_id per the policies, and lat/lng for up to 30 consecutive calendar days). Names and addresses have no exception, so a CSV holding displayName/formattedAddress for weeks and a 30-day prefill window are …
-  Default: CSV columns `googlePlaceId, lat, lng, queryArea, dishSlug` only; the import preview fetches `displayName`/`formattedAddress` live per row via Place Details (displayName is Pro: 5,000 free/month) and shows them with the Google logo for the admin to type/confirm; never write …
-  Where: docs/07-DATA-PIPELINES.md § 1. Candidate seeding, step 3; docs/07-DATA-PIPELINES.md § 1. Candidate seeding, Policy notes; docs/OPEN-QUESTIONS.md § Open.
 - **TX-14** (major) Restaurant search spec relies on admin-entered restaurant aliases that have no column and no admin input.
   Claim: Restaurant has no `aliases` field (Dish does), the admin create/patch payloads have no alias input, and no UI in Phase 2 collects alternative names, so searchText can only ever contain the name; the documented Roman-Urdu tolerance for restaurants rests entirely on trigram similarity to the name.
   Default: Add `aliases String[] @default([])` to Restaurant, include it in adminRestaurantInput and the /admin/restaurants edit form, and recompute searchText on write.
@@ -439,6 +435,7 @@ All eight are fixed. The owner set up the laptop (Node 24, pnpm 12.14, PostgreSQ
 - **ST-09** `connection_limit=1` in DATABASE_URL is a Prisma-engine parameter that the pg driver adapter ignores; pool size/timeouts now come from pg. Resolved: version and auth decisions.
 - **ST-10** Supabase signed upload URLs are valid for a fixed 2 hours; docs/11 requires signed URLs to expire in <= 10 min. Resolved: checklist reworded for 2 h signed upload URLs.
 - **ST-11** Supabase Free allows 2 active projects; docs/10 implies three cloud projects and the laptop lacks Docker/Supabase CLI for `supabase start`. Resolved: Homebrew PostgreSQL locally; preview + production projects.
+- **ST-16** Places terms allow storing only place IDs (indefinitely) and lat/lng (30 days); the seed CSV kept displayName/formattedAddress and the Create form was prefilled from them. Resolved 2026-10-25 by the owner's decision (docs/OPEN-QUESTIONS.md, Decided; Maps Platform Terms 3.2.3(a)(iii), 3.2.3(b), 3.2.3(c)(iv)): live search with Google data shown, never saved; empty Create form; no CSV; only place id, lat/lng and fetch time saved on Create or Link.
 - **ST-17** No Node version is pinned; Node 20 is EOL and deprecated on Vercel, vitest 5/supabase-js/Prisma 8 need >= 22, and the laptop runs 20.19.4 with a broken pnpm. Resolved: version and auth decisions.
 - **ST-18** TypeScript `latest` is 7.0.2 with no JavaScript API; typescript-eslint supports < 6.1, so pin TypeScript 6.0.x (ESLint 10 is fine with eslint-config-next 16.4 flat config). Resolved: TypeScript 6.0 approved.
 - **ST-21** Zod `latest` is 4.6.7; v4 renames error customisation and deprecates several APIs the validation layer and error mapping will touch. Resolved: Zod 4 approved.

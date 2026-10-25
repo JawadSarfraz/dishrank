@@ -106,15 +106,15 @@ sequenceDiagram
   N-->>G: HTML + JSON-LD ItemList (cached 1h, revalidated on new rating)
 ```
 
-### Candidate seeding (Google Places) — proposes, never writes DB
+### Candidate search (Google Places) — Google data shown, never saved
 
 ```mermaid
 flowchart LR
-  S["scripts/seed-places.ts<br/>--city --dish"] --> Q["For each area: Text Search<br/>'chicken karahi F-7 Islamabad'<br/>includedType=restaurant"]
-  Q --> IDs["Collect place IDs<br/>(+ displayName, address, location for review)"]
-  IDs --> CSV["tmp/candidates-city-dish.csv"]
-  CSV --> AdminImport["/admin/import<br/>admin confirms name/address,<br/>picks area, creates Restaurant"]
-  AdminImport --> RD["RestaurantDish rows<br/>status=CANDIDATE source=GOOGLE_SEARCH conf=0.4"]
+  A["/admin/import<br/>admin picks dish + area"] --> Q["Places Text Search (live)<br/>'chicken karahi F-7 Islamabad'<br/>rectangle around F-7, no cache"]
+  Q --> R["Results shown to the admin only<br/>name, address, Maps link: never saved"]
+  R --> C["Create: admin types name + address<br/>or Link to an existing restaurant"]
+  C --> RD["Saved: googlePlaceId, lat/lng, fetch time<br/>+ RestaurantDish CANDIDATE source=GOOGLE_SEARCH conf=0.4"]
+  P["pnpm seed:places (planning)<br/>place ids only, counts, no file"] -.-> Q
 ```
 
 ### Menu ingestion (photo → structured dishes)
@@ -189,7 +189,7 @@ dishrank/
 │   ├── cities.json  areas.json  dishes.json  dish-categories.json  variant-tags.json  meat-words.json
 ├── docs/                            # the planning kit (specs, plans, prompts)
 ├── scripts/
-│   ├── seed-places.ts               # Google Places → tmp/candidates-*.csv
+│   ├── seed-places.ts               # planning: Places counts and call estimates (place ids only, no file)
 │   ├── parse-menu.ts                # one MenuUpload → MenuItems + matching
 │   └── recompute-rankings.ts        # calls RankingService.recomputeAll()
 ├── src/
@@ -246,7 +246,7 @@ dishrank/
 ├── tests/
 │   ├── unit/   matching/ ranking/ slug/ normalize/
 │   └── e2e/    rate-flow.spec.ts  ranking-page.spec.ts  admin-review.spec.ts
-└── tmp/        (gitignored) candidates-*.csv, menu images for local parse
+└── tmp/        (gitignored) menu images for local parse
 ```
 
 ## Cross-cutting
@@ -272,7 +272,7 @@ dishrank/
 | ADR-1 | Single Next.js app, no separate API service | One deploy, server actions remove boilerplate, free tier | Native app needs its own API surface (then `/api/v1` already exists) |
 | ADR-2 | Postgres + Prisma on Supabase | Relational data, trigram search, free tier, storage included | > 500 MB DB or need PostGIS |
 | ADR-3 | TypeScript only in v1 (no Python) | One language, one toolchain | Heavy NLP batch work |
-| ADR-4 | Google Places for seeding only; humans confirm | Policy compliance + data we own | Never |
+| ADR-4 | Google Places only to find candidates (shown, never saved); we keep just the place id and a ≤ 30-day location; humans type name and address | Policy compliance + data we own | Never |
 | ADR-5 | No PostGIS; haversine on lat/lng | City-scale data, simpler Prisma | Multi-city nearby search at scale |
 | ADR-6 | Ratings 1–10 + Bayesian score; pairwise votes deferred | Simple to explain, enough signal early | Phase 7 (pairwise/Bradley-Terry blend) |
 | ADR-7 | Precomputed aggregates on `restaurant_dishes` | Ranking page is one indexed query | Need per-user personalised ranking |
