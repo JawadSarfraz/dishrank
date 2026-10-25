@@ -1,110 +1,123 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { encodeCandidatesCsv, type CandidateRow } from "@/server/services/candidates-csv";
-import { importCreate, importLink, previewImport } from "@/server/services/import.service";
+import { PlacesApiError } from "@/server/places";
+import { importCreate, importLink, searchPlacesForImport } from "@/server/services/import.service";
 import { resetAppData } from "../../setup/db-reset";
+import { fakePlace, scriptedPlaces } from "../places/fake-places";
 import { ADMIN, USER, daysAgo, makeDish, makeRestaurant, place } from "../restaurants/fixtures";
 
+// Every name and address here is made up; the Places client is a fake (no network).
 const NOW = new Date();
-const F7 = { lat: 33.7215, lng: 73.0569 };
+const QUERY = "Chicken Karahi F-7 Islamabad";
 
-const row = (id: string, displayName: string, over: Partial<CandidateRow> = {}): CandidateRow => ({
-  googlePlaceId: `ChIJ-${id}-000000`,
-  displayName,
-  formattedAddress: `${displayName}, F-7 Markaz, Islamabad`,
-  ...F7,
-  primaryType: "restaurant",
-  queryArea: "f-7",
+const link = (googlePlaceId: string, over: Record<string, unknown> = {}) => ({
+  googlePlaceId,
+  lat: 33.7215,
+  lng: 73.0569,
+  fetchedAt: daysAgo(0.01, NOW).toISOString(),
   dishSlug: "chicken-karahi",
-  fetchedAt: daysAgo(2, NOW).toISOString(),
   ...over,
 });
 
-async function preview(rows: CandidateRow[]) {
-  const { city } = await place("islamabad", "f-7");
-  return previewImport(ADMIN, { cityId: city.id, csvText: encodeCandidatesCsv(rows) }, NOW);
-}
-
-describe("/admin/import service (docs/07 §2, test DB)", () => {
+describe("/admin/import live search (docs/07 §2, test DB)", () => {
   beforeEach(resetAppData);
   afterAll(() => db.$disconnect());
 
-  it("flags duplicates by googlePlaceId, then by name trigram ≥ 0.6 in the same area", async () => {
-    const linked = await makeRestaurant("Savour Foods", { googlePlaceId: "ChIJ-linked-000000" });
-    await makeRestaurant("Butt Karahi");
-    await makeRestaurant("Butt Karahi", { areaSlug: "g-9" }); // same name, other area: not a duplicate
-    const result = await preview([
-      row("linked", "Savour Foods Blue Area"),
-      row("butt", "Butt Karahi & BBQ"),
-      row("monal", "Monal Restaurant"),
-    ]);
-    const [savour, butt, monal] = result.rows;
-    expect(savour).toMatchObject({
-      status: "imported",
-      existing: { id: linked.id, hasDish: false },
+  it("searches the dish in the area and flags duplicates by place id, then by name in the area", async () => {
+    const { area } = await place("islamabad", "f-7");
+    const linked = await makeRestaurant("Fixture Pulao House", {
+      googlePlaceId: "ChIJfixturelinked",
     });
-    expect(butt).toMatchObject({ status: "possible_duplicate", suggestedArea: { name: "F-7" } });
-    expect(
-      butt?.status !== "rejected" &&
-        butt?.duplicates.map((d) => [d.name, d.areaName, d.similarity]),
-    ).toEqual([
-      ["Butt Karahi", "F-7", 0.63], // 12 of 19 trigrams shared
-    ]);
-    expect(monal).toMatchObject({ status: "new", duplicates: [], existing: null });
-    expect(result.counts).toEqual({ rejected: 0, new: 1, imported: 1, possible_duplicate: 1 });
-  });
+    await makeRestaurant("Fixture Karahi");
+    await makeRestaurant("Fixture Karahi", { areaSlug: "g-9" }); // other area: not a duplicate
+    const { client, seen } = scriptedPlaces({
+      [QUERY]: [
+        {
+          places: [
+            fakePlace("linked", { googlePlaceId: "ChIJfixturelinked" }),
+            fakePlace("dup", { displayName: "Fixture Karahi and BBQ" }),
+            fakePlace("new", { displayName: "Brand New Grill" }),
+          ],
+          next: "tok-2",
+        },
+      ],
+    });
 
-  it("rejects stale, unknown-dish, wrong-city and repeated rows and warns about far-away places", async () => {
-    const result = await preview([
-      row("old", "Old Row", { fetchedAt: daysAgo(31, NOW).toISOString() }),
-      row("dish", "Unknown Dish", { dishSlug: "sushi" }),
-      row("pindi", "Wrong City", { queryArea: "saddar" }),
-      row("twice", "Twice"),
-      row("twice", "Twice again"),
-      row("lahore", "Butt Karahi Lahore", { lat: 31.38, lng: 74.31 }),
-    ]);
-    expect(result.rows.map((r) => r.status)).toEqual([
-      "rejected",
-      "rejected",
-      "rejected",
-      "new",
-      "rejected",
-      "new",
-    ]);
-    const reasons = result.rows.flatMap((r) => (r.status === "rejected" ? r.reasons : []));
-    expect(reasons).toEqual([
-      expect.stringMatching(/older than 30 days/),
-      'Unknown dish "sushi"',
-      expect.stringMatching(/queryArea "saddar" is not an area of Islamabad/),
-      "Same Google place as line 5",
-    ]);
-    const far = result.rows[5];
-    expect(far?.status !== "rejected" && far?.warnings[0]).toMatch(
-      /km from the nearest Islamabad area/,
+    const page = await searchPlacesForImport(
+      ADMIN,
+      { dishSlug: "chicken-karahi", areaId: area.id },
+      client,
     );
+
+    expect(seen[0]).toMatchObject({ textQuery: QUERY, includedType: "restaurant" });
+    const box = seen[0]!.restriction;
+    expect(box.low.lat < area.lat && area.lat < box.high.lat).toBe(true);
+    expect(box.low.lng < area.lng && area.lng < box.high.lng).toBe(true);
+    expect(page.results.map((r) => r.status)).toEqual(["imported", "possible_duplicate", "new"]);
+    expect(page.results[0]?.existing).toMatchObject({ id: linked.id, hasDish: false });
+    expect(page.results[1]?.duplicates.map((d) => [d.name, d.areaName, d.similarity])).toEqual([
+      ["Fixture Karahi", "F-7", 0.65], // 15 of 23 trigrams shared
+    ]);
+    expect(page.results[1]?.mapsUrl).toBe(
+      "https://www.google.com/maps/search/?api=1&query=Chicken+Karahi+F-7+Islamabad&query_place_id=ChIJfixturedup",
+    );
+    expect(page).toMatchObject({
+      nextPageToken: "tok-2",
+      area: { id: area.id, name: "F-7" },
+      city: { slug: "islamabad" },
+    });
   });
 
-  it("previews without writing anything", async () => {
-    await makeRestaurant("Butt Karahi");
+  it("Load more sends the same query with the page token, and searching writes nothing", async () => {
+    const { area } = await place("islamabad", "f-7");
+    await makeRestaurant("Fixture Karahi");
+    const { client, seen } = scriptedPlaces({
+      [QUERY]: [{ places: [fakePlace("a")], next: "tok-2" }, { places: [fakePlace("b")] }],
+    });
     const before = await Promise.all([db.restaurant.count(), db.restaurantDish.count()]);
-    await preview([row("a", "Butt Karahi"), row("b", "New Place")]);
+    await searchPlacesForImport(ADMIN, { dishSlug: "chicken-karahi", areaId: area.id }, client);
+    const second = await searchPlacesForImport(
+      ADMIN,
+      { dishSlug: "chicken-karahi", areaId: area.id, pageToken: "tok-2" },
+      client,
+    );
+    expect(seen[1]).toEqual({ ...seen[0], pageToken: "tok-2" });
+    expect(second.nextPageToken).toBeNull();
     expect(await Promise.all([db.restaurant.count(), db.restaurantDish.count()])).toEqual(before);
   });
 
-  it("Create saves the admin-confirmed form, googleSyncedAt = fetchedAt and a CANDIDATE dish", async () => {
+  it("refuses non-admins and a missing API key, and reports Google errors by status only", async () => {
+    const { area } = await place("islamabad", "f-7");
+    const input = { dishSlug: "chicken-karahi", areaId: area.id };
+    const { client } = scriptedPlaces({
+      [QUERY]: [new PlacesApiError(403, "PERMISSION_DENIED", "Fixture error detail")],
+    });
+    await expect(searchPlacesForImport(USER, input, client)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    await expect(searchPlacesForImport(ADMIN, input, null)).rejects.toMatchObject({
+      code: "PLACES_KEY_MISSING",
+    });
+    const error = await searchPlacesForImport(ADMIN, input, client).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: "PLACES_ERROR", status: 502 });
+    expect((error as Error).message).toContain("403 PERMISSION_DENIED");
+    expect((error as Error).message).not.toContain("Fixture error detail");
+  });
+
+  it("Create saves the typed name and address, the place id, location and fetch time, and a CANDIDATE dish", async () => {
     const { city, area } = await place("islamabad", "f-7");
-    const csv = row("create", "BUTT KARAHI (F-7 Markaz)");
+    const fetchedAt = daysAgo(0.01, NOW).toISOString();
     const { restaurant, restaurantDish } = await importCreate(
       ADMIN,
       {
-        name: "Butt Karahi", // typed by the admin, not the Google name
+        name: "Fixture Karahi House", // typed by the admin
         cityId: city.id,
         areaId: area.id,
-        address: "Shop 3, F-7 Markaz",
-        lat: csv.lat,
-        lng: csv.lng,
-        googlePlaceId: csv.googlePlaceId,
-        fetchedAt: csv.fetchedAt,
+        address: "Shop 3, Fixture Market",
+        lat: 33.7212,
+        lng: 73.0571,
+        googlePlaceId: "ChIJfixturecreate",
+        fetchedAt,
         phone: "03001234567",
         priceBand: 2,
         dishSlug: "chicken-karahi",
@@ -113,14 +126,16 @@ describe("/admin/import service (docs/07 §2, test DB)", () => {
     );
     const saved = await db.restaurant.findUniqueOrThrow({ where: { id: restaurant.id } });
     expect(saved).toMatchObject({
-      name: "Butt Karahi",
-      slug: "butt-karahi-f-7",
-      address: "Shop 3, F-7 Markaz",
-      googlePlaceId: csv.googlePlaceId,
+      name: "Fixture Karahi House",
+      slug: "fixture-karahi-house-f-7",
+      address: "Shop 3, Fixture Market",
+      googlePlaceId: "ChIJfixturecreate",
+      lat: 33.7212,
+      lng: 73.0571,
       phone: "03001234567",
       priceBand: 2,
     });
-    expect(saved.googleSyncedAt?.toISOString()).toBe(csv.fetchedAt);
+    expect(saved.googleSyncedAt?.toISOString()).toBe(fetchedAt);
     expect(
       await db.restaurantDish.findUniqueOrThrow({ where: { id: restaurantDish!.id } }),
     ).toMatchObject({
@@ -129,19 +144,18 @@ describe("/admin/import service (docs/07 §2, test DB)", () => {
       confidence: 0.4,
       cityId: city.id,
     });
-    // The same row again: the place is linked already.
     await expect(
       importCreate(
         ADMIN,
         {
-          name: "X",
+          name: "Another Name",
           cityId: city.id,
           areaId: area.id,
-          address: "Y",
+          address: "Another Address",
           lat: 1,
           lng: 1,
-          googlePlaceId: csv.googlePlaceId,
-          fetchedAt: csv.fetchedAt,
+          googlePlaceId: "ChIJfixturecreate",
+          fetchedAt,
           dishSlug: "chicken-karahi",
         },
         NOW,
@@ -150,41 +164,43 @@ describe("/admin/import service (docs/07 §2, test DB)", () => {
   });
 
   it("Link sets the place on a restaurant without one, never on one with another place", async () => {
-    const plain = await makeRestaurant("Butt Karahi", { lat: 33.7, lng: 73.0 });
-    const other = await makeRestaurant("Savour Foods", { googlePlaceId: "ChIJ-other-000000" });
-    const csv = row("link", "Butt Karahi", { dishSlug: "haleem" });
+    const plain = await makeRestaurant("Fixture Karahi", { lat: 33.7, lng: 73.0 });
+    const other = await makeRestaurant("Fixture Pulao House", {
+      googlePlaceId: "ChIJfixtureother",
+    });
+    const row = link("ChIJfixturelink", { dishSlug: "haleem" });
 
-    const linked = await importLink(ADMIN, { restaurantId: plain.id, ...pick(csv) }, NOW);
+    const linked = await importLink(ADMIN, { restaurantId: plain.id, ...row }, NOW);
     expect(linked).toMatchObject({
       outcome: "linked",
       placeLinked: true,
       restaurantDish: { created: true },
     });
     const saved = await db.restaurant.findUniqueOrThrow({ where: { id: plain.id } });
-    expect(saved).toMatchObject({ googlePlaceId: csv.googlePlaceId, lat: csv.lat, lng: csv.lng });
-    expect(saved.googleSyncedAt?.toISOString()).toBe(csv.fetchedAt);
+    expect(saved).toMatchObject({ googlePlaceId: "ChIJfixturelink", lat: row.lat, lng: row.lng });
+    expect(saved.googleSyncedAt?.toISOString()).toBe(row.fetchedAt);
 
     const refused = await importLink(
       ADMIN,
-      { restaurantId: other.id, ...pick(row("x", "Savour")) },
+      { restaurantId: other.id, ...link("ChIJfixturex") },
       NOW,
     );
     expect(refused.outcome).toBe("possible_duplicate");
     expect(await db.restaurant.findUniqueOrThrow({ where: { id: other.id } })).toMatchObject({
-      googlePlaceId: "ChIJ-other-000000",
+      googlePlaceId: "ChIJfixtureother",
     });
     expect(await db.restaurantDish.count({ where: { restaurantId: other.id } })).toBe(0);
   });
 
-  it("Link never downgrades a stronger dish row and refuses stale rows and non-admins", async () => {
-    const r = await makeRestaurant("Savour Foods", { googlePlaceId: "ChIJ-strong-000000" });
+  it("Link never downgrades a stronger dish row and refuses stale fetch times and non-admins", async () => {
+    const r = await makeRestaurant("Fixture Pulao House", { googlePlaceId: "ChIJfixturestrong" });
     const strong = await makeDish(r, "chicken-karahi", {
       status: "MENU_VERIFIED",
       source: "MENU_PHOTO",
       confidence: 0.95,
     });
-    const csv = row("strong", "Savour Foods");
-    expect(await importLink(ADMIN, { restaurantId: r.id, ...pick(csv) }, NOW)).toMatchObject({
+    const row = link("ChIJfixturestrong");
+    expect(await importLink(ADMIN, { restaurantId: r.id, ...row }, NOW)).toMatchObject({
       outcome: "linked",
       placeLinked: false,
       restaurantDish: { id: strong.id, created: false, status: "MENU_VERIFIED" },
@@ -197,24 +213,12 @@ describe("/admin/import service (docs/07 §2, test DB)", () => {
     await expect(
       importLink(
         ADMIN,
-        { restaurantId: r.id, ...pick(csv), fetchedAt: daysAgo(31, NOW).toISOString() },
+        { restaurantId: r.id, ...row, fetchedAt: daysAgo(31, NOW).toISOString() },
         NOW,
       ),
     ).rejects.toMatchObject({ code: "GOOGLE_DATA_TOO_OLD" });
-    await expect(importLink(USER, { restaurantId: r.id, ...pick(csv) }, NOW)).rejects.toMatchObject(
-      {
-        code: "FORBIDDEN",
-      },
-    );
+    await expect(importLink(USER, { restaurantId: r.id, ...row }, NOW)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
   });
 });
-
-function pick(r: CandidateRow) {
-  return {
-    googlePlaceId: r.googlePlaceId,
-    lat: r.lat,
-    lng: r.lng,
-    fetchedAt: r.fetchedAt,
-    dishSlug: r.dishSlug,
-  };
-}

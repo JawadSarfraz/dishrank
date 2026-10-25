@@ -144,9 +144,9 @@ const restaurantFields = {
 const isoDateTime = z.iso.datetime({ offset: true });
 
 /**
- * POST /api/v1/admin/restaurants (create from an import row or by hand). With a googlePlaceId the
- * CSV fetchedAt is required, because googleSyncedAt = fetchedAt (docs/07 §2); the service rejects
- * rows older than 30 days.
+ * POST /api/v1/admin/restaurants (create from a live search result or by hand). With a
+ * googlePlaceId the fetchedAt of that Google response is required, because googleSyncedAt =
+ * fetchedAt (docs/07 §2); the service rejects Google data older than 30 days.
  */
 export const adminRestaurantInput = z
   .strictObject({
@@ -160,7 +160,10 @@ export const adminRestaurantInput = z
   });
 export type AdminRestaurantInput = z.infer<typeof adminRestaurantInput>;
 
-/** /admin/import Create: the form the admin confirmed for one CSV row (docs/07 §2). */
+/**
+ * /admin/import Create (docs/07 §2): name and address are typed by the admin, never copied from
+ * Google; googlePlaceId, lat/lng and fetchedAt come from the live search result.
+ */
 export const importCreateInput = z.strictObject({
   ...restaurantFields,
   googlePlaceId,
@@ -169,7 +172,7 @@ export const importCreateInput = z.strictObject({
 });
 export type ImportCreateInput = z.infer<typeof importCreateInput>;
 
-/** /admin/import Link: attach a CSV row's place and dish to an existing restaurant. */
+/** /admin/import Link: attach a search result's place and dish to an existing restaurant. */
 export const importLinkInput = z.strictObject({
   restaurantId: id,
   googlePlaceId,
@@ -180,9 +183,18 @@ export const importLinkInput = z.strictObject({
 });
 export type ImportLinkInput = z.infer<typeof importLinkInput>;
 
+/** /admin/import live search: one Text Search page for a dish in an area (pageToken = "Load more"). */
+export const placesSearchInput = z.strictObject({
+  dishSlug: slug,
+  areaId: id,
+  pageToken: z.string().min(1).max(4096).optional(),
+});
+export type PlacesSearchInput = z.infer<typeof placesSearchInput>;
+
 /**
  * PATCH /api/v1/admin/restaurants/:id (edit). The slug never changes. lat/lng can be typed only for
- * a restaurant without a googlePlaceId: Google coordinates come from the CSV and the daily refresh.
+ * a restaurant without a googlePlaceId: Google coordinates come only from a search result (Create
+ * or Link) and the daily refresh.
  */
 export const adminRestaurantUpdateInput = z.strictObject({
   name: text(120),

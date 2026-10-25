@@ -1,12 +1,17 @@
-// /admin/import (docs/07 §2): preview a seed CSV, then create or link rows one at a time.
-// The preview writes nothing; Google names and addresses reach the DB only through the Create form
-// the admin confirms (importCreate), as our own record.
-import { CsvError } from "@/lib/csv";
-import { haversineKm } from "@/lib/geo";
+// /admin/import (docs/07 §2): live Places search, then Create / Link / Skip one result at a time.
+// Google names and addresses are display only: they are returned to the admin's browser and
+// nothing else. They are never saved, logged, cached or used to prefill (Maps Platform Terms
+// 3.2.3(a)(iii)); only the place id, lat/lng and fetch time are saved, on Create or Link.
 import { similarity } from "@/lib/trigram";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
-import { findCityWithAreasById, listCitiesWithAreas } from "@/server/repositories/geo.repo";
+import {
+  PlacesApiError,
+  googleMapsUrl,
+  type PlaceResult,
+  type PlacesClient,
+} from "@/server/places";
+import { findAreaWithCityById, listCitiesWithAreas } from "@/server/repositories/geo.repo";
 import {
   findRestaurantByGooglePlaceId,
   findRestaurantById,
@@ -16,38 +21,20 @@ import {
   updateRestaurantById,
 } from "@/server/repositories/restaurant.repo";
 import { listRestaurantDishPairs } from "@/server/repositories/restaurant-dish.repo";
-import { findDishBySlug, findDishesBySlugs } from "@/server/repositories/taxonomy.repo";
+import { findDishBySlug, listDishesForPicker } from "@/server/repositories/taxonomy.repo";
 import { inTransaction } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
-import type { ImportCreateInput, ImportLinkInput } from "@/server/validation";
-import { parseCandidatesCsv, type CandidateRow } from "./candidates-csv";
+import type { ImportCreateInput, ImportLinkInput, PlacesSearchInput } from "@/server/validation";
 import { cleanText } from "./matching/normalize";
 import { checkFetchedAt } from "./places-policy";
+import { buildPlacesSearch } from "./places-query";
 import { createRestaurant, ensureImportedDish } from "./restaurant.service";
 
 export const IMPORT_RULES = {
-  /** docs/07 §2: trigram similarity on the name within the same area. */
+  /** docs/07 §2: trigram similarity on the name within the searched area. */
   nameSimilarity: 0.6,
   maxDuplicates: 3,
-  /** Text Search only biases to the area: rows this far from every area centre get a warning. */
-  // DECISION-PENDING: 10 km warning distance for rows that may lie outside the city.
-  farFromCityKm: 10,
 } as const;
-
-type Area = { id: string; slug: string; name: string; lat: number; lng: number };
-
-/** The area whose centre is nearest to the place: the Create form's suggested area. */
-export function nearestArea(
-  point: { lat: number; lng: number },
-  areas: readonly Area[],
-): { area: Area; distanceKm: number } | null {
-  let best: { area: Area; distanceKm: number } | null = null;
-  for (const area of areas) {
-    const distanceKm = haversineKm(point, area);
-    if (!best || distanceKm < best.distanceKm) best = { area, distanceKm };
-  }
-  return best;
-}
 
 export type DedupeRestaurant = {
   id: string;
@@ -59,7 +46,10 @@ export type DedupeRestaurant = {
   area: { name: string } | null;
 };
 
-/** Restaurants in the same area whose name (or another name) has trigram similarity ≥ 0.6. */
+/**
+ * Our restaurants in the same area whose name (or another name) has trigram similarity ≥ 0.6 with
+ * a result's name. The result's name is compared in memory only.
+ */
 export function findNameDuplicates(
   name: string,
   areaId: string,
@@ -80,123 +70,96 @@ export function findNameDuplicates(
     .slice(0, IMPORT_RULES.maxDuplicates);
 }
 
-export type PreviewRestaurant = { id: string; slug: string; name: string; areaName: string | null };
-
-export type PreviewRow =
-  | {
-      line: number;
-      status: "rejected";
-      reasons: string[];
-      googlePlaceId: string;
-      displayName: string;
-      dishSlug: string;
-    }
-  | {
-      line: number;
-      /** imported: a restaurant already has this googlePlaceId; possible_duplicate: name match in the area. */
-      status: "new" | "imported" | "possible_duplicate";
-      candidate: CandidateRow;
-      ageDays: number;
-      dish: { slug: string; name: string };
-      suggestedArea: { id: string; name: string; distanceKm: number };
-      warnings: string[];
-      existing: (PreviewRestaurant & { hasDish: boolean }) | null;
-      duplicates: (PreviewRestaurant & { similarity: number })[];
-    };
-
-export type ImportPreview = {
-  city: { id: string; slug: string; name: string; areas: { id: string; name: string }[] };
-  rows: PreviewRow[];
-  counts: Record<PreviewRow["status"], number>;
+export type ImportRestaurantRef = {
+  id: string;
+  slug: string;
+  name: string;
+  areaName: string | null;
 };
 
-/** Parses and checks the CSV, finds existing and possible duplicate restaurants. Writes nothing. */
-export async function previewImport(
+export type ImportSearchResult = {
+  googlePlaceId: string;
+  /** Google's name and address: display only. */
+  displayName: string;
+  formattedAddress: string;
+  /** Saved only with a Create or Link (googleSyncedAt = the page's fetchedAt). */
+  lat: number;
+  lng: number;
+  mapsUrl: string;
+  /** imported: a restaurant already has this place id; possible_duplicate: a name match in the area. */
+  status: "new" | "imported" | "possible_duplicate";
+  existing: (ImportRestaurantRef & { hasDish: boolean }) | null;
+  duplicates: (ImportRestaurantRef & { similarity: number })[];
+};
+
+export type ImportSearchPage = {
+  dish: { slug: string; name: string };
+  area: { id: string; slug: string; name: string };
+  city: { id: string; slug: string; name: string };
+  /** Time of the Google response: sent back with a Create or Link from this page. */
+  fetchedAt: string;
+  results: ImportSearchResult[];
+  withoutLocation: number;
+  nextPageToken: string | null;
+};
+
+/** One page of the live Text Search for a dish in an area, with dedupe against our restaurants. */
+export async function searchPlacesForImport(
   actor: SessionUser | null,
-  input: { cityId: string; csvText: string },
-  now: Date = new Date(),
-): Promise<ImportPreview> {
-  assertRole(actor, "ADMIN");
-  const city = await findCityWithAreasById(input.cityId);
-  if (!city) throw new AppError("CITY_NOT_FOUND", "Unknown city", 404);
-
-  let parsed;
-  try {
-    parsed = parseCandidatesCsv(input.csvText, now);
-  } catch (error) {
-    if (error instanceof CsvError) throw new AppError("CSV_INVALID", error.message, 400);
-    throw error;
+  input: PlacesSearchInput,
+  places: Pick<PlacesClient, "textSearch"> | null,
+): Promise<ImportSearchPage> {
+  const admin = assertRole(actor, "ADMIN");
+  if (!places) {
+    throw new AppError("PLACES_KEY_MISSING", "GOOGLE_PLACES_API_KEY is not set on the server", 503);
   }
-  const valid = parsed.flatMap((p) => (p.ok ? [p] : []));
-  const dishes = await findDishesBySlugs([...new Set(valid.map((p) => p.row.dishSlug))]);
-  const dishBySlug = new Map(dishes.map((d) => [d.slug, d]));
-  const existing = await findRestaurantsByGooglePlaceIds(valid.map((p) => p.row.googlePlaceId));
+  const dish = await findDishBySlug(input.dishSlug);
+  if (!dish) throw new AppError("DISH_NOT_FOUND", `Unknown dish "${input.dishSlug}"`, 404);
+  const area = await findAreaWithCityById(input.areaId);
+  if (!area) throw new AppError("AREA_NOT_FOUND", "Unknown area", 404);
+
+  const params = buildPlacesSearch({
+    dish: { name: dish.name, categorySlug: dish.category.slug },
+    area,
+    city: area.city,
+  });
+  let page;
+  try {
+    page = await places.textSearch({ ...params, pageToken: input.pageToken });
+  } catch (error) {
+    if (!(error instanceof PlacesApiError)) throw error;
+    logEvent("import.search.error", { userId: admin.id, status: error.describe() }, "warn");
+    throw new AppError(
+      "PLACES_ERROR",
+      `Google Places answered ${error.describe()}. Search again${input.pageToken ? " from the first page" : ""}.`,
+      502,
+    );
+  }
+
+  const ids = page.places.map((p) => p.googlePlaceId);
+  const existing = await findRestaurantsByGooglePlaceIds(ids);
   const existingByPlace = new Map(existing.map((r) => [r.googlePlaceId!, r]));
-  const pairs = await listRestaurantDishPairs(
-    existing.map((r) => r.id),
-    dishes.map((d) => d.id),
+  const served = new Set(
+    (
+      await listRestaurantDishPairs(
+        existing.map((r) => r.id),
+        [dish.id],
+      )
+    ).map((p) => p.restaurantId),
   );
-  const servedPairs = new Set(pairs.map((p) => `${p.restaurantId}:${p.dishId}`));
-  const cityRestaurants = await listRestaurantsForDedupe(city.id);
-  const cityAreaSlugs = new Set(city.areas.map((a) => a.slug));
-  const firstLineOfPlace = new Map<string, number>();
+  const cityRestaurants = await listRestaurantsForDedupe(area.city.id);
 
-  const rows = parsed.map((p): PreviewRow => {
-    if (!p.ok) {
-      return {
-        line: p.line,
-        status: "rejected",
-        reasons: p.reasons,
-        googlePlaceId: p.raw.googlePlaceId ?? "",
-        displayName: p.raw.displayName ?? "",
-        dishSlug: p.raw.dishSlug ?? "",
-      };
-    }
-    const reasons: string[] = [];
-    const dish = dishBySlug.get(p.row.dishSlug);
-    if (!dish) reasons.push(`Unknown dish "${p.row.dishSlug}"`);
-    if (!cityAreaSlugs.has(p.row.queryArea)) {
-      reasons.push(
-        `queryArea "${p.row.queryArea}" is not an area of ${city.name}: is this the CSV's city?`,
-      );
-    }
-    const firstLine = firstLineOfPlace.get(p.row.googlePlaceId);
-    if (firstLine) reasons.push(`Same Google place as line ${firstLine}`);
-    else firstLineOfPlace.set(p.row.googlePlaceId, p.line);
-    if (!dish || reasons.length > 0) {
-      return {
-        line: p.line,
-        status: "rejected",
-        reasons,
-        googlePlaceId: p.row.googlePlaceId,
-        displayName: p.row.displayName,
-        dishSlug: p.row.dishSlug,
-      };
-    }
-
-    const nearest = nearestArea(p.row, city.areas)!;
-    const warnings: string[] = [];
-    if (nearest.distanceKm > IMPORT_RULES.farFromCityKm) {
-      warnings.push(
-        `${Math.round(nearest.distanceKm)} km from the nearest ${city.name} area: check that it is in ${city.name}.`,
-      );
-    }
+  const results = page.places.map((place: PlaceResult): ImportSearchResult => {
     const base = {
-      line: p.line,
-      candidate: p.row,
-      ageDays: p.ageDays,
-      dish: { slug: dish.slug, name: dish.name },
-      suggestedArea: {
-        id: nearest.area.id,
-        name: nearest.area.name,
-        distanceKm: Math.round(nearest.distanceKm * 10) / 10,
-      },
-      warnings,
+      googlePlaceId: place.googlePlaceId,
+      displayName: place.displayName,
+      formattedAddress: place.formattedAddress,
+      lat: place.lat,
+      lng: place.lng,
+      mapsUrl: googleMapsUrl(place.googlePlaceId, params.textQuery),
     };
-
-    const same = existingByPlace.get(p.row.googlePlaceId);
+    const same = existingByPlace.get(place.googlePlaceId);
     if (same) {
-      if (same.cityId !== city.id) warnings.push(`Already imported in ${same.city.name}.`);
       return {
         ...base,
         status: "imported",
@@ -205,20 +168,18 @@ export async function previewImport(
           slug: same.slug,
           name: same.name,
           areaName: same.area?.name ?? null,
-          hasDish: servedPairs.has(`${same.id}:${dish.id}`),
+          hasDish: served.has(same.id),
         },
         duplicates: [],
       };
     }
-    const duplicates = findNameDuplicates(p.row.displayName, nearest.area.id, cityRestaurants).map(
-      (d) => ({
-        id: d.restaurant.id,
-        slug: d.restaurant.slug,
-        name: d.restaurant.name,
-        areaName: d.restaurant.area?.name ?? null,
-        similarity: Math.round(d.similarity * 100) / 100,
-      }),
-    );
+    const duplicates = findNameDuplicates(place.displayName, area.id, cityRestaurants).map((d) => ({
+      id: d.restaurant.id,
+      slug: d.restaurant.slug,
+      name: d.restaurant.name,
+      areaName: d.restaurant.area?.name ?? null,
+      similarity: Math.round(d.similarity * 100) / 100,
+    }));
     return {
       ...base,
       status: duplicates.length > 0 ? "possible_duplicate" : "new",
@@ -227,22 +188,27 @@ export async function previewImport(
     };
   });
 
-  const counts = { rejected: 0, new: 0, imported: 0, possible_duplicate: 0 };
-  for (const row of rows) counts[row.status]++;
-  logEvent("import.preview", { userId: actor!.id, cityId: city.id, rows: rows.length, ...counts });
+  logEvent("import.search", {
+    userId: admin.id,
+    dishSlug: dish.slug,
+    areaSlug: area.slug,
+    nextPage: Boolean(input.pageToken),
+    results: results.length,
+    imported: results.filter((r) => r.status === "imported").length,
+    possibleDuplicates: results.filter((r) => r.status === "possible_duplicate").length,
+  });
   return {
-    city: {
-      id: city.id,
-      slug: city.slug,
-      name: city.name,
-      areas: city.areas.map((a) => ({ id: a.id, name: a.name })),
-    },
-    rows,
-    counts,
+    dish: { slug: dish.slug, name: dish.name },
+    area: { id: area.id, slug: area.slug, name: area.name },
+    city: area.city,
+    fetchedAt: page.fetchedAt.toISOString(),
+    results,
+    withoutLocation: page.withoutLocation,
+    nextPageToken: page.nextPageToken ?? null,
   };
 }
 
-/** Create: the admin-confirmed form for one row; googleSyncedAt = the row's fetchedAt. */
+/** Create: name and address typed by the admin; place id, lat/lng and fetch time from the result. */
 export async function importCreate(
   actor: SessionUser | null,
   input: ImportCreateInput,
@@ -287,9 +253,9 @@ export type LinkResult =
     };
 
 /**
- * Link (docs/07 §2 step 3): to a restaurant without a googlePlaceId, save the row's place id,
+ * Link (docs/07 §2 step 3): to a restaurant without a googlePlaceId, save the result's place id,
  * lat/lng and googleSyncedAt = fetchedAt; then add the dish. A restaurant that already has a
- * different place id is not changed at all and the row stays a possible duplicate.
+ * different place id is not changed at all and the result stays a possible duplicate.
  */
 export async function importLink(
   actor: SessionUser | null,
@@ -363,9 +329,17 @@ export async function importLink(
   return result;
 }
 
-/** Cities with their areas for the upload form. */
-export async function getImportCities(actor: SessionUser | null) {
+/** Cities with their areas and every dish (launch dishes first) for the search form. */
+export async function getImportOptions(actor: SessionUser | null) {
   assertRole(actor, "ADMIN");
-  const cities = await listCitiesWithAreas();
-  return cities.map((c) => ({ id: c.id, slug: c.slug, name: c.name }));
+  const [cities, dishes] = await Promise.all([listCitiesWithAreas(), listDishesForPicker()]);
+  return {
+    cities: cities.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      areas: c.areas.map((a) => ({ id: a.id, slug: a.slug, name: a.name })),
+    })),
+    dishes,
+  };
 }

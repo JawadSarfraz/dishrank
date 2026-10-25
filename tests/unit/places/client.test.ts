@@ -5,16 +5,15 @@ import { fakeFetch, googleError, jsonResponse } from "./fake-fetch";
 const KEY = "test-key-not-real";
 const search = {
   textQuery: "Chai Blue Area Islamabad",
-  center: { latitude: 33.7169, longitude: 73.0718 },
+  restriction: { low: { lat: 33.69, lng: 73.04 }, high: { lat: 33.74, lng: 73.1 } },
 };
 const onePlace = {
   places: [
     {
       id: "p1",
-      displayName: { text: "Chai Shai" },
-      formattedAddress: "Blue Area",
+      displayName: { text: "Fixture Chai Stop" },
+      formattedAddress: "Fixture Arcade",
       location: { latitude: 33.71, longitude: 73.07 },
-      primaryType: "cafe",
     },
   ],
 };
@@ -45,7 +44,7 @@ describe("Places client", () => {
     expect(sleeps).toHaveLength(1);
   });
 
-  it("gives up on 5xx after 3 attempts with Google's status and message", async () => {
+  it("gives up on 5xx after 3 attempts; describe() carries only the status codes", async () => {
     const { places, sleeps } = client([
       googleError(503, "UNAVAILABLE", "Try again"),
       googleError(503, "UNAVAILABLE", "Try again"),
@@ -53,7 +52,8 @@ describe("Places client", () => {
     ]);
     const error = await places.textSearch(search).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PlacesApiError);
-    expect((error as PlacesApiError).describe()).toBe("503 UNAVAILABLE: Try again");
+    expect((error as PlacesApiError).describe()).toBe("503 UNAVAILABLE");
+    expect((error as PlacesApiError).message).toBe("Try again"); // terminal output only
     expect(places.calls).toBe(3);
     expect(sleeps).toHaveLength(2);
     expect(sleeps[1]).toBeGreaterThan(sleeps[0]!); // exponential
@@ -62,8 +62,8 @@ describe("Places client", () => {
   it("does not retry other 4xx errors, and the error never carries the key", async () => {
     const { places } = client([googleError(400, "INVALID_ARGUMENT", "Invalid pageToken")]);
     const error = (await places.textSearch(search).catch((e: unknown) => e)) as PlacesApiError;
-    expect(error.describe()).toBe("400 INVALID_ARGUMENT: Invalid pageToken");
-    expect(JSON.stringify(error) + error.describe()).not.toContain(KEY);
+    expect(error.describe()).toBe("400 INVALID_ARGUMENT");
+    expect(JSON.stringify(error) + error.describe() + error.message).not.toContain(KEY);
     expect(places.calls).toBe(1);
   });
 
@@ -87,12 +87,19 @@ describe("Places client", () => {
     expect(places.calls).toBe(2);
   });
 
-  it("returns NOT_FOUND from Place Details as a result, not an error", async () => {
-    const { places } = client([googleError(404, "NOT_FOUND", "Place ID is no longer valid")]);
-    expect(await places.placeDetails("old-id")).toEqual({
-      kind: "not_found",
-      message: "Place ID is no longer valid",
+  it("sends the planning search with the ids-only mask and returns ids only", async () => {
+    const { places, requests } = client([jsonResponse(200, onePlace)]);
+    const page = await places.textSearchIds(search);
+    expect(page.placeIds).toEqual(["p1"]);
+    expect(requests[0]?.init.headers).toMatchObject({
+      "X-Goog-FieldMask": "places.id,nextPageToken",
     });
+    expect(JSON.stringify(page)).not.toContain("Fixture Chai Stop");
+  });
+
+  it("returns NOT_FOUND from Place Details as a result without Google's text", async () => {
+    const { places } = client([googleError(404, "NOT_FOUND", "Place ID is no longer valid")]);
+    expect(await places.placeDetails("old-id")).toEqual({ kind: "not_found" });
     expect(places.calls).toBe(1);
   });
 
@@ -106,7 +113,7 @@ describe("Places client", () => {
   it("summarises a non-JSON error body by HTTP status", async () => {
     const { places } = client([new Response("<html>bad gateway</html>", { status: 400 })]);
     const error = (await places.placeDetails("p1").catch((e: unknown) => e)) as PlacesApiError;
-    expect(error.describe()).toMatch(/^400 HTTP_400: /);
+    expect(error.describe()).toBe("400 HTTP_400");
   });
 
   it("refuses to start without an API key", () => {

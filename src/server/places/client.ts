@@ -6,8 +6,11 @@ import {
   type PlaceDetailsResult,
 } from "./placeDetails";
 import {
+  TEXT_SEARCH_IDS_FIELD_MASK,
   buildTextSearchRequest,
+  parseTextSearchIdsResponse,
   parseTextSearchResponse,
+  type TextSearchIdsPage,
   type TextSearchPage,
   type TextSearchParams,
 } from "./textSearch";
@@ -25,7 +28,10 @@ export type PlacesClientOptions = {
 };
 
 export type PlacesClient = {
+  /** Names, addresses and locations: display only (/admin/import). */
   textSearch(params: TextSearchParams): Promise<TextSearchPage>;
+  /** Place ids only (pnpm seed:places). */
+  textSearchIds(params: TextSearchParams): Promise<TextSearchIdsPage>;
   placeDetails(googlePlaceId: string): Promise<PlaceDetailsResult>;
   /** HTTP requests sent so far, retries included (what Google can bill). */
   readonly calls: number;
@@ -78,6 +84,14 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
     }
   }
 
+  async function parse<T>(json: unknown, at: Date, parser: (j: unknown, d: Date) => T): Promise<T> {
+    try {
+      return parser(json, at);
+    } catch {
+      throw new PlacesApiError(200, "BAD_RESPONSE", "unexpected Places response");
+    }
+  }
+
   return {
     get calls() {
       return calls;
@@ -86,11 +100,17 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
     async textSearch(params) {
       const { url, init } = buildTextSearchRequest(params, options.apiKey);
       const { json, at } = await send(url, init);
-      try {
-        return parseTextSearchResponse(json, at);
-      } catch {
-        throw new PlacesApiError(200, "BAD_RESPONSE", "unexpected Text Search response");
-      }
+      return parse(json, at, parseTextSearchResponse);
+    },
+
+    async textSearchIds(params) {
+      const { url, init } = buildTextSearchRequest(
+        params,
+        options.apiKey,
+        TEXT_SEARCH_IDS_FIELD_MASK,
+      );
+      const { json, at } = await send(url, init);
+      return parse(json, at, parseTextSearchIdsResponse);
     },
 
     async placeDetails(googlePlaceId) {
@@ -103,15 +123,11 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
           error instanceof PlacesApiError &&
           (error.httpStatus === 404 || error.googleStatus === "NOT_FOUND")
         ) {
-          return { kind: "not_found", message: error.message };
+          return { kind: "not_found" };
         }
         throw error;
       }
-      try {
-        return parsePlaceDetailsResponse(result.json, result.at);
-      } catch {
-        throw new PlacesApiError(200, "BAD_RESPONSE", "unexpected Place Details response");
-      }
+      return parse(result.json, result.at, parsePlaceDetailsResponse);
     },
   };
 }

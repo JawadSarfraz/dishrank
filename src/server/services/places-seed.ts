@@ -1,5 +1,10 @@
-// Candidate seeding (docs/07 §1): Text Search per area → CSV rows. Reads the city, areas and dish
-// from the DB; never writes to it. Google results only ever go to the scratch CSV in tmp/.
+// pnpm seed:places (docs/07 §1): a planning tool only. It runs the same Text Search queries as the
+// live search on /admin/import, but with the IDs-only field mask (Text Search Essentials IDs Only,
+// no charge), and prints per-area counts and the Text Search Pro calls a full live import would
+// take. Google names and addresses are never requested; it writes no file and never writes the DB.
+import { parseArgs } from "node:util";
+import { isSlug } from "@/lib/slug";
+import { AppError } from "@/server/errors";
 import {
   PlacesApiError,
   PlacesBudgetError,
@@ -7,27 +12,9 @@ import {
   type PlacesClient,
   type TextSearchParams,
 } from "@/server/places";
-import { AppError } from "@/server/errors";
 import { findCityWithAreasBySlug } from "@/server/repositories/geo.repo";
 import { findDishBySlug } from "@/server/repositories/taxonomy.repo";
-import type { CandidateRow } from "./candidates-csv";
-
-/**
- * includedType only biases results (strictTypeFiltering stays false), but the bias still pushes
- * other venues down the list. Tea stalls, halwa-puri shops, sweet shops and street stalls are often
- * typed cafe, tea_house, bakery or nothing at all, so dishes in these categories search without a type.
- */
-// DECISION-PENDING: which dish categories search without includedType "restaurant" (docs/OPEN-QUESTIONS.md).
-export const UNTYPED_SEARCH_CATEGORIES: readonly string[] = [
-  "breakfast",
-  "drinks",
-  "desserts",
-  "street-food",
-];
-
-export function includedTypeFor(categorySlug: string): string | undefined {
-  return UNTYPED_SEARCH_CATEGORIES.includes(categorySlug) ? undefined : "restaurant";
-}
+import { buildPlacesSearch } from "./places-query";
 
 export type SeedTarget = {
   city: { slug: string; name: string };
@@ -67,16 +54,11 @@ export async function loadSeedTarget(input: {
 
 export type PlannedQuery = { areaSlug: string; params: TextSearchParams };
 
-/** One query per area: "<dish name> <area name> <city>", biased to a 2.5 km circle on the area. */
+/** One query per area, exactly as /admin/import sends it (docs/07 §2). */
 export function planSeedQueries(target: SeedTarget): PlannedQuery[] {
-  const includedType = includedTypeFor(target.dish.categorySlug);
   return target.areas.map((area) => ({
     areaSlug: area.slug,
-    params: {
-      textQuery: `${target.dish.name} ${area.name} ${target.city.name}`,
-      includedType,
-      center: { latitude: area.lat, longitude: area.lng },
-    },
+    params: buildPlacesSearch({ dish: target.dish, area, city: target.city }),
   }));
 }
 
@@ -85,19 +67,19 @@ export function maxCallsFor(queries: readonly PlannedQuery[]): number {
   return queries.length * TEXT_SEARCH.maxPages;
 }
 
-export type AreaResult = {
+export type AreaCount = {
   areaSlug: string;
+  /** Pages Google returned: the Text Search Pro calls the live search needs to show them all. */
   pages: number;
   results: number;
   /** Places not already returned for an earlier area. */
   newPlaces: number;
-  withoutLocation: number;
   error?: string;
 };
 
-export type SeedRun = {
-  rows: CandidateRow[];
-  areas: AreaResult[];
+export type PlanningRun = {
+  areas: AreaCount[];
+  uniquePlaces: number;
   calls: number;
   /** Why the run stopped before searching every area (budget or a Google error), if it did. */
   stoppedEarly?: string;
@@ -105,20 +87,17 @@ export type SeedRun = {
 };
 
 /**
- * Runs the planned queries in order, up to 3 pages each, deduping by place id (first area wins).
- * fetchedAt is the time of the page's response. Stops when the call budget is reached, or at the
- * first page-1 error that a retry cannot fix (bad key, disabled API, invalid request), because
- * every other area would fail the same way.
+ * Runs the planned queries in order, up to 3 pages each, counting unique place ids. Stops at the
+ * call budget, or at a page-1 error a retry cannot fix (bad key, disabled API, invalid request),
+ * because every other area would fail the same way.
  */
-export async function runSeedQueries(
-  client: PlacesClient,
+export async function runPlanningQueries(
+  client: Pick<PlacesClient, "textSearchIds" | "calls">,
   queries: readonly PlannedQuery[],
-  dishSlug: string,
-  onArea?: (result: AreaResult) => void,
-): Promise<SeedRun> {
+  onArea?: (result: AreaCount) => void,
+): Promise<PlanningRun> {
   const seen = new Set<string>();
-  const rows: CandidateRow[] = [];
-  const areas: AreaResult[] = [];
+  const areas: AreaCount[] = [];
   const notSearched: string[] = [];
   let stoppedEarly: string | undefined;
 
@@ -127,30 +106,17 @@ export async function runSeedQueries(
       notSearched.push(query.areaSlug);
       continue;
     }
-    const result: AreaResult = {
-      areaSlug: query.areaSlug,
-      pages: 0,
-      results: 0,
-      newPlaces: 0,
-      withoutLocation: 0,
-    };
+    const result: AreaCount = { areaSlug: query.areaSlug, pages: 0, results: 0, newPlaces: 0 };
     let pageToken: string | undefined;
     try {
       do {
-        const page = await client.textSearch({ ...query.params, pageToken });
+        const page = await client.textSearchIds({ ...query.params, pageToken });
         result.pages++;
-        result.results += page.places.length;
-        result.withoutLocation += page.withoutLocation;
-        for (const place of page.places) {
-          if (seen.has(place.googlePlaceId)) continue;
-          seen.add(place.googlePlaceId);
+        result.results += page.placeIds.length;
+        for (const id of page.placeIds) {
+          if (seen.has(id)) continue;
+          seen.add(id);
           result.newPlaces++;
-          rows.push({
-            ...place,
-            queryArea: query.areaSlug,
-            dishSlug,
-            fetchedAt: page.fetchedAt.toISOString(),
-          });
         }
         pageToken = page.nextPageToken;
       } while (pageToken && result.pages < TEXT_SEARCH.maxPages);
@@ -159,7 +125,8 @@ export async function runSeedQueries(
         result.error = "call budget reached";
         stoppedEarly = `call budget reached after ${error.calls} calls`;
       } else if (error instanceof PlacesApiError) {
-        result.error = error.describe();
+        // Google's error text goes to the operator's terminal only; it is never stored or logged.
+        result.error = `${error.describe()}: ${error.message}`;
         if (result.pages === 0 && error.httpStatus >= 400 && error.httpStatus < 500) {
           stoppedEarly = `Google answered ${error.describe()}`;
         }
@@ -170,5 +137,134 @@ export async function runSeedQueries(
     areas.push(result);
     onArea?.(result);
   }
-  return { rows, areas, calls: client.calls, stoppedEarly, notSearched };
+  return { areas, uniquePlaces: seen.size, calls: client.calls, stoppedEarly, notSearched };
+}
+
+export class UsageError extends Error {}
+
+export const SEED_PLACES_USAGE =
+  "Usage: pnpm seed:places -- --city=<city> --dish=<dish> [--areas=<a,b>] [--dry-run] [--max-calls=<n>]";
+
+const DEFAULT_MAX_CALLS = 150;
+
+export function parseSeedPlacesArgs(argv: readonly string[]) {
+  const args = argv[0] === "--" ? argv.slice(1) : [...argv]; // `pnpm run x -- …` passes "--" on
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args,
+      strict: true,
+      options: {
+        city: { type: "string" },
+        dish: { type: "string" },
+        areas: { type: "string" },
+        "dry-run": { type: "boolean", default: false },
+        "max-calls": { type: "string" },
+      },
+    }));
+  } catch (error) {
+    throw new UsageError(error instanceof Error ? error.message : String(error));
+  }
+  const city = values.city?.trim() ?? "";
+  const dish = values.dish?.trim() ?? "";
+  if (!isSlug(city) || !isSlug(dish)) throw new UsageError("--city and --dish are required slugs.");
+  const areas = values.areas
+    ?.split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (areas?.some((a) => !isSlug(a)))
+    throw new UsageError("--areas must be comma-separated slugs.");
+  const maxCalls =
+    values["max-calls"] === undefined ? DEFAULT_MAX_CALLS : Number(values["max-calls"]);
+  if (!Number.isInteger(maxCalls) || maxCalls < 1) {
+    throw new UsageError("--max-calls must be a positive integer.");
+  }
+  return { city, dish, areas, dryRun: values["dry-run"] ?? false, maxCalls };
+}
+
+export type SeedPlacesDeps = {
+  print: (line: string) => void;
+  printError: (line: string) => void;
+  /** null when GOOGLE_PLACES_API_KEY is missing. */
+  createClient: (maxCalls: number) => Pick<PlacesClient, "textSearchIds" | "calls"> | null;
+};
+
+/** The CLI behind scripts/seed-places.ts. Returns the exit code; prints only slugs and counts. */
+export async function runSeedPlaces(
+  argv: readonly string[],
+  deps: SeedPlacesDeps,
+): Promise<number> {
+  let cli;
+  try {
+    cli = parseSeedPlacesArgs(argv);
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error;
+    deps.printError(`seed:places: ${error.message}\n${SEED_PLACES_USAGE}`);
+    return 1;
+  }
+  let target;
+  try {
+    target = await loadSeedTarget({ citySlug: cli.city, dishSlug: cli.dish, areaSlugs: cli.areas });
+  } catch (error) {
+    if (!(error instanceof AppError)) throw error;
+    deps.printError(`seed:places: ${error.message}`);
+    return 1;
+  }
+  const queries = planSeedQueries(target);
+  const maxCalls = maxCallsFor(queries);
+  deps.print(
+    `seed:places ${target.city.slug} / ${target.dish.slug} (${target.dish.name}; category ` +
+      `${target.dish.categorySlug}; includedType ${queries[0]?.params.includedType ?? "(none)"})`,
+  );
+  deps.print(
+    `areas: ${queries.length} · max calls: ${maxCalls} (${queries.length} areas × ` +
+      `${TEXT_SEARCH.maxPages} pages, before retries) · budget --max-calls: ${cli.maxCalls}`,
+  );
+
+  if (cli.dryRun) {
+    deps.print(
+      "DRY RUN: no Google calls. Planned queries (each limited to a rectangle around the area):",
+    );
+    for (const q of queries) {
+      const { low, high } = q.params.restriction;
+      deps.print(
+        `  ${q.areaSlug.padEnd(18)} "${q.params.textQuery}"  box ${low.lat},${low.lng} → ${high.lat},${high.lng}`,
+      );
+    }
+    deps.print(
+      `A full live import of this dish (every page of every area) takes at most ${maxCalls} Text Search Pro calls.`,
+    );
+    return 0;
+  }
+
+  const client = deps.createClient(cli.maxCalls);
+  if (!client) {
+    deps.printError(
+      "seed:places: GOOGLE_PLACES_API_KEY is not set. Add it to your env file (see .env.example); --dry-run works without it.",
+    );
+    return 1;
+  }
+  const run = await runPlanningQueries(client, queries, (area) => {
+    deps.print(
+      `  ${area.areaSlug.padEnd(18)} ${area.pages} pages  ${String(area.results).padStart(3)} results  ` +
+        `${String(area.newPlaces).padStart(3)} new${area.error ? `  (error: ${area.error})` : ""}`,
+    );
+  });
+  if (run.stoppedEarly) {
+    deps.printError(
+      `stopped early: ${run.stoppedEarly}. Not searched: ${run.notSearched.join(", ") || "none"}.`,
+    );
+  }
+  const proCalls = run.areas.reduce((sum, a) => sum + a.pages, 0);
+  deps.print(
+    `unique places: ${run.uniquePlaces} · calls used: ${run.calls} of ${cli.maxCalls} ` +
+      "(Text Search Essentials IDs Only: no charge)",
+  );
+  deps.print(
+    `live import estimate: ${proCalls} Text Search Pro calls to load every page of these areas in /admin/import.`,
+  );
+  deps.print(
+    "No file written: this tool never fetches names or addresses. Import with the live search in /admin/import.",
+  );
+  return run.stoppedEarly ? 1 : 0;
 }

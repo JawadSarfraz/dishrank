@@ -1,9 +1,10 @@
 // Google data age rules (CLAUDE.md rule 2, docs/07 §2 and §5). googleSyncedAt is always the time of
-// the Google call behind lat/lng (CSV fetchedAt or a refresh), never the import time.
+// the Google call behind lat/lng (the search response on Create/Link, or a refresh), never the
+// import time.
 import { z } from "zod";
 
 export const PLACES_POLICY = {
-  /** Google lat/lng may be kept at most 30 days; older CSV rows cannot be imported. */
+  /** Google lat/lng may be kept at most 30 days; older Google data cannot be saved. */
   maxAgeDays: 30,
   /** refresh-places selects rows whose googleSyncedAt is NULL or older than this. */
   refreshAfterDays: 25,
@@ -44,7 +45,7 @@ export function checkFetchedAt(value: string | null | undefined, now: Date): Fet
   if (ageDays > PLACES_POLICY.maxAgeDays) {
     return {
       ok: false,
-      reason: `Fetched ${Math.floor(ageDays)} days ago: Google data older than ${PLACES_POLICY.maxAgeDays} days cannot be imported. Run pnpm seed:places again.`,
+      reason: `Fetched ${Math.floor(ageDays)} days ago: Google data older than ${PLACES_POLICY.maxAgeDays} days cannot be saved. Search again in /admin/import.`,
     };
   }
   return { ok: true, fetchedAt, ageDays };

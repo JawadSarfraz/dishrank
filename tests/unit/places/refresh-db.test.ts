@@ -14,7 +14,7 @@ const ok = (lat: number, lng: number, at = NOW): PlaceDetailsResult => ({
   lng,
   fetchedAt: at,
 });
-const notFound: PlaceDetailsResult = { kind: "not_found", message: "Place ID is no longer valid" };
+const notFound: PlaceDetailsResult = { kind: "not_found" };
 const unavailable = new PlacesApiError(503, "UNAVAILABLE", "Backend error");
 
 function fakePlaces(answers: Record<string, PlaceDetailsResult | PlacesApiError>) {
@@ -78,7 +78,7 @@ describe("refresh-places (docs/07 §5, test DB)", () => {
     expect(item?.payload).toEqual({
       restaurantId: gone.id,
       googlePlaceId: "p-gone",
-      error: "NOT_FOUND: Place ID is no longer valid",
+      error: "404 NOT_FOUND",
       googleSyncedAt: daysAgo(26, NOW).toISOString(),
     });
 
@@ -103,7 +103,7 @@ describe("refresh-places (docs/07 §5, test DB)", () => {
     expect(await items(day27.id)).toHaveLength(0);
     expect(await reload(day28.id)).toMatchObject({ lat: null, lng: null });
     expect((await items(day28.id))[0]?.payload).toMatchObject({
-      error: "503 UNAVAILABLE: Backend error",
+      error: "503 UNAVAILABLE", // status only: Google's error text is never stored
     });
   });
 

@@ -44,3 +44,10 @@ export async function listCitiesWithAreas(client: Client = db) {
 export async function findAreaById(id: string, client: Client = db) {
   return client.area.findUnique({ where: { id }, select: { ...areaSelect, cityId: true } });
 }
+
+export async function findAreaWithCityById(id: string, client: Client = db) {
+  return client.area.findUnique({
+    where: { id },
+    select: { ...areaSelect, city: { select: { id: true, slug: true, name: true } } },
+  });
+}

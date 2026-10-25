@@ -1,20 +1,25 @@
+import Image from "next/image";
+
 /**
- * Places policy (checked 2026-10-25): Places data shown without a Google map needs "Google Maps"
- * attribution; the text form is allowed where a logo does not fit. Unchanged wording on one line,
- * not translated, Roboto or sans-serif at weight 400, 12-16 px, gray #5E5E5E (white on dark).
- * Shown only on /admin/import, the one page that displays Google data.
+ * Places policies (checked 2026-10-25): Places data shown without a Google map needs the Google
+ * Maps logo, Google's own file unmodified (public/attribution: the non-outlined gray logo for a
+ * plain background, from Google_Maps_Attribution_Assets.zip), 16-19 dp high, with clear space of
+ * 10 dp left, right and top and 5 dp at the bottom, labelled "Google Maps", in the same container
+ * as the data. Shown only on /admin/import, the one page that displays Google data.
  */
-// DECISION-PENDING: text attribution instead of the Google Maps logo image (docs/OPEN-QUESTIONS.md).
 export function GoogleMapsAttribution() {
   return (
-    <p className="text-xs text-muted-foreground">
-      Names, addresses and locations below: data from{" "}
-      <span
-        translate="no"
-        className="[font-family:Roboto,sans-serif] text-xs font-normal whitespace-nowrap text-[#5E5E5E] dark:text-white"
-      >
-        Google Maps
+    <div className="flex flex-wrap items-center text-xs text-muted-foreground">
+      <span>Search results from</span>
+      <span className="inline-flex px-[10px] pt-[10px] pb-[5px]">
+        <Image
+          src="/attribution/google-maps-logo-gray.svg"
+          alt="Google Maps"
+          width={98}
+          height={18}
+          unoptimized
+        />
       </span>
-    </p>
+    </div>
   );
 }

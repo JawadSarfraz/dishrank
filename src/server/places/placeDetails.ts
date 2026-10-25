@@ -15,14 +15,14 @@ export function buildPlaceDetailsRequest(googlePlaceId: string, apiKey: string) 
         "X-Goog-Api-Key": apiKey,
         "X-Goog-FieldMask": PLACE_DETAILS_FIELD_MASK,
       },
+      cache: "no-store", // Google responses are never cached (Next.js fetch cache included)
     } satisfies RequestInit,
   };
 }
 
 /** NOT_FOUND (an obsolete place id) is a result, not an error: the refresh job nulls lat/lng at once. */
 export type PlaceDetailsResult =
-  | { kind: "ok"; lat: number; lng: number; fetchedAt: Date }
-  | { kind: "not_found"; message: string };
+  { kind: "ok"; lat: number; lng: number; fetchedAt: Date } | { kind: "not_found" };
 
 const responseSchema = z.object({
   location: z.object({ latitude: z.number(), longitude: z.number() }),

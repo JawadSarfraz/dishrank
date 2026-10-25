@@ -111,3 +111,11 @@ export async function findDishesBySlugs(slugs: readonly string[], client: Client
     select: { id: true, slug: true, name: true },
   });
 }
+
+/** Every dish for pickers: launch dishes first, then by name. */
+export async function listDishesForPicker(client: Client = db) {
+  return client.dish.findMany({
+    orderBy: [{ isLaunch: "desc" }, { name: "asc" }],
+    select: { slug: true, name: true, isLaunch: true },
+  });
+}

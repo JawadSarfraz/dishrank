@@ -1,6 +1,7 @@
 // Places coordinate refresh (docs/07 §5), run daily by /api/cron/refresh-places. Keeps Google
 // lat/lng under 30 days old (CLAUDE.md rule 2): refresh after 25 days; NOT_FOUND, or any failure
 // once a row is 28+ days old, nulls lat/lng and opens one PLACE_REFRESH_FAILED review item.
+// Review items and logs carry only status codes ("503 UNAVAILABLE"), never Google's error text.
 import { PlacesApiError, type PlaceDetailsResult, type PlacesClient } from "@/server/places";
 import { logEvent } from "@/server/log";
 import {
@@ -157,7 +158,7 @@ export async function refreshPlaces(deps: RefreshDeps) {
         // The place id is obsolete: null at once.
         summary.notFound++;
         if (await nullCoordinates(row)) summary.nulled++;
-        if (await openRefreshItem(row, `NOT_FOUND: ${result.message}`)) summary.reviewItems++;
+        if (await openRefreshItem(row, "404 NOT_FOUND")) summary.reviewItems++;
         continue;
       }
 
