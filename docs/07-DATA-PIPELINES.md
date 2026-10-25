@@ -1,60 +1,91 @@
 # 07 — Data pipelines
 
-How restaurants and (restaurant, dish) links get into the system. Four sources, in order of trust:
+How restaurants and (restaurant, dish) links get into the system.
+
+Restaurants come from two sources, and an admin confirms every one before it is public (CLAUDE.md rule 2, ADR-13):
+- Overture Maps places, staged by `pnpm overture:sync` (§1) and reviewed on /admin/import (§2);
+- restaurants added by hand on /admin/restaurants/new for places Overture misses.
+
+(restaurant, dish) links come from four sources, in order of trust:
 
 | Source | Creates | Confidence | Status |
 |---|---|---|---|
 | Owner (claimed) | RestaurantDish | 1.0 | OWNER_VERIFIED |
 | Menu photo → vision → matching | RestaurantDish | 0.85–1.0 auto, else review | MENU_VERIFIED |
 | User rating / "add dish" | RestaurantDish | 0.5 | CANDIDATE → USER_CONFIRMED at 3 raters |
-| Google Places Text Search (live, /admin/import) | RestaurantDish, only after an admin Create or Link | 0.4 | CANDIDATE |
+| Admin ticks a dish (/admin/import Create, /admin/restaurants/new) | RestaurantDish, source ADMIN | 0.4 | CANDIDATE |
 
-## 1. Finding candidates with Google Places (New)
+## 1. Restaurant candidates from Overture Maps (`pnpm overture:sync`)
 
-**Purpose**: a starting list of restaurants per dish per area so the panel knows where to go and the rate flow has restaurants to pick. It never ranks anything.
+**Purpose**: a starting list of restaurants per area for an admin to review, so the panel knows where to go and the rate flow has restaurants to pick. It never ranks anything.
 
-**Google data rule** (owner decision 2026-10-25; Google Maps Platform Terms 3.2.3(a)(iii), 3.2.3(b) and 3.2.3(c)(iv), and the Places API Service Specific Terms):
-- We save only `googlePlaceId` (indefinitely) and `lat/lng` with the time of the Google call (`googleSyncedAt`, at most 30 days, refreshed daily: §5), and only when an admin creates or links a restaurant (§2).
-- Google names and addresses are shown to the admin during the search and nowhere else. They are never saved (DB, files, fixtures, logs, caches) and never prefill a form: the admin types name and address.
-- Google responses are never cached: every request is sent with `cache: "no-store"`; no `unstable_cache` or `"use cache"`; and `next.config.ts` turns off the dev-only HMR fetch cache (`experimental.serverComponentsHmrCache: false`, which otherwise keeps even no-store responses during `next dev`) and the dev log of Server Function arguments (`logging.serverFunctions: false`, which would print page tokens).
-- Google coordinates are never an input for deriving data (no area suggestion, distance check or point-in-polygon from them).
-- Google errors are kept as status codes only (`404 NOT_FOUND`): the client never reads Google's error text, so it cannot reach a review item, a log or a terminal.
-- Public responses and pages carry no Google coordinates (they are cached for our own use, not re-served: Maps Platform Terms 3.2.3(a)); the admin restaurant page shows a Google Maps link instead of numbers.
-- Guard tests: `tests/unit/import/google-data-guard.test.ts` (canary names, addresses and error text must not reach the DB, any file or any log) and `tests/unit/places/google-data-static.test.ts`.
+**Rules** (owner decision 2026-10-25, ADR-13; coverage and quality in `docs/research/overture-coverage.md`):
+- No Google Places, ever: Google's Maps Platform Terms 3.2.3(d)(iii) forbid the Places API "in a listings or directory service". The only Google service left is the sign-in (OAuth).
+- Only Overture records whose every whole-record source is Meta or Microsoft, licence CDLA Permissive 2.0. AllThePlaces records are left out (scraped data, CLAUDE.md rule 1), and so are Foursquare's (Apache 2.0 notice duties).
+- The sync fills only the staging table `OvertureCandidate`. A restaurant exists only after an admin creates it on /admin/import (§2), where the form may be prefilled from Overture.
+- Credit: the public page /about/data, linked from the footer, shows Overture's credit lines word for word with the licence text linked (https://cdla.dev/permissive-2-0/):
+  > Overture Maps Foundation, overturemaps.org (release 2026-10-21.0, accessed 2026-10-25).
+  > Data from Meta. Available under CDLA Permissive 2.0.
+  > Data from Microsoft. Available under CDLA Permissive 2.0.
 
-**The query** (`src/server/services/places-query.ts`; the live search and the planning tool send exactly the same one per dish × area):
-- `POST https://places.googleapis.com/v1/places:searchText`
-- body: `{ textQuery: "<dish name> <area name> <city>", includedType: "restaurant" (omitted for dishes in the categories breakfast, drinks, desserts and street-food), locationRestriction: { rectangle: { low: { latitude, longitude }, high: { latitude, longitude } } }, pageSize: 20, regionCode: "PK", languageCode: "en" }`. The rectangle reaches 3 km north, south, east and west of our own area centre (`seed/areas.json`), so far-away places (a Lahore branch) never come back. `locationRestriction` accepts only a rectangle and cannot be combined with `locationBias`.
-- `includedType` only biases results; `strictTypeFiltering` stays false so dhabas and cafés that serve the dish are not lost. The bias still pushes other venues down the list, so chai, halwa puri, dessert and street-food searches send no type: tea stalls and breakfast shops are often typed `cafe`, `tea_house`, `bakery` or nothing.
-- next page: resend the same body plus `pageToken: "<nextPageToken>"`; at most 3 pages (Text Search returns at most 60 results). `nextPageToken` must be in the field mask, otherwise the response carries no token and only page 1 comes back.
-- field masks: /admin/import `places.id,places.displayName,places.formattedAddress,places.location,places.attributions,nextPageToken` (Text Search Pro: 5,000 free per month, then $32 per 1,000; `places.attributions`, the data providers Google requires to be credited next to a result, is in the IDs Only group at no extra charge); planning tool `places.id,nextPageToken` (Text Search Essentials IDs Only: no charge).
+  The release is the newest one synced successfully, and the date is the day it was first synced (`JobRun` "overture-sync"). Before any sync the page shows the research report's release and date, as above.
 
-### Planning tool: `pnpm seed:places`
+**The command**: `pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--refresh]` (`scripts/overture-sync.ts`; pure rules in `src/server/services/overture/places.ts`):
+1. Release: `latest` reads Overture's STAC catalog; an explicit release looks like `2026-10-21.0`.
+2. Download: DuckDB (`@duckdb/node-api`, a dev dependency, CLI only) copies the places of the release that lie inside a box around every seed area centre, plus the margin, from Overture's public S3 bucket into `tmp/overture/places-<release>-<box>.parquet`. This happens once per release and box; `--refresh` downloads again. The download code is shared with `pnpm research:overture` (`scripts/lib/overture.ts`).
+3. Filter: a candidate must pass all of these:
+   - food and drink: `taxonomy.hierarchy[1] = food_and_drink`, without the alcohol branch;
+   - every whole-record source is Meta or Microsoft under CDLA-Permissive-2.0;
+   - it has a name;
+   - it is not `permanently_closed`;
+   - the nearest seed area centre is within the margin (default 5 km). That area's city is the candidate's city.
+4. Clean:
+   - Google links are removed from the address, as are links to any google.* host, goo.gl, g.page, g.co and share.google (e.g. Maps short links). Literal `\n` escapes and links glued to the word before them count as word breaks.
+   - The website is the first http(s) website that is not a Google link.
+   - The phone is the first one our phone format accepts, normalised.
+5. Location unknown: some points are geocoder fallbacks rather than locations. A point (rounded to 4 decimals, about 10 m) with at least 10 places, most of them with different addresses, is one; this is counted over all places in the box. A place on such a point gets no coordinates and no suggested area, and its city comes from the point. Every other place keeps Overture's coordinates.
+6. Suggested area: the nearest seed area centre within 1.5 km, else none ("No area suggested" on /admin/import).
+7. Stage: a GERS id not yet in `OvertureCandidate` is inserted as `NEW`, with `release` set to this release. An existing row keeps its data and its review state; only `lastSeenRelease` moves forward when this release is newer. Overture ids churn between releases (11.9% in 2026-10-21.0), so the same place can come back under a new id as `NEW`; /admin/import then flags it as a likely duplicate of the earlier candidate or of the restaurant made from it (§2).
+8. Every run writes a `JobRun` named `overture-sync`. Its summary has the release, the filter counts and, per city: candidates in the release, inserted, already staged, last seen updated, with or without an area, location unknown, and likely duplicate pairs.
 
-`scripts/seed-places.ts --city=islamabad --dish=chicken-karahi [--areas=f-7,f-8] [--dry-run] [--max-calls=150]`
+Rerun it after each monthly Overture release. Overture's confidence and categories only order the review list and suggest dishes; they never touch a ranking.
 
-- Runs the query for each area with the ids-only field mask, up to 3 pages, and prints per area the pages, results and new places (not returned for an earlier area); then the unique places, the calls used and the live-import estimate: the Text Search Pro calls /admin/import needs to load every page of those areas. It never requests names or addresses, writes no file and never writes the DB (it only reads the city, areas and dish).
-- `--dry-run` prints the planned queries, their rectangles and the maximum number of calls; no Google call, no API key needed.
-- `--max-calls` (default 150) caps HTTP requests, retries included: the client refuses the request that would go over. A missing `GOOGLE_PLACES_API_KEY` stops the run before any call. 429 and 5xx are retried with exponential backoff (3 attempts). A 4xx on an area's first page (bad key, API disabled, invalid request) stops the run, because every other area would fail the same way. Errors are printed as status codes.
+## 2. Admin review (`/admin/import`)
 
-Budget for a full live import: at most 3 pages per area, so ≤ 60 Text Search Pro calls per dish for Islamabad (20 areas) and ≤ 30 for Rawalpindi (10 areas); all 19 launch dishes in both cities ≤ 1,710 calls, inside the 5,000 free per month. The limit `global:places-search` (150 per day for all admins together, counted only for valid requests) keeps a month under that cap. The planning tool's ids-only calls cost nothing.
+1. Pick a city (links), an area and a view. Each area shows the number of places left to review; there is also "No area suggested". The views are To review, Skipped, and Created or linked. The default area is the one with the most places left. Candidates are listed by Overture's confidence, highest first, at most 300 at a time. Overture recommends no threshold, so none is applied.
+2. Each row shows:
+   - name, confidence and categories; address, phone and website;
+   - Overture's coordinates, or "location unknown", and the suggested area;
+   - "not in the latest Overture release" when a newer sync no longer had the place;
+   - the source, and the dish hints (see Create below);
+   - likely duplicates, at most 3 of each kind:
+     - our restaurants of the city (not merged) within 50 m whose name or other name is similar. Similar means: equal after keeping only letters and digits, lowercase; or Jaro-Winkler ≥ 0.9; or, when both names have at least 4 characters, one contains the other. When either side has no location, the rule is stricter: an equal name or Jaro-Winkler ≥ 0.9, in the candidate's suggested area (in the whole city when it has none);
+     - other candidates of the city within 50 m with a similar name, with their status and the restaurant they became.
+3. **Create** opens the restaurant form, prefilled from Overture with the name, address, phone and website. The admin:
+   - fixes the name to the signboard spelling;
+   - checks the address and the area (default: the suggested area; any area of either city);
+   - may add a price band and other names;
+   - ticks the launch dishes it serves. These are pre-ticked:
+     - every launch dish with an alias that appears in the name as whole words (docs/05 normal form). "nashta" is ignored, and so is "mandi" after sabzi, bakra, namak… or before road, more, station…;
+     - both Chicken Karahi and Mutton Karahi for a bare "karahi" (kadai, karhai…);
+     - from Overture categories: pizza_restaurant → Pizza, burger_restaurant → Beef Burger, tea_room → Chai.
 
-**Policy notes (keep these in the import UI copy)**
-- We store `googlePlaceId` forever; `lat/lng` are kept at most 30 days old by the daily `/api/cron/refresh-places` (§5: Place Details, field mask `location`, Essentials, 10,000 free per month).
-- Request shapes, field masks, prices and the attribution rules were checked against the Places API (New) Text Search, Place Details, Google Maps URLs, pricing and Places policies pages on 2026-10-25 (pages last updated 2026-10-23).
-- Attribution: where Google data is shown (/admin/import only), each result's Google block (name, address, data-provider credits, "Open in Google Maps") carries the official Google Maps logo, apart from our own data (status, duplicates, actions): Google's gray non-outlined logo from `Google_Maps_Attribution_Assets.zip`, unmodified (`public/attribution/google-maps-logo-gray.svg`), 18 px high (policy: 16–19 dp), clear space of 10 px left, right and top and 5 px at the bottom, alt text "Google Maps".
-- "Open in Google Maps" links are built from the place id (Google Maps URLs `search` action with `query_place_id`); the required `query` is our own text (dish, area, city), never a Google name.
+   The restaurant gets `source OVERTURE`, `overtureId` (the GERS id), and Overture's coordinates with `locationSource OVERTURE`. A location-unknown place gets no coordinates; the admin adds them later on the restaurant page. Each ticked dish becomes `RestaurantDish CANDIDATE, source ADMIN, confidence 0.4`; an existing row of any status is left as it is. The candidate becomes `CREATED`.
+4. **Link** works from a duplicate shown on the row (one click) or any restaurant found by name. The restaurant takes the candidate's GERS id when it has none, and Overture's coordinates when it has no location; nothing else changes. The candidate becomes `LINKED`.
+5. **Skip** takes an optional reason (closed, duplicate, not a restaurant) and makes the candidate `SKIPPED`. **Reopen** puts it back to `NEW`.
+6. Every action:
+   - locks the candidate row and works only on a `NEW` candidate (else `CANDIDATE_REVIEWED`, 409; Reopen works only on `SKIPPED`);
+   - records `reviewedByUserId` and `reviewedAt`;
+   - is limited by `user:{id}:admin-write`;
+   - logs ids only.
 
-## 2. Admin import (`/admin/import`)
+   Links to our restaurants open in a new tab, so the list keeps its place.
 
-1. Search: the admin picks a dish and an area (city, then area) and clicks Search. The server sends the §1 query for that dish and area and returns one page of up to 20 results, each with Google's name and address (display only), an "Open in Google Maps" link and the fetch time of that page. "Load more" sends the same query with the page token (at most 3 pages). Every result is shown in Google's order, including results without a location (shown, but not importable). Each page is one billable Text Search Pro call, limited by `global:places-search` (150 per day for all admins). Searching saves nothing.
-2. Dedupe per result: a restaurant with the same `googlePlaceId` → "already imported" (with "Add <dish> to it" when it lacks the dish); else our restaurants, in either city, in every area whose centre (our coordinates) lies inside the search rectangle, whose name or another name has trigram similarity ≥ 0.6 with the result's name → "possible duplicate" (with Link buttons; a candidate already linked to another Google place gets a "merge instead" note, because Link would be refused); else "new". The Google name is compared in memory only.
-3. Admin actions per result: **Create** opens an empty form, which says so: the admin types the name as on the signboard or the restaurant's own page, and a short address in their own words (e.g. "Jinnah Super, F-7 Markaz"); the area defaults to the searched area and can be changed to any area of either city (a search near the city line can return places in the twin city); phone, price band and other names are optional. Nothing is prefilled from Google. / **Link to existing** (a possible duplicate, or any restaurant found by name) / **Skip** (no write).
-4. On Create, or on Link to a restaurant without a `googlePlaceId`: save `googlePlaceId`, the result's `lat/lng` and `googleSyncedAt` = the page's fetch time (the time of the Google call, never the import time; refused when older than 24 hours; a live result is minutes old). Linking to a restaurant that already has a different `googlePlaceId` changes nothing and the result stays a possible duplicate. Then create `RestaurantDish(restaurant, dish)` with `status CANDIDATE, source GOOGLE_SEARCH, confidence 0.4` unless a row for that dish already exists: an import never changes an existing row, so it cannot downgrade a stronger one or revive a STALE or REMOVED one.
-5. Logs carry ids and counts only (dish, area, results by status, place ids), never a Google name, address or error text.
-6. Links to our restaurants open in a new tab, so the loaded results (billable to fetch again) stay; a refused Link or an error leaves the result open for another action, and Skip can be undone.
+Goal: about 40 places reviewed in 15 minutes.
 
-A restaurant with a `googlePlaceId` and no `googleSyncedAt` counts as due for the next refresh (§5).
+**Places Overture misses**: /admin/restaurants/new ("Add restaurant") is the same form, empty, with an optional latitude and longitude (`locationSource ADMIN`). It sets `source MANUAL`.
+
+**Coordinates later**: on /admin/restaurants/[id] an admin can type or clear the coordinates at any time. Changed coordinates become `locationSource ADMIN`, unchanged ones keep their source, and cleared ones mean location unknown. A restaurant's own coordinates (Overture or admin) are public data and drive the distance features (docs/04, docs/06).
 
 ### Merging duplicate restaurants (`RestaurantService.merge(sourceId, targetId)`)
 
@@ -64,7 +95,7 @@ Admin-only (`PATCH /api/v1/admin/restaurants/:id { mergeIntoId }` or the merge d
 2. Ratings: one per user per kept row. When the same user rated both rows, keep the rating with the newer `updatedAt`; append the older rating (score, comment, createdAt) to the kept rating's `RatingHistory`, move the older rating's own history rows over, then delete the older `Rating`.
 3. Flags move to the kept row; a flag is dropped when the same user already flagged that row for the same reason.
 4. Menu uploads, owner claims and open review items of the source move to the target; a claim by a user who already claimed the target is dropped. If both restaurants are claimed by different owners, the merge stops with `MERGE_CONFLICTING_OWNERS`; if only the source is claimed, its owner moves to the target.
-5. Google place: clear `googlePlaceId` on the source first (the column is unique), then set it on the target if the target has none, together with the source's `lat/lng` and `googleSyncedAt`. The source keeps no Google data: its `lat/lng` and `googleSyncedAt` are cleared with the place id. Restaurants of different cities cannot be merged (`MERGE_CITY_MISMATCH`).
+5. Overture id and location: the target keeps its own. When it has no `overtureId`, it takes the source's, which is cleared on the source first because the column is unique. When it has no location, it takes the source's `lat/lng` with their `locationSource`. Candidates created from or linked to the source then point at the target. Restaurants of different cities cannot be merged (`MERGE_CITY_MISMATCH`).
 6. Source: `status = DUPLICATE`, `mergedIntoId = target`. Its URLs redirect permanently to the surviving restaurant (docs/06), following `mergedIntoId` chains.
 7. After commit: `recomputeOne` for every kept row whose ratings changed (until Phase 3 builds `recomputeOne`, the merge logs those ids), then `revalidatePath` for both restaurant pages and the affected ranking pages. Log one line with every moved, merged and dropped id. Ratings are moved with plain SQL, so their `updatedAt` (the decay clock) does not change.
 
@@ -97,22 +128,6 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 
 ## 5. Freshness and hygiene jobs (nightly recompute, docs/04)
 
-### Places coordinate refresh (`/api/cron/refresh-places`, daily)
-
-CLAUDE.md rule 2 allows Google `lat/lng` for at most 30 days. The job runs daily, oldest rows first:
-
-1. Catch-up: any restaurant whose `googleSyncedAt` is older than 29 days (after missed runs) gets `lat/lng = NULL` and a `PLACE_REFRESH_FAILED` review item before anything else.
-2. Select restaurants with a `googlePlaceId` whose `googleSyncedAt` is NULL or older than 25 days.
-3. For each: `GET https://places.googleapis.com/v1/places/{googlePlaceId}` with header `X-Goog-FieldMask: location` (no `places.` prefix for Place Details; Essentials). Success → update `lat/lng`, `googleSyncedAt = now()`.
-4. `NOT_FOUND` means the place ID is obsolete: set `lat/lng = NULL` at once and open a `PLACE_REFRESH_FAILED` review item. Any other error (after retries with backoff): keep the coordinates and retry on the next run, unless `googleSyncedAt` is already 28 days old or more; then set `lat/lng = NULL` and open the review item. Coordinates therefore stay under 30 days old as long as the job runs once a day.
-5. One OPEN review item per restaurant; a later successful refresh resolves it automatically. Review items and logs record only Google's status code (`404 NOT_FOUND`, `503 UNAVAILABLE`) or our own reason (catch-up, missing API key), never Google's error text.
-6. Stop before the function time limit (250 s: no new call once 235 s have passed, keeping room for one slow call with retries) and leave the rest for the next run. `JobRun.summary` records `{ selected, calls, ok, notFound, errors, nulled, caughtUp, reviewItems, resolvedReviewItems, skippedForTime, error? }`.
-7. A row nulled by the catch-up is still due, so the same run refreshes it: success restores its coordinates and resolves the item. A failure on a row whose `googleSyncedAt` is NULL (unknown age) counts as 28+ days. Without `GOOGLE_PLACES_API_KEY` the catch-up still runs and every due row counts as a failure (so the 28-day rule still holds); the run is then marked failed (`JobRun.ok = false`, HTTP 500).
-
-A restaurant with NULL `lat/lng` stays listed; it only loses the map link.
-
-### Other nightly steps
-
 - Stale marking by status age.
 - `Rating` comments with phone/URL → hidden pending review (regex at write time; nightly sweep as backup).
 - Trust recompute.
@@ -130,7 +145,6 @@ A restaurant with NULL `lat/lng` stays listed; it only loses the map link.
 | `SUSPICIOUS_RATINGS` | `{ restaurantDishId, ratingIds[], reason }` | release (ratings ACTIVE) · hide (HIDDEN, lower trust) · ban users |
 | `OWNER_CLAIM` | `{ claimId, phone, proofNote }` | approve · reject |
 | `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A (rules in §2) · keep both |
-| `PLACE_REFRESH_FAILED` | `{ restaurantId, googlePlaceId, error (Google status code or our own reason), googleSyncedAt }` | re-link (new `googlePlaceId` from a live search result on /admin/import; `lat/lng` and `googleSyncedAt` = that result's fetch time) · mark restaurant CLOSED · keep without coordinates (clears `googlePlaceId`) |
 
 Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed.
 

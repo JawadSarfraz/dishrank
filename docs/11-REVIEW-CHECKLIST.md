@@ -19,15 +19,11 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Dev-only scripts refuse to run when `NODE_ENV=production`
 
 ## Data policy
-- [ ] Only `googlePlaceId` and `lat/lng` with their fetch time (refreshed ≤ 30 days) persisted from Google, and only on an admin Create or Link; Google names and addresses are never saved, logged, cached or prefilled (admins type them); `tests/unit/import/google-data-guard.test.ts` passes
-- [ ] No Google response is cached (`cache: "no-store"`; no `unstable_cache` or `"use cache"`), and Google coordinates are never used to derive data (no area or distance computed from them)
-- [ ] `googleSyncedAt` is the time of the Google call (the search response on Create/Link, or a refresh), never the import time; Google data older than 30 days cannot be saved
-- [ ] refresh-places runs daily; `NOT_FOUND` or a failure at 28+ days sets `lat/lng` to NULL and opens a `PLACE_REFRESH_FAILED` review item (test by backdating a row)
+- [ ] No Google Places anywhere: no Places client, key, endpoint or cron (`tests/unit/ops/no-google-places.test.ts` passes); Google is only the sign-in provider
+- [ ] Every restaurant was created or confirmed by an admin: `OVERTURE` restaurants from a reviewed candidate on /admin/import, `MANUAL` ones by hand; `pnpm overture:sync` writes only `OvertureCandidate`
+- [ ] Overture candidates come only from Meta and Microsoft records (no AllThePlaces, no Foursquare); staged addresses and websites hold no Google links (SQL check: `address ~* 'goo\.gl|google\.'` finds nothing)
+- [ ] `/about/data` shows Overture's credit lines (release and access date) and links the CDLA Permissive 2.0 text; the public footer links it
 - [ ] No scraping code anywhere (grep for `cheerio`, `puppeteer`, `playwright` outside tests, `foodpanda`)
-- [ ] Official Google Maps logo (unmodified) and the data-provider attributions shown with Google data (admin import only), apart from our own data
-- [ ] `next.config.ts` keeps `experimental.serverComponentsHmrCache: false` and `logging.serverFunctions: false`, so `next dev` neither caches nor prints Google data
-- [ ] Public responses and pages carry no Google coordinates; Google errors are kept as status codes only
-- [ ] `/terms` carries Google's Maps notice if any Google content reaches end users (Maps Platform Terms 3.2.2(a)(i))
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
 - [ ] Privacy page states what we store (email, ratings, photos) and how to delete
 

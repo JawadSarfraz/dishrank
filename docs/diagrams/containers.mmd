@@ -9,14 +9,14 @@ flowchart TB
       CronEP["Cron endpoints /api/cron/* (CRON_SECRET)"]
       Services["src/server/services<br/>ranking · matching · rating · restaurant · menu · claims · review"]
       Repos["src/server/repositories (Prisma)"]
-      Ext["src/server/places · src/server/vision"]
+      Ext["src/server/vision"]
     end
   end
   subgraph Supabase
     PG[("Postgres + pg_trgm")]
     ST[("Storage: dish-photos (public), menus (private)")]
   end
-  CLI["scripts/* (local CLI, tsx)"]
+  CLI["scripts/* (local CLI, tsx)<br/>overture:sync reads Overture's S3 bucket with DuckDB"]
   Pages --> Services
   Rate --> Services
   OwnerUI --> Services
@@ -25,7 +25,6 @@ flowchart TB
   CronEP --> Services
   Services --> Repos --> PG
   Services --> ST
-  Ext --> Google["Google Places API"]
   Ext --> Anthropic["Anthropic API"]
   Services --> Ext
   CLI --> Services

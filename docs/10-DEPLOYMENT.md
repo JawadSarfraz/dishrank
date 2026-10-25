@@ -7,7 +7,8 @@
 | GitHub | repo + CI | private repo |
 | Vercel | hosting, crons, analytics | Hobby is for non-commercial use; move to Pro ($20/mo) the month you charge a restaurant. Hobby crons run at most once per day — our schedule fits. |
 | Supabase | Postgres + Storage | Two projects: preview and production (Free allows 2). Region: ap-south-1 (Mumbai) for lowest latency from Pakistan. Free project pauses after ~1 week of inactivity; the daily cron keeps it alive, but a paused DB on launch day is a risk — upgrade to Pro ($25/mo) before launch marketing. |
-| Google Cloud | Places API (New) key, OAuth client | Restrict the Places key to the Places API (New) (an IP restriction is impossible for Vercel functions: KICKOFF-REVIEW OP-31); restrict OAuth to your domains. |
+| Google Cloud | OAuth client (sign-in only) | Restrict OAuth to your domains. No Places API key: Google Places is not used (ADR-13). |
+| Overture Maps | restaurant candidates (open data) | No account or key: `pnpm overture:sync` reads the public S3 bucket from the admin's machine (DuckDB, a few MB per release) and writes the staging table of the database `DATABASE_URL` points at. Run it against production by hand after each monthly release. |
 | Anthropic Console | API key for vision + matcher | Set a monthly spend limit (e.g. $20). |
 | Domain | e.g. dishrank.pk / .com | Point to Vercel; set `NEXT_PUBLIC_SITE_URL`. |
 
@@ -31,9 +32,6 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
 SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
 SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
-
-# Google Places: /admin/import live search, pnpm seed:places (planning) and the daily refresh-places cron; required from Phase 2
-GOOGLE_PLACES_API_KEY=
 
 # Anthropic
 ANTHROPIC_API_KEY=
@@ -61,8 +59,7 @@ ADMIN_EMAIL=                       # first admin: a Better Auth user-create hook
 ```json
 {
   "crons": [
-    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" },
-    { "path": "/api/cron/refresh-places",     "schedule": "0 22 * * *" }
+    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }
   ]
 }
 ```
@@ -87,7 +84,7 @@ ADMIN_EMAIL=                       # first admin: a Better Auth user-create hook
 |---|---|
 | Vercel Hobby → Pro at monetisation | $0 → $20 |
 | Supabase Free → Pro before launch | $0 → $25 |
-| Google Places (seed + daily refresh of rows older than 25 days) | $0 within free caps |
+| Overture Maps (open data, read once a month) | $0 |
 | Anthropic (≈300 menus + matcher calls) | $5–15 |
 | Domain | ~$1–2 |
 | **Total** | **$5–60** |

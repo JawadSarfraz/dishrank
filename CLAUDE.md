@@ -26,7 +26,7 @@ Roman-Urdu-tolerant search (karahi / kadai / karhai all work).
 - Better Auth with Google sign-in, Prisma adapter and database sessions; roles `USER | OWNER | ADMIN` enforced by `requireUser()` / `requireRole()` (ADR-11)
 - Supabase Storage for photos (menu photos, dish photos)
 - Anthropic API (Claude) for menu-photo → JSON and as the last-resort dish matcher
-- Google Places API (New) **only** to find candidates (live admin search, planning tool) and for the daily coordinate refresh
+- Overture Maps Places (open data: Meta and Microsoft records, CDLA Permissive 2.0) **only** to find restaurant candidates, read with DuckDB by `pnpm overture:sync` (ADR-13). No Google Places API
 - Zod for all input validation
 - Vitest (unit), Playwright (e2e), ESLint + Prettier, pnpm
 - Deploy on Vercel; scheduled jobs via `vercel.json` crons hitting `/api/cron/*`
@@ -43,15 +43,15 @@ pnpm test:e2e         # playwright
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # planning only: counts and call estimates; no file, never the DB
+pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import; never writes a restaurant
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 ```
 
 ## Non-negotiable rules
 
-1. **No scraping.** Never scrape Google Maps, foodpanda, Instagram, or any site. The only Google data source is the official Places API (New) called from `src/server/places/*`.
-2. **Google data policy.** From Places we persist only `googlePlaceId` (indefinitely) and `lat/lng` with their fetch time (refreshed within 30 days), and only when an admin creates or links a restaurant. Google names and addresses are never saved anywhere (DB, files, fixtures, logs, caches) and never prefill a form: restaurant `name`, `address`, `phone` are typed by a human (panel, owner, admin) and are our own records. Google responses are never cached, and Google coordinates are never used to derive other data (Maps Platform Terms 3.2.3(a)(iii), 3.2.3(b), 3.2.3(c)(iv)). `pnpm seed:places` is a planning tool (place ids only, writes no file).
+1. **No scraping.** Never scrape Google Maps, foodpanda, Instagram, or any site, and never import a scraped dataset (Overture's AllThePlaces records are left out). Restaurant candidates come only from Overture Maps Places (Meta and Microsoft records), staged by `pnpm overture:sync` (`scripts/overture-sync.ts`, `src/server/services/overture/*`).
+2. **Human review.** Every restaurant is reviewed by a human before it goes public. We never use Google Places. Overture data (Meta, Microsoft) may prefill the form; we credit it on a data sources page.
 3. **Rankings use only our own ratings.** No imported scores from anywhere.
 4. **Thin data never ranks.** Eligibility rules in `docs/04-RANKING.md` are enforced in the query, not just in the UI.
 5. **No free-text dish creation by users.** Users pick from `dishes`. Unknown names become a `ReviewItem` for admin.
@@ -93,3 +93,4 @@ Do not invent product behavior. Pick the simplest safe default, mark it with
 - **Ranking**: the ordered list of eligible RestaurantDish rows for a (city, dish) by `score`.
 - **Panel**: trusted early raters (admin-only `isPanel` flag, trust fixed at 1.3), used to seed the first ratings.
 - **Review queue**: `ReviewItem` rows an admin resolves (unmatched menu items, dish proposals, flags, suspicious bursts, owner claims).
+- **Candidate**: an Overture place staged in `OvertureCandidate` (`NEW → CREATED / LINKED / SKIPPED`) for an admin to review on `/admin/import`; it is never public itself.

@@ -446,6 +446,11 @@ Overture has and how many of its entries there still trade.
 5. **Later releases and credit.** Re-match on later releases by name and distance, not only by Overture
    id. Show the credit line from §7.
 
+> Decided by the owner on 2026-10-25 (docs/OPEN-QUESTIONS.md, docs/02 ADR-13): Google Places is dropped;
+> Overture-created restaurants keep Overture's coordinates; the Create form may prefill from Overture (rule 2
+> rewritten); only Meta and Microsoft records are used. Built as `pnpm overture:sync` and /admin/import
+> (docs/07 §1–2).
+
 Decisions for you before an import (this task commits only the script and this report, so they are not
 in `docs/OPEN-QUESTIONS.md` yet):
 - **Rule 2 and prefill.** Rule 2 sits under the Google data policy, but its wording ("restaurant name,

@@ -117,7 +117,7 @@ ORDER BY rd.score DESC NULLS LAST, rd."distinctRaters" DESC, rd."lastRatedAt" DE
 LIMIT 100;
 ```
 
-Split into `eligible` / `insufficient` in the service using the thresholds (bootstrap-aware). Rank numbers are the city-wide positions of the eligible rows in this order; no filter or sort ever renumbers them. The ranking page always runs this query without `$area` (one cached page per city × dish) and never reads `searchParams`: area filter and sort run in the browser over the returned rows. Every distance feature below (browser or API) is (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates). `GET /api/v1/rankings` may pass `$area` and `lat/lng/radiusKm` (haversine filter and `distanceKm`); it numbers ranks over the whole city list first, then filters.
+Split into `eligible` / `insufficient` in the service using the thresholds (bootstrap-aware). Rank numbers are the city-wide positions of the eligible rows in this order; no filter or sort ever renumbers them. The ranking page always runs this query without `$area` (one cached page per city × dish) and never reads `searchParams`: area filter and sort run in the browser over the returned rows. Distance features (browser or API) use our own restaurant coordinates (from Overture or typed by an admin; docs/07 §2); a restaurant without a location has no distance. `GET /api/v1/rankings` may pass `$area` and `lat/lng/radiusKm` (haversine filter and `distanceKm`); it numbers ranks over the whole city list first, then filters.
 
 ## Worked example
 

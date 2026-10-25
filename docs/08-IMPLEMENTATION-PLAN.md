@@ -28,18 +28,23 @@ Acceptance
 - `pnpm db:migrate && pnpm db:seed` yields 2 cities, 30 areas, 12 categories, ~80 dishes
 - All matching test cases and seed tests pass; `normalize("Chicken White Karahi Full 1kg Rs 2400")` → `"chicken white karahi"`, and `matchDish` on it → `chicken-karahi`, tags `["white"]`, ALIAS 1.0
 
-## Phase 2 — Restaurants: live Places search + admin import (6–8 h)
+## Phase 2 — Restaurants: Overture candidates + admin review (6–8 h)
+
+Google Places was dropped on 2026-10-25 (ADR-13); this replaces the first Phase 2 plan (live Places search and refresh cron).
 
 Tasks
-- `src/server/places/textSearch.ts` (field masks incl. `nextPageToken`, `locationRestriction` rectangle, pagination, regionCode PK, never cached), `placeDetails.ts` (location only)
-- `scripts/seed-places.ts`: planning tool only (place ids, per-area counts and call estimates, no file)
-- `/admin/import`: live Text Search by dish and area (Google name and address shown, never saved; Load more), dedupe, Create (admin types name and address) / Link / Skip, `googleSyncedAt` = the search's fetch time, RD CANDIDATE creation, Google Maps logo
-- `/admin/restaurants`: list/search/edit/merge/status; merge per docs/07 §2 with redirect of merged URLs
-- `/api/cron/refresh-places`: daily refresh with failure handling per docs/07 §5
+- `pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]`: Overture Maps food and drink places from Meta and Microsoft only, Google links stripped, placeholder points = location unknown, city and suggested area from our seed areas, staged in `OvertureCandidate`; a newer release only adds new GERS ids (docs/07 §1)
+- `/admin/import`: review one area at a time by confidence; Create (form prefilled from Overture, launch dishes pre-ticked) / Link / Skip with a reason / Reopen; likely duplicates within 50 m; RD CANDIDATE (source ADMIN, 0.4) per ticked dish (docs/07 §2)
+- `/admin/restaurants`: list/search/edit/merge/status, "Add restaurant" by hand (`/admin/restaurants/new`, optional location); merge per docs/07 §2 with redirect of merged URLs
+- `Restaurant.source` (OVERTURE | MANUAL), `overtureId`, `locationSource` (OVERTURE | ADMIN), `website`
+- Public `/about/data` with Overture's credit lines and the CDLA Permissive 2.0 link, linked from the footer
 - `RestaurantService`, `restaurant.repo.ts`, trigram search endpoint
 
 Acceptance
-- Search 2 dishes live in /admin/import and import ≥ 40 restaurants in Islamabad with areas, typing each name and address; `/api/v1/restaurants/search?q=but karahi` returns Butt Karahi; the Google-data guard tests pass (no Google name, address or error text in the DB, files or logs; no Google response cached).
+- `pnpm overture:sync -- --city=all` stages both cities (release 2026-10-21.0: Islamabad 1,710, Rawalpindi 1,074 candidates); a second run adds nothing.
+- An admin reviews ≥ 40 places in Islamabad in about 15 minutes on /admin/import, fixing names to the signboard spelling and ticking dishes; the created restaurants have their area, Overture's coordinates (or none for location-unknown places) and CANDIDATE dishes; `/api/v1/restaurants/search?q=but karahi` returns Butt Karahi.
+- `/about/data` shows the credit lines with the licence link, and the footer links it.
+- Tests pass: sync filters (sources, food categories, placeholder points, Google-link stripping), area suggestion, duplicates, dish hints, create / link / skip, the credit page, and the guard that no Google Places code returns.
 
 ## Phase 3 — Rating flow (8–10 h)
 
@@ -56,13 +61,13 @@ Acceptance
 ## Phase 4 — Ranking pages + SEO (8–10 h)
 
 Tasks
-- `RankingService.getRanking` (eligible/insufficient split, bootstrap mode, filters; distance (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates))
-- `/[city]/best-[dish]`: list, browser-side filter bar (area, sort; ranks stay city-wide; distance on hold, see docs/OPEN-QUESTIONS.md), "Not enough votes yet" section, eligibility note, share button
+- `RankingService.getRanking` (eligible/insufficient split, bootstrap mode, filters; distance from our own coordinates: Overture or admin-typed)
+- `/[city]/best-[dish]`: list, browser-side filter bar (area, sort, distance when the visitor shares a location; ranks stay city-wide), "Not enough votes yet" section, eligibility note, share button
 - `/[city]/r/[slug]`: restaurant page with dish scores + "Rate" buttons + "Upload menu photo"
 - `/`, `/[city]`: dish grids with eligible counts
 - Metadata: title/description per page, canonical, OpenGraph, JSON-LD `ItemList` + `Restaurant`; `sitemap.ts`, `robots.ts`
 - ISR 3600s + `revalidatePath` after rating writes
-- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (`/terms` carries Google's Maps notice if any Google content reaches end users: Maps Platform Terms 3.2.2(a)(i), docs/OPEN-QUESTIONS.md)
+- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (`/about/data`, the data sources and credits page, exists since Phase 2); link the dispute page in the footer
 - `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`, DishStat, stale, snapshot, JobRun)
 
 Acceptance

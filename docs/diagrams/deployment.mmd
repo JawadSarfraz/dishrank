@@ -3,7 +3,7 @@ flowchart LR
   GH -->|preview per PR| VP["Vercel Preview"]
   GH -->|main| VProd["Vercel Production<br/>dishrank.pk"]
   VProd --> SB[("Supabase ap-south-1<br/>Postgres + Storage")]
-  VProd --> Cron["Vercel Cron<br/>02:00 PKT recompute<br/>daily Places refresh"]
+  VProd --> Cron["Vercel Cron<br/>02:00 PKT recompute"]
   VProd --> Ant["Anthropic API"]
-  VProd --> GP["Google Places API"]
   VProd --> GO["Google OAuth"]
+  Dev -->|pnpm overture:sync| SB

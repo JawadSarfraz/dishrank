@@ -44,7 +44,6 @@ production `pnpm start` exits with code 1 and names every missing variable.
 | `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
 | `CRON_SECRET` | output of `openssl rand -hex 32` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (needed from Phase 3; local storage uses the preview project) |
-| `GOOGLE_PLACES_API_KEY` | required from Phase 2 (/admin/import live search, the planning script and the daily refresh cron): a Places API (New) key |
 | `ANTHROPIC_*` | optional; used from Phases 1 and 5 |
 
 Commands (same as `CLAUDE.md`):
@@ -61,7 +60,7 @@ pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
-pnpm seed:places -- --city=islamabad --dish=chicken-karahi [--dry-run] [--max-calls=150]   # planning: counts and call estimates, no file
+pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # Phase 4
 ```
@@ -82,7 +81,7 @@ a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and 
 5. `docs/04-RANKING.md` — the score, eligibility, abuse rules
 6. `docs/05-DISH-TAXONOMY.md` — dish list rules + matching pipeline
 7. `docs/06-API-SPEC.md` — endpoints, rate limits
-8. `docs/07-DATA-PIPELINES.md` — how restaurants/dishes get in (Google seed, menu photos, owners)
+8. `docs/07-DATA-PIPELINES.md` — how restaurants/dishes get in (Overture candidates reviewed by an admin, menu photos, owners)
 9. `docs/08-IMPLEMENTATION-PLAN.md` — phases with acceptance criteria
 10. `docs/09-CLAUDE-CODE-PROMPTS.md` — **the prompts to paste, in order**
 11. `docs/10-DEPLOYMENT.md` — accounts, env vars, crons, costs

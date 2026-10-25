@@ -6,6 +6,7 @@ flowchart LR
   App --> DB[("PostgreSQL<br/>Supabase")]
   App --> Store[("Object storage<br/>Supabase Storage")]
   App -->|OAuth sign-in| GAuth["Google OAuth"]
-  App -->|find candidates, daily location refresh| Places["Google Places API (New)"]
   App -->|menu photo to JSON, matcher fallback| LLM["Anthropic API"]
-  Cron["Vercel Cron"] -->|nightly recompute, daily Places refresh| App
+  Sync["pnpm overture:sync<br/>(admin laptop, DuckDB)"] -->|reads a release| Overture[("Overture Maps<br/>open data on S3")]
+  Sync -->|stages candidates| DB
+  Cron["Vercel Cron"] -->|nightly recompute| App

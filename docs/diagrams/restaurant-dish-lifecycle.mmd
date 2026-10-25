@@ -1,5 +1,5 @@
 stateDiagram-v2
-  [*] --> CANDIDATE: Google seed / user adds dish
+  [*] --> CANDIDATE: admin ticks dish / user adds dish
   CANDIDATE --> USER_CONFIRMED: 3 distinct raters
   CANDIDATE --> MENU_VERIFIED: menu item matched at conf 0.85 or more, or admin
   USER_CONFIRMED --> MENU_VERIFIED: menu item matched

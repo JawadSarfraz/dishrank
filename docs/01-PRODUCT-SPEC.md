@@ -43,7 +43,7 @@
 
 ### Diner
 - D1. As a diner I can pick a city and a dish and see restaurants ranked for that dish, with score, number of votes, area and price band.
-- D2. I can filter by area and sort by score / votes / price. Distance when I share my location is (on hold: docs/OPEN-QUESTIONS.md, Phase 4 distance and Google coordinates).
+- D2. I can filter by area and sort by score / votes / price, or by distance when I share my location (our own restaurant coordinates).
 - D3. I can open a restaurant page and see all its dishes with scores, best dish first.
 - D4. I can search a restaurant (Roman Urdu tolerant) and rate a dish there in under 30 seconds on my phone.
 - D5. If the dish I ate is not listed for that restaurant, I can add it from the dish list (never free text).
@@ -62,7 +62,7 @@
 - O3. I can see my dish ranks and vote counts (basic report). Paid report comes later.
 
 ### Admin
-- A1. I can search Google Places candidates live by dish and area, review them, and create restaurants by typing their name and address (Google data is shown, never saved).
+- A1. I can review Overture Maps candidates one area at a time and create restaurants from a prefilled form (fixing the name, address and area and ticking the dishes they serve), link them to restaurants we have, or skip them; and add a restaurant by hand when Overture misses it. Nothing is public until I create it.
 - A2. I can resolve the review queue: unmatched menu items, dish proposals, flags, suspicious bursts, claims.
 - A3. I can set user trust, hide ratings, merge duplicate restaurants, mark closed.
 - A4. I can trigger a full ranking recompute.

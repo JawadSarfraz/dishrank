@@ -1,5 +1,7 @@
 # Kickoff review (2026-10-22)
 
+> 2026-10-25: Google Places was dropped completely (docs/02 ADR-13). Findings about Places (the request body, field masks, budget and key restrictions, `googleSyncedAt`, the refresh-places cron, the import CSV) no longer apply; restaurant candidates now come from Overture Maps (docs/07 §1–2). The text below is kept as it was.
+
 Findings from the Prompt 0 audit of this kit (6 of 8 audit areas finished; data model and product/SEO did not). Adversarial verification never ran, so every item is an unverified lead: confirm it against the cited docs before acting.
 
 Triage: one pass by Claude on 2026-10-22, no sub-agents. Every finding is marked **blocker for Phases 0–2**, **later** (with the phase where it belongs; "not blocking" when that phase is 0–2), or **drop** (resolved by a decision in `docs/OPEN-QUESTIONS.md`, or not worth acting on).

@@ -86,6 +86,8 @@ Commit as: feat(data): schema, seed and dish matching
 
 ## Prompt 3 — Phase 2: Google Places seeding + admin import + restaurants
 
+> Superseded on 2026-10-25 (docs/02 ADR-13): Google Places was dropped completely, and Phase 2 now stages Overture Maps candidates for admin review (docs/07 §1–2, docs/08 Phase 2). Kept for history; do not run it again.
+
 ```
 Implement Phase 2 from docs/08 following docs/07 §1 and §2 and CLAUDE.md rules 1–2 (no scraping; persist only googlePlaceId + lat/lng + fetch time from Google, and only on an admin Create or Link; Google names and addresses are shown, never saved, logged, cached or prefilled). Revised 2026-10-25: live search replaces the CSV import.
 
@@ -144,8 +146,8 @@ Implement Phase 4 from docs/08 using docs/04 (query, eligibility, recomputeAll) 
 
 1. RankingService.getRanking({ citySlug, dishSlug, areaSlug?, sort, lat?, lng?, radiusKm?, limit }) → { eligible, insufficient, mode, thresholds, computedAt } using the SQL in docs/04 and splitting by thresholds (bootstrap mode while City.launchedAt is NULL or within 60 days of it). The page calls it with city and dish only; areaSlug, sort and lat/lng serve GET /api/v1/rankings. Ranks are always city-wide. Distance (lat/lng/radiusKm): DO NOT BUILD until the owner decides the Phase 4 open question on distance and Google coordinates (docs/OPEN-QUESTIONS.md).
 2. Pages (RSC, export const revalidate = 3600):
-   - /[city]/best-[dish]: H1 "Best <Dish> in <City>", intro line with counts and mode label ("Early rankings" in bootstrap), FilterBar (client component: area select, sort by score/votes/price (no distance until that open question is decided); it filters and sorts the cached rows in the browser and never renumbers ranks; the server page never reads searchParams), RankingList rows: rank, restaurant name (link), area, score "8.3 · 23 votes", price if present, variant tags, "Rate this" button; then "Not enough votes yet" list; EligibilityNote linking to /how-rankings-work; share button (Web Share API fallback copy link).
-   - /[city]/r/[slug]: header (name, area, address, price band, map link to Google Maps by lat/lng), dishes sorted eligible-by-score then by votes, each with score/votes/rank and "Rate" link, "Upload menu photo" (signed-in), "Report a problem" (flags). Show "Claimed" badge if claimed.
+   - /[city]/best-[dish]: H1 "Best <Dish> in <City>", intro line with counts and mode label ("Early rankings" in bootstrap), FilterBar (client component: area select, sort by score/votes/price, and by distance when the visitor shares a location (our own restaurant coordinates; rows without a location have no distance); it filters and sorts the cached rows in the browser and never renumbers ranks; the server page never reads searchParams), RankingList rows: rank, restaurant name (link), area, score "8.3 · 23 votes", price if present, variant tags, "Rate this" button; then "Not enough votes yet" list; EligibilityNote linking to /how-rankings-work; share button (Web Share API fallback copy link).
+   - /[city]/r/[slug]: header (name, area, address, price band, map link by our own lat/lng when the location is known), dishes sorted eligible-by-score then by votes, each with score/votes/rank and "Rate" link, "Upload menu photo" (signed-in), "Report a problem" (flags). Show "Claimed" badge if claimed.
    - / and /[city]: city picker, launch dish grid with eligible counts, "Rate a dish" CTA.
    - Static pages: /how-rankings-work (plain-language version of docs/04 + trust rules from docs/01), /dispute (form → ReviewItem FLAG with reason OTHER + email to ADMIN_EMAIL env), /about, /privacy, /terms (placeholders I will edit).
 3. SEO: generateMetadata per page (title "Best Chicken Karahi in Islamabad (2026) — DishRank", description with counts), canonical URLs, OpenGraph image route (simple dynamic OG image with dish + city + top 3), JSON-LD ItemList of Restaurant items on ranking pages, Restaurant schema on restaurant pages, sitemap.ts (all city×launch-dish pages + restaurant pages), robots.ts.
@@ -174,7 +176,7 @@ Implement Phase 5 from docs/08 using docs/07 §3 and §6 and docs/05.
 4. /admin/review: tabs by type, open items first, each with a resolve panel implementing every action in docs/07 §6; resolution writes resolvedBy/resolution/resolvedAt; triggers recomputeOne when ratings change. Keyboard-friendly (j/k, enter) is a nice-to-have, not required.
 5. /admin/menu-uploads/[id]: image preview + items grouped matched / needs review / ignored; one-click assign for suggestions.
 6. Flags: "Report a problem" on restaurant page → POST /api/v1/flags; one OPEN FLAG review item per (RD, reason). Upheld NOT_SERVED ×3 → RD REMOVED; RESTAURANT_CLOSED upheld → restaurant CLOSED.
-7. Proposals: DISH_PROPOSAL resolve → create dish (slug, name, category) and its DishAlias rows (normalised); RESTAURANT_PROPOSAL resolve → find the place with the live search on /admin/import and Create or Link it there (the admin types name and address; RestaurantCreateFields), or create it without a Google place from typed coordinates (adminRestaurantInput).
+7. Proposals: DISH_PROPOSAL resolve → create dish (slug, name, category) and its DishAlias rows (normalised); RESTAURANT_PROPOSAL resolve → find the place among the Overture candidates on /admin/import and Create or Link it there, or add it by hand (adminRestaurantInput, as on /admin/restaurants/new).
 
 Acceptance:
 - Parsing a real desi menu photo auto-matches ≥ 80% of items; the rest show in the queue with suggestions and can be assigned in one click.
@@ -213,10 +215,10 @@ Commit as: feat(owner): claims, owner dashboard, hardening and analytics
 Act as a reviewer who has not seen this code before. Read CLAUDE.md and docs/11-REVIEW-CHECKLIST.md. Then inspect the repo and answer, with file:line references:
 
 1. Which server actions, /api/v1 handlers, admin/owner pages or admin/owner services can run without the right role? List any missing requireUser/requireRole/requirePageRole, any admin service that does not take and check the current user, any cron handler that does not fail closed, and any missing Zod parse.
-2. Where does the code persist Google Places fields other than place ID and lat/lng? (Grep the places module and import UI.)
+2. Is any Google Places code, key or data left anywhere, and does every restaurant pass an admin's review? (tests/unit/ops/no-google-places.test.ts; docs/07 §1–2.)
 3. Can any user create a Dish row outside the admin resolve flow?
 4. Can an RD get a rank number while below thresholds? Trace getRanking and the page.
-5. What happens if ANTHROPIC_API_KEY is missing? (Should degrade gracefully.) GOOGLE_PLACES_API_KEY is required in production (src/env.ts); in development the import answers PLACES_KEY_MISSING and the refresh counts due rows as failures.
+5. What happens if ANTHROPIC_API_KEY is missing? (Should degrade gracefully.)
 6. Any N+1 queries on ranking or restaurant pages? Any client components that could be server components?
 7. Any TODOs without an entry in docs/OPEN-QUESTIONS.md?
 
