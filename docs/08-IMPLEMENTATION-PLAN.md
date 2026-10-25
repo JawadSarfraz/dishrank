@@ -49,14 +49,22 @@ Acceptance
 ## Phase 3 — Rating flow (8–10 h)
 
 Tasks
-- `/rate`: restaurant search → dish picker (launch dishes first, trigram search, "add dish") → score 1–10 → optional taste/portion/value, photo (signed upload, client resize), comment → submit
-- `RatingService.createOrReplace` with abuse checks from docs/04; `RatingHistory`; `rate-limit.ts`
-- `RankingService.recomputeOne` (score math + status promotion)
-- `/me`: list, edit, delete own ratings
-- Unit tests for ranking math and abuse rules
+- `/rate`: restaurant search ("Can't find it?" files a restaurant suggestion) → dish picker (the restaurant's dishes, launch dishes, trigram search over the canonical list; "Dish not listed? Propose it") → score 1–10 → optional taste/portion/value, photo (10-minute presigned upload, client resize), comment → submit; signed-out users sign in with Google and come back to the same step
+- `RatingService.createOrReplace` / `deleteOwn` with abuse checks from docs/04; `RatingHistory`; rating keys in `rate-limit.ts` (the limiter exists since Phase 2)
+- `RankingService.recomputeOne` (score math, status promotion, re-rank of the (city, dish) list) and the recompute after a merge
+- `/me`: list, edit (reopens /rate prefilled), delete own ratings
+- Panel: "I'm at this restaurant now" location observations → location suggestions
+- `/admin/users` (panel toggle) and a minimal `/admin/review` for held ratings, bursts, dish and restaurant suggestions and location suggestions (the full queue with menu items, flags and claims stays in Phase 5)
+- `pnpm dev:demo [-- --undo]`: local demo data
+- Unit tests for ranking math and abuse rules; Playwright at 360 px with a real session cookie
 
 Acceptance
-- On a phone-sized viewport, rating a dish takes ≤ 30 s and 4 taps; a 5th rating from a new account within 24 h is HELD and a review item appears.
+- On a phone-sized viewport (360 px), rating a dish at an existing restaurant takes 4 taps after the search and under 30 s (Playwright).
+- Re-rating replaces the old rating and adds a RatingHistory row.
+- The 5th rating from new accounts on one dish within 24 h holds all five and a review item appears; panel members are exempt.
+- An owner cannot rate their own restaurant.
+- A dish row with too few raters shows "needs N more" and never gets a rank.
+- `pnpm dev:demo` and `pnpm dev:demo -- --undo` work on the dev database.
 
 ## Phase 4 — Ranking pages + SEO (8–10 h)
 

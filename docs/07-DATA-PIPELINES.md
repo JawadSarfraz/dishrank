@@ -129,7 +129,7 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 ## 5. Freshness and hygiene jobs (nightly recompute, docs/04)
 
 - Stale marking by status age.
-- `Rating` comments with phone/URL → hidden pending review (regex at write time; nightly sweep as backup).
+- `Rating` comments with a phone number, link or e-mail address → the whole rating is HELD with a `SUSPICIOUS_RATINGS` item (reason `COMMENT`), checked at write time in RatingService (Decided 2026-10-26, docs/04 abuse control 5); a nightly sweep as backup arrives with the nightly job (Phase 4).
 - Trust recompute.
 - Weekly `RankingSnapshot`.
 - `JobRun` rows for every job; admin dashboard shows last 10 runs.
@@ -139,18 +139,20 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 | type | payload | admin actions |
 |---|---|---|
 | `UNMATCHED_MENU_ITEM` | `{ menuItemId, rawName, rawPrice, suggestions: [{dishSlug, conf}] }` | assign dish (→ RD MENU_VERIFIED) · ignore · create dish then assign |
-| `DISH_PROPOSAL` | `{ name, note, restaurantId? }` | create dish (slug, category, aliases) · map to existing dish · reject |
-| `RESTAURANT_PROPOSAL` | `{ name, cityId, areaId, note }` | create restaurant · link to existing · reject |
+| `DISH_PROPOSAL` | `{ name, note, restaurantId }` (`restaurantId` null when the diner was not rating anywhere) | create dish (slug, category, aliases; not a launch dish) · map to existing dish · reject |
+| `RESTAURANT_PROPOSAL` | `{ name, cityId, areaId, note }` | create restaurant (source MANUAL, the admin types the fields; optional location and dishes) · link to existing · reject |
 | `FLAG` | `{ restaurantDishId, reason, flagIds[] }` | uphold (NOT_SERVED ×3 upheld → RD REMOVED; RESTAURANT_CLOSED → Restaurant CLOSED) · dismiss |
-| `SUSPICIOUS_RATINGS` | `{ restaurantDishId, ratingIds[], reason }` | release (ratings ACTIVE) · hide (HIDDEN, lower trust) · ban users |
+| `SUSPICIOUS_RATINGS` | `{ restaurantDishId, ratingIds[], reason: "BURST" \| "COMMENT", flags? }` (`flags` = what the comment screen found: PHONE, LINK, EMAIL, BLOCKLIST). One OPEN item per dish row and reason; later held ratings join it | release (HELD ratings → ACTIVE, except ones still listed in another open item; never held again by the burst rule) · hide (HIDDEN; the user's trust is recomputed from the docs/04 table, where ≥ 2 hidden gives 0.3) · ban users (bannedAt, all their ratings HIDDEN) |
+| `LOCATION_SUGGESTION` | `{ restaurantId, observationIds[], best: { observationId, lat, lng, accuracyM }, current: { lat, lng, source } \| null, distanceM }` (§7) | approve (the restaurant takes `best`, `locationSource PANEL_GPS`) · reject |
 | `OWNER_CLAIM` | `{ claimId, phone, proofNote }` | approve · reject |
 | `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A (rules in §2) · keep both |
 
-Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed.
+Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed. A status change of a rating never moves its `updatedAt` (the decay clock, docs/04). Phase 3 builds the decisions for `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION` on `/admin/review`; the other types arrive with their phases.
 
 ## 7. Panel operations (non-code, but the plan depends on it)
 
-- Recruit 8–12 panel members; admin sets `isPanel` (trust fixed at 1.3; 30 ratings/day, 10 per restaurant per day; no new-account burst hold; still blocked from restaurants they own).
+- Recruit 8–12 panel members; admin sets `isPanel` on `/admin/users` (trust fixed at 1.3; 30 ratings/day, 10 per restaurant per day; no new-account burst hold; still blocked from restaurants they own).
+- On-site locations: on the rating screen a panel member can tap "I'm at this restaurant now – share location"; the browser asks for permission each time. The location is kept as a `LocationObservation` (never on the rating), and only when the browser reports an accuracy of 50 m or better. When the restaurant has no location, or the observation is more than 150 m away (DECISION-PENDING), one OPEN `LOCATION_SUGGESTION` item collects the observations; accepting it sets the most accurate one with `locationSource PANEL_GPS`. Observations follow their restaurant into a merge.
 - Week 1–2 target: every launch dish has ≥ 10 restaurants with ≥ 4 panel ratings each in Islamabad → bootstrap-mode eligibility.
 - Panel uploads a menu photo at each visit (one tap on the restaurant page).
 - Weekly 20-minute review session: clear the review queue, merge duplicates.

@@ -19,19 +19,21 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `user:{id}:flag` | 10 / day |
 | `user:{id}:proposal` | 5 / day |
 | `user:{id}:upload` | 20 / day |
+| `user:{id}:rating-delete` | 30 / day (DECISION-PENDING) |
+| `user:{id}:location` | 30 / day, panel members' on-site locations (DECISION-PENDING) |
 | `ip:{hash}:search` | 120 / min |
 | `ip:{hash}:api` | 600 / hour (public GETs) |
-| `user:{id}:admin-write` | 600 / hour (every admin write: import create/link/skip/reopen, add, edit, status, merge) |
+| `user:{id}:admin-write` | 600 / hour (every admin write: import create/link/skip/reopen, add, edit, status, merge, review decisions, panel toggle) |
 
-Exceeding → `429 { error: { code: "RATE_LIMITED" } }`.
+Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. Windows roll: hits are counted in buckets of max(5 s, window / 12), so a daily key frees up over 22–24 h. Every call that reaches a check counts, also one that a later check refuses. Rating keys: every submission counts, new or edited (docs/04 abuse control 2); a rating that adds the dish row does not spend `add-dish`, which only `POST /api/v1/restaurant-dishes` spends when it creates a row.
 
 ## Public (no auth)
 
 ### `GET /api/v1/cities`
-→ `[{ slug, name, areas: [{ slug, name }] }]`
+→ `[{ id, slug, name, areas: [{ id, slug, name }] }]` (ids for `POST /api/v1/proposals`). Limit: `ip:{hash}:api`.
 
 ### `GET /api/v1/dishes?city=&q=&launchOnly=`
-→ `[{ slug, name, category, isLaunch, eligibleCount }]` (eligibleCount = eligible RDs in that city; sorted launch first, then eligibleCount desc; `q` uses trigram over `DishAlias`, docs/05)
+→ `[{ id, slug, name, category, isLaunch, eligibleCount }]` (eligibleCount = eligible RDs in that city; sorted launch first, then eligibleCount desc; `q` uses trigram over `DishAlias`, docs/05). Limits: `ip:{hash}:api`, plus `ip:{hash}:search` when `q` is given.
 
 ### `GET /api/v1/rankings?city=islamabad&dish=chicken-karahi&area=&sort=score|votes|price&lat=&lng=&radiusKm=&limit=`
 →
@@ -65,29 +67,35 @@ Distance (`lat`, `lng`, `radiusKm`, `distanceKm`) and the restaurant `lat`/`lng`
 ## Authenticated (role USER+)
 
 ### `POST /api/v1/ratings`
-Body:
+Body (JSON only: another `Content-Type` → `415 UNSUPPORTED_MEDIA_TYPE`, a bad body → `400 INVALID_JSON`):
 ```json
 { "restaurantId": "...", "dishId": "...", "score": 8, "taste": 4, "portion": 3, "value": 4,
-  "comment": "Best ginger in F-7", "photoPath": "dish-photos/abc.jpg" }
+  "comment": "Best ginger in F-7", "photoPath": "dish-photos/<userId>/<random>.jpg" }
 ```
-Rules: score 1–10 int; sub-scores 1–5 optional; comment ≤ 280; `photoPath` must be under `dish-photos/` and belong to this user. If the RD doesn't exist → created as CANDIDATE/USER. Replaces an existing rating by this user. Runs abuse checks. Returns `{ ratingId, restaurantDishId, score, eligible, rank }`.
-Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_REVIEW` (still 200 but `held: true`).
+Rules: score 1–10 int; sub-scores 1–5 optional; comment ≤ 280; `dishId` from the canonical list. `photoPath` is `dish-photos/<userId>/<random>.(jpg|jpeg|webp)` from `POST /api/v1/uploads/sign` for this user; the object must exist in storage, be at most 5 MB and image/jpeg or image/webp, and be on no other rating. If the RD doesn't exist → created as CANDIDATE / USER / 0.5. A STALE RD becomes USER_CONFIRMED again; a REMOVED one takes no ratings. Replaces an existing rating by this user (the old score and comment go to RatingHistory); an edit keeps a HELD or HIDDEN status. Runs the docs/04 abuse checks in RatingService, then `recomputeOne`.
+Returns `201` (new) or `200` (replaced): `{ ratingId, restaurantDishId, created, held, heldReason: null|"COMMENT"|"BURST", score, votes, eligible, rank, ratingsNeeded, mode: "normal"|"bootstrap", restaurant: { id, slug, name, citySlug }, dish: { id, slug, name } }` (`score`, `votes`, `rank` describe the dish row after the recompute; `rank` is `rankInCity`, null when not eligible; `ratingsNeeded` is how many more 0.6-trust raters it needs to rank). A held rating is still a success, with `held: true`.
+Errors: `401 UNAUTHENTICATED`, `403 USER_BANNED`, `404 NOT_FOUND` (restaurant), `409 RESTAURANT_INACTIVE`, `403 OWNER_SELF_RATING`, `404 DISH_NOT_FOUND`, `409 DISH_REMOVED`, `400 PHOTO_NOT_YOURS`, `400 PHOTO_NOT_FOUND`, `400 PHOTO_INVALID`, `409 PHOTO_IN_USE`, `400 UPLOADS_DISABLED` (a photo while storage is not set up), `429 RATE_LIMITED`, `400 VALIDATION_FAILED`.
 
-### `DELETE /api/v1/ratings/:id` — own rating only; triggers recomputeOne.
+### `DELETE /api/v1/ratings/:id`
+Own rating only (anyone else's answers `404 NOT_FOUND`). A HELD or HIDDEN rating cannot be deleted by its author: `409 RATING_UNDER_REVIEW`. The rating and its history are deleted (DECISION-PENDING: hard delete), then `recomputeOne`. Limit: `user:{id}:rating-delete`. → `{ id }`.
 
-### `GET /api/v1/me/ratings?cursor=` — own ratings with restaurant/dish.
+### `GET /api/v1/me/ratings?cursor=&limit=`
+Own ratings of any status, newest first (`limit` ≤ 100, default 50) → `{ data: [{ id, score, taste, portion, value, comment, photoPath, status, createdAt, updatedAt, restaurantDishId, dish: { id, slug, name }, restaurant: { id, slug, name, active, area, city: { slug, name } } }], nextCursor }`. `status` HELD = under review, HIDDEN = not counted.
 
 ### `POST /api/v1/restaurant-dishes`
-`{ restaurantId, dishId, menuName?, price? }` → creates CANDIDATE if absent, returns the RD. No-op if exists.
+`{ restaurantId, dishId, menuName?, price? }` → creates CANDIDATE / USER / 0.5 if absent (`201`, spends `add-dish`); an existing row of any status is returned as it is (`200`). → `{ id, status, created }`. The restaurant must be ACTIVE and not the caller's own.
 
 ### `POST /api/v1/flags`
 `{ restaurantDishId, reason: NOT_SERVED|WRONG_DISH|RESTAURANT_CLOSED|DUPLICATE|OTHER, note? }` → creates Flag + `ReviewItem FLAG` (one review item per RD per reason while OPEN).
 
 ### `POST /api/v1/proposals`
-`{ type: "DISH" | "RESTAURANT", name, cityId?, areaId?, note? }` → `ReviewItem DISH_PROPOSAL | RESTAURANT_PROPOSAL`.
+`{ type: "DISH", name, restaurantId?, note? }` (the restaurant the diner was rating) or `{ type: "RESTAURANT", name, cityId, areaId, note? }` (the area must be in that city, else `400 AREA_NOT_IN_CITY`) → `ReviewItem DISH_PROPOSAL | RESTAURANT_PROPOSAL` only; nothing is created until an admin decides (docs/07 §6). → `201 { id, type, duplicate: false }`; the same person's open suggestion with the same name answers `200 { id, type, duplicate: true }` and files nothing new. Limit: `user:{id}:proposal`.
 
 ### `POST /api/v1/uploads/sign`
-`{ kind: "dish-photo" | "menu", contentType, sizeBytes }` → `{ uploadUrl, path }` (Supabase signed upload URL, valid 2 h and bound to one path; max 5 MB; image/jpeg or image/webp, since the client re-encodes). `dish-photo` → public `dish-photos` bucket under a random cuid file name; `menu` → private `menus` bucket. The client resizes and re-encodes before upload, which strips EXIF/GPS.
+`{ kind: "dish-photo" | "menu", contentType: "image/jpeg" | "image/webp", sizeBytes ≤ 5 MB }` → `{ path, uploadUrl, method: "PUT", headers, expiresAt }`: a presigned S3 `PUT` for Supabase Storage (S3 protocol, ADR-14), valid 10 minutes, for one object key; the content type is signed, so the client must send exactly `headers`. `dish-photo` → public `dish-photos` bucket, key `<userId>/<random>.<ext>`, `path` = `dish-photos/<userId>/<random>.<ext>`; `menu` → `400 NOT_AVAILABLE` until Phase 5 (private `menus` bucket). Without the four `SUPABASE_S3_*` variables: `503 UPLOADS_DISABLED` (the rate flow then hides the photo step). The client resizes to at most 1600 px and re-encodes before upload, which strips EXIF/GPS. Limit: `user:{id}:upload`.
+
+### `POST /api/v1/location-observations`
+Panel members only (`403 PANEL_ONLY`, read from the database): `{ restaurantId, lat, lng, accuracyM }` from the browser at the restaurant. `accuracyM` worse than 50 m → `400 LOCATION_TOO_COARSE` (never saved). Saved as a `LocationObservation`, never on a rating. When the restaurant has no location, or the observation is more than 150 m from it, one OPEN `LOCATION_SUGGESTION` review item is created or updated (docs/07 §7). → `201 { observationId, suggestion: "none" | "created" | "updated" }`. Limit: `user:{id}:location`.
 
 ## Owner (role OWNER or ADMIN)
 
@@ -99,12 +107,12 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 
 ## Admin (role ADMIN)
 
-- `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=`
-- `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`).
+- `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=&limit=` → `{ data, nextCursor, counts }` (counts of OPEN items per type). Phase 3 serves `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION`; the other types arrive with their phases.
+- `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`). An item that is not OPEN → `409 ITEM_CLOSED`; an action of another type → `400 ACTION_NOT_ALLOWED`; a type of a later phase → `400 NOT_AVAILABLE`; `create_dish` → `409 DISH_EXISTS` or `409 ALIAS_TAKEN`. After the decision the affected dish rows are recomputed and the affected users' trust is refreshed. Limit: `user:{id}:admin-write`.
 - `POST /api/v1/admin/restaurants` — add by hand (`source MANUAL`) `{ name, areaId, address, phone?, website?, priceBand?, aliases?, lat?, lng?, dishSlugs? }`; the city is the area's; `lat` and `lng` go together and become `locationSource ADMIN`; each dish slug becomes a CANDIDATE RestaurantDish (source ADMIN, confidence 0.4). The slug is `<name>-<area slug>` (area not repeated when the name ends with it), then `-2`, `-3`… when taken; it never changes afterwards.
 - `PATCH /api/v1/admin/restaurants/:id` — edit `{ name, areaId, address, phone|null, website|null, priceBand|null, aliases, lat?|null, lng?|null }` (changed coordinates become `locationSource ADMIN`; null clears the location), `{ status: ACTIVE|CLOSED|HIDDEN }`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE). In v1 these admin operations are server actions on /admin pages (`src/server/actions/admin-*.ts`) calling the same services; the JSON routes are not built yet (KICKOFF-REVIEW AP-07).
 - `PATCH /api/v1/admin/restaurant-dishes/:id` — status / confidence / tags.
-- `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules).
+- `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules). Phase 3 builds only `{ isPanel }` (a strict body): on → trust 1.3; off → the docs/04 trust table at once; then every dish row the user's ratings count in is recomputed → the user with `recomputedRows`. Limit: `user:{id}:admin-write`.
 - `PATCH /api/v1/admin/ratings/:id` — `status: ACTIVE|HELD|HIDDEN`.
 - `POST /api/v1/admin/menu-uploads/:id/parse` — run vision + matching now.
 - `POST /api/v1/admin/rankings/recompute` — `RankingService.recomputeAll()` (async, returns JobRun id).
@@ -120,4 +128,4 @@ All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` 
 
 ## Zod schemas (`src/server/validation/`)
 
-`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`. Export inferred types; reuse in both actions and handlers.
+`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; Phase 3: `locationObservationInput`, `meRatingsQuery`, `dishSearchQuery`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`, `adminUserListQuery`, `adminUserUpdateInput`, `reviewQueueQuery`. Export inferred types; reuse in both actions and handlers.

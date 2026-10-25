@@ -30,8 +30,14 @@ GOOGLE_CLIENT_SECRET=
 # Supabase Storage
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=        # server only, never exposed
-SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; random cuid file names; writes only via signed upload URLs
+SUPABASE_DISH_PHOTOS_BUCKET=dish-photos  # public read; keys <userId>/<random>.<ext>; writes only via presigned upload URLs
 SUPABASE_MENUS_BUCKET=menus              # private; menu photos, read server-side with the service role key
+# Dish photo uploads (Phase 3, ADR-14): Supabase Storage's S3 protocol, so upload URLs expire after
+# 10 minutes. All four or none; without them the rate flow hides the photo step.
+SUPABASE_S3_ENDPOINT=              # Dashboard → Storage → Settings → S3 connection: https://<ref>.storage.supabase.co/storage/v1/s3
+SUPABASE_S3_REGION=                # the region shown there
+SUPABASE_S3_ACCESS_KEY_ID=         # an S3 access key created there (server only: it bypasses storage policies)
+SUPABASE_S3_SECRET_ACCESS_KEY=
 
 # Anthropic
 ANTHROPIC_API_KEY=
@@ -49,10 +55,20 @@ ADMIN_EMAIL=                       # first admin: a Better Auth user-create hook
 
 | Env | DB | Notes |
 |---|---|---|
-| local | Homebrew PostgreSQL, same major version as the Supabase projects, with `pg_trgm` and `unaccent`; storage uses the preview Supabase project | `pnpm db:migrate`, `pnpm db:seed`, `scripts/dev-fake-ratings.ts`; no Docker |
+| local | Homebrew PostgreSQL, same major version as the Supabase projects, with `pg_trgm` and `unaccent`; storage uses the preview Supabase project | `pnpm db:migrate`, `pnpm db:seed`, `pnpm dev:demo` (demo restaurants, users and ratings; `-- --undo` removes them; refuses any database not on this machine); no Docker |
 | CI (GitHub Actions) | `postgres` service container, same major version (the image ships `pg_trgm` and `unaccent`) | `prisma migrate deploy`, then lint, typecheck, test |
 | preview (Vercel) | the preview Supabase project (also serves local storage) | Never point previews at prod data |
 | production | Supabase prod | Migrations run from CI/CD step `prisma migrate deploy` before build |
+
+## Photo storage (Phase 3)
+
+In each Supabase project (preview, production):
+
+1. Buckets: `dish-photos` public, with file size limit 5 MB (`file_size_limit 5242880`) and allowed MIME types `image/jpeg, image/webp`; `menus` private (Phase 5). The bucket limits check the declared `Content-Type`, so the server also checks each object (HEAD: exists, ≤ 5 MB, JPEG or WebP) before a rating accepts it.
+2. Storage → Settings → S3 connection: enable it, note the endpoint and region, create an access key. Put the four `SUPABASE_S3_*` values in Vercel (server only) and in local `.env` (the preview project).
+3. Check: on `/rate`, the score step shows "Add a photo"; an upload URL expires after 10 minutes.
+
+Production should not launch without them (DECISION-PENDING, docs/OPEN-QUESTIONS.md): without photo uploads no non-panel rater can reach the 1.0 or 1.2 trust rows of docs/04. `src/env.ts` keeps them optional so local, preview and CI runs work without storage.
 
 ## Crons (`vercel.json`)
 

@@ -77,17 +77,17 @@ sequenceDiagram
   participant DB as Postgres
   U->>P: search restaurant (trigram) → pick dish → score 1-10 (+photo)
   P->>A: submitRating(payload)
-  A->>A: requireUser(), zod parse, rateLimit(user, "rating")
-  A->>RS: createOrReplace(userId, payload)
-  RS->>R: ensure RestaurantDish exists (create CANDIDATE if user added)
-  RS->>R: upsert Rating (unique restaurantDishId+userId), insert RatingHistory
-  RS->>RS: abuse checks (burst, owner-self-rating, new-account limits)
-  RS->>RK: recomputeOne(restaurantDishId)
-  RK->>DB: SELECT active ratings → compute W, R, score → UPDATE restaurant_dishes
-  RK->>R: maybe promote status CANDIDATE→USER_CONFIRMED (3 distinct raters)
+  A->>A: requireUser(), zod parse
+  A->>RS: createOrReplace(user, payload)
+  RS->>R: checks: user not banned, restaurant ACTIVE and not the user's own, dish canonical, photo
+  RS->>R: rate limits (per user, per restaurant; panel limits)
+  RS->>R: one transaction: ensure RestaurantDish (CANDIDATE/USER), upsert Rating + RatingHistory, comment hold, burst rule
+  RS->>RK: recomputeOne(restaurantDishId) after commit
+  RK->>DB: SELECT counted ratings → W, R, score → UPDATE restaurant_dishes; promote CANDIDATE→USER_CONFIRMED at 3 raters
+  RK->>DB: re-rank the (city, dish) list (rankInCity)
   A->>A: revalidatePath(ranking page, restaurant page)
-  A-->>P: { ok, score, eligible }
-  P-->>U: "Thanks — Butt Karahi is #3 for Chicken Karahi in F-7"
+  A-->>P: { score, votes, eligible, rank, ratingsNeeded, held }
+  P-->>U: "8.3 · 23 votes · #3 in Islamabad" or "needs 2 more ratings to rank"
 ```
 
 ### Ranking page render
@@ -98,8 +98,8 @@ sequenceDiagram
   participant N as Next.js (ISR)
   participant RK as RankingService
   participant DB as Postgres
-  G->>N: GET /islamabad/best-chicken-karahi?area=f-7
-  N->>RK: getRanking(city, dish, {area, sort})
+  G->>N: GET /islamabad/best-chicken-karahi
+  N->>RK: getRanking(city, dish) (area filter and sort run in the browser)
   RK->>DB: SELECT restaurant_dishes JOIN restaurants WHERE city, dish, status IN (...) ORDER BY score DESC
   DB-->>RK: eligible rows + insufficient rows
   RK-->>N: { eligible[], insufficient[], meta }
@@ -195,7 +195,8 @@ dishrank/
 │   ├── lib/overture.ts              # DuckDB download + reader (shared with research/)
 │   ├── research/overture-coverage.ts # the coverage report in docs/research/
 │   ├── parse-menu.ts                # one MenuUpload → MenuItems + matching
-│   └── recompute-rankings.ts        # calls RankingService.recomputeAll()
+│   ├── recompute-rankings.ts        # calls RankingService.recomputeAll()
+│   └── dev-demo.ts                  # pnpm dev:demo [-- --undo]: local demo data (local databases only)
 ├── src/
 │   ├── app/
 │   │   ├── (public)/
@@ -213,14 +214,15 @@ dishrank/
 │   │   ├── owner/  (layout.tsx and every page call requirePageRole)  claim/  restaurants/[id]/
 │   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  restaurants/  users/  rankings/
 │   │   ├── api/
-│   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ flags/ uploads/ owner/ admin/
+│   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ flags/ uploads/ owner/ admin/
 │   │   │   ├── cron/ recompute-rankings/ mark-stale/   # mark-stale: manual only
 │   │   │   └── auth/[...all]/           # Better Auth handler: toNextJsHandler(auth)
 │   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme tokens (Tailwind 4)
 │   ├── components/
 │   │   ├── ui/            # shadcn
 │   │   ├── ranking/       # RankingList, RankingRow, EligibilityNote, FilterBar
-│   │   ├── rating/        # RestaurantSearch, DishPicker, ScoreInput, PhotoUpload
+│   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
+│   │   ├── me/            # DeleteRatingButton
 │   │   ├── restaurant/    # RestaurantHeader, DishScoreList
 │   │   ├── layout/        # Footer, OvertureCredit; Nav, CityPicker (Phase 4)
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
@@ -230,10 +232,14 @@ dishrank/
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
 │   │   ├── errors.ts               # AppError
 │   │   ├── rate-limit.ts           # DB-backed sliding window
+│   │   ├── storage/                # StorageAdapter; Supabase Storage through S3 presigned URLs (sigv4.ts, ADR-14)
 │   │   ├── actions/                # submitRating, addRestaurantDish, flag, claim, admin*
 │   │   ├── services/
 │   │   │   ├── ranking.service.ts  # score math, eligibility, recomputeOne/All
-│   │   │   ├── rating.service.ts
+│   │   │   ├── rating.service.ts   # createOrReplace, deleteOwn: docs/04 abuse controls
+│   │   │   ├── comment-screen.ts  proposal.service.ts  location.service.ts  upload.service.ts
+│   │   │   ├── admin-users.service.ts  rate-page.service.ts
+│   │   │   ├── dev-demo.service.ts # pnpm dev:demo (local only)
 │   │   │   ├── matching/           # normalize.ts aliases.ts trigram.ts llm.ts index.ts
 │   │   │   ├── restaurant.service.ts
 │   │   │   ├── import.service.ts   # /admin/import review queue: Create / Link / Skip
@@ -251,8 +257,9 @@ dishrank/
 │   ├── instrumentation.ts          # register() imports env.ts
 │   └── types/
 ├── tests/
-│   ├── unit/   matching/ ranking/ slug/ normalize/
-│   └── e2e/    rate-flow.spec.ts  ranking-page.spec.ts  admin-review.spec.ts
+│   ├── unit/   matching/ ranking/ rating/ restaurants/ import/ admin/ api/ storage/ dev-demo/ …
+│   ├── e2e/    smoke.spec.ts  rate.spec.ts (360 px, real session cookie)  setup/prepare.ts
+│   └── setup/  test database (dishrank_test): create, migrate, seed, reset
 └── tmp/        (gitignored) menu images for local parse
 ```
 
@@ -269,7 +276,7 @@ dishrank/
 | Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. One scheduled cron: recompute (with stale marking). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
 | Env | `src/env.ts` parses `process.env` with Zod. `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
 | Observability | Vercel logs + optional Sentry (free tier). Every service logs `{ action, userId, entityId, durationMs }`. |
-| Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under random cuid file names; menu photos go to the private `menus` bucket. Uploads use Supabase signed upload URLs (fixed 2 h validity, one path each) issued only by `/api/v1/uploads/sign`; the DB stores the path, not a URL. |
+| Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under `<userId>/<random>.<ext>`; menu photos go to the private `menus` bucket. Uploads use presigned S3 `PUT` URLs for Supabase Storage (ADR-14: valid 10 minutes, one object key, content type signed) issued only by `/api/v1/uploads/sign`; a rating accepts a photo only after the server checked that the object exists, is at most 5 MB and is JPEG or WebP. The DB stores the path, not a URL. Without the `SUPABASE_S3_*` variables uploads are off and the rate flow hides the photo step. |
 | i18n | English only; `lang="en"`; dish aliases carry Roman Urdu. |
 
 ## ADRs (architecture decision records)
@@ -289,3 +296,4 @@ dishrank/
 | ADR-11 | Better Auth replaces Auth.js v5: Google sign-in, Prisma adapter, database sessions, same roles and `requireUser()` / `requireRole()` | Auth.js v5 never left beta (`next-auth@5.0.0-beta.32` in Oct 2026) and is in maintenance under the Better Auth team; Better Auth 1.7 is stable and supports Next.js 16 and Prisma 7 | Phone OTP (Phase 7) or a native app needs another sign-in method |
 | ADR-12 | Pinned versions: Node.js 24 LTS, Next.js 16 (stable), Prisma ORM 7 (latest stable 7.x, not the 8.0 release candidate that npm `latest` installs) | Node 20 is end-of-life; Next.js 16 is the current stable major; Prisma 7 needs `prisma.config.ts` and a driver adapter (`@prisma/adapter-pg`) | Prisma 8 is GA plus one patch release; Node 26 becomes the Vercel default |
 | ADR-13 | No Google Places at all (2026-10-25). Restaurant candidates come from Overture Maps Places, Meta and Microsoft records only (CDLA Permissive 2.0), staged by `pnpm overture:sync` and reviewed one by one by an admin on /admin/import before anything is public; the Create form may prefill from Overture; restaurants keep Overture's coordinates as our own; /about/data carries the credit and the licence link | Google Maps Platform Terms 3.2.3(d)(iii) forbid using the Places API "in a listings or directory service", which DishRank is; Google also forbids saving names and addresses and caps stored coordinates at 30 days. Overture's open licence allows storing, changing and showing the data with a credit. AllThePlaces is left out (scraped, rule 1) and Foursquare too (Apache 2.0 notice duties); coverage and quality: docs/research/overture-coverage.md | Overture changes its licences or sources, or reviews show its records are too poor (then owner sign-ups and panel visits carry more of the load) |
+| ADR-14 | Photo uploads through Supabase Storage's S3 protocol (2026-10-26): `/api/v1/uploads/sign` returns a SigV4 presigned `PUT` (`src/server/storage`, no AWS SDK) valid 10 minutes, with the content type signed; the server checks the object (HEAD) before a rating accepts it. Storage stays Supabase Storage | The owner asked for upload URLs valid ≤ 10 minutes; Supabase's own signed upload URLs are fixed at 2 hours on hosted projects, while S3 presigned URLs take any expiry. Needs four env vars (endpoint, region, access key id, secret) from the project's Storage settings | Supabase makes its own signed upload URLs' expiry configurable, or uploads move to a server-side proxy |

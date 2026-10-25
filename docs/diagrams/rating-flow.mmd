@@ -8,14 +8,14 @@ sequenceDiagram
   participant DB as Postgres
   U->>P: search restaurant (trigram) → pick dish → score 1-10 (+photo)
   P->>A: submitRating(payload)
-  A->>A: requireUser(), zod parse, rateLimit(user, "rating")
-  A->>RS: createOrReplace(userId, payload)
-  RS->>R: ensure RestaurantDish exists (create CANDIDATE if user added)
-  RS->>R: upsert Rating (unique restaurantDishId+userId), insert RatingHistory
-  RS->>RS: abuse checks (burst, owner-self-rating, new-account limits)
-  RS->>RK: recomputeOne(restaurantDishId)
-  RK->>DB: SELECT active ratings → compute W, R, score → UPDATE restaurant_dishes
-  RK->>R: maybe promote status CANDIDATE→USER_CONFIRMED (3 distinct raters)
+  A->>A: requireUser(), zod parse
+  A->>RS: createOrReplace(user, payload)
+  RS->>R: checks: user not banned, restaurant ACTIVE and not the user's own, dish canonical, photo
+  RS->>R: rate limits (per user, per restaurant; panel limits)
+  RS->>R: one transaction: ensure RestaurantDish (CANDIDATE/USER), upsert Rating + RatingHistory, comment hold, burst rule
+  RS->>RK: recomputeOne(restaurantDishId) after commit
+  RK->>DB: SELECT counted ratings → W, R, score → UPDATE restaurant_dishes; promote CANDIDATE→USER_CONFIRMED at 3 raters
+  RK->>DB: re-rank the (city, dish) list (rankInCity)
   A->>A: revalidatePath(ranking page, restaurant page)
-  A-->>P: { ok, score, eligible }
-  P-->>U: "Thanks — Butt Karahi is #3 for Chicken Karahi in F-7"
+  A-->>P: { score, votes, eligible, rank, ratingsNeeded, held }
+  P-->>U: "8.3 · 23 votes · #3 in Islamabad" or "needs 2 more ratings to rank"

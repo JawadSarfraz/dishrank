@@ -117,10 +117,10 @@ Commit as: feat(restaurants): places seeding, admin import, restaurant admin
 ```
 Implement Phase 3 from docs/08 using docs/04 (abuse rules, recomputeOne) and docs/06 (POST /api/v1/ratings, restaurant-dishes, uploads/sign, rate limits).
 
-1. src/server/rate-limit.ts: DB sliding window on RateLimitBucket (1-hour buckets, sum last N buckets). Helper assertRateLimit(key, limit, windowSeconds).
-2. src/server/services/rating.service.ts: createOrReplace(userId, input) implementing: restaurant ACTIVE check, owner-self-rating block (panel users included), rate limits (panel: 30/day, 10 per restaurant per day), RD get-or-create (CANDIDATE/USER/0.5), upsert Rating + RatingHistory, comment screening (phone/URL regex → status HELD + ReviewItem), burst detection (≥5 ratings in 24h from non-panel accounts < 7 days → HELD + ReviewItem SUSPICIOUS_RATINGS), then RankingService.recomputeOne. deleteOwn(userId, ratingId).
+1. src/server/rate-limit.ts exists since Phase 2 (buckets of max(5 s, window/12), assertRateLimit(key, rule, now)); add the docs/06 rating keys to RATE_LIMITS.
+2. src/server/services/rating.service.ts: createOrReplace(userId, input) implementing: restaurant ACTIVE check, owner-self-rating block (panel users included), rate limits (panel: 30/day, 10 per restaurant per day), RD get-or-create (CANDIDATE/USER/0.5), upsert Rating + RatingHistory, comment screening (phone/URL regex → the whole rating HELD + ReviewItem, Decided 2026-10-26), burst detection (≥5 ratings in 24h from non-panel accounts < 7 days → all of them HELD + one ReviewItem SUSPICIOUS_RATINGS), then RankingService.recomputeOne. deleteOwn(userId, ratingId).
 3. src/server/services/ranking.service.ts: constants file; weight(), bayes(), eligibility(cityLaunchedAt), recomputeOne(rdId) with the SQL from docs/04; promotion CANDIDATE → USER_CONFIRMED at 3 distinct raters. (recomputeAll comes in Phase 4.)
-4. Storage: POST /api/v1/uploads/sign using Supabase service key to create a signed upload URL in the public dish-photos bucket at dish-photos/<userId>/<cuid>.<ext> (random cuid name); validate content type (image/jpeg, image/webp) and size; client-side resize to ≤1600px re-encoded through canvas (no heavy libs), which strips EXIF/GPS. Menu photos use the private menus bucket.
+4. Storage: POST /api/v1/uploads/sign returns a presigned S3 PUT for Supabase Storage valid 10 minutes (ADR-14; Supabase's own signed upload URLs are fixed at 2 h) in the public dish-photos bucket at dish-photos/<userId>/<random>.<ext>; validate content type (image/jpeg, image/webp) and size; client-side resize to ≤1600px re-encoded through canvas (no heavy libs), which strips EXIF/GPS. Menu photos use the private menus bucket (Phase 5). Without the storage env vars, hide the photo step.
 5. /rate page (mobile-first): step 1 restaurant search (debounced, trigram endpoint, shows area) → step 2 dish picker (launch dishes as chips, search box with trigram, "Add a dish this restaurant serves" that only lists canonical dishes; "Can't find it? Propose a dish" → DISH_PROPOSAL) → step 3 score 1–10 big tap targets, optional taste/portion/value 1–5, optional photo and comment → submit via server action submitRating → success screen with current score/rank or "needs N more votes".
 6. Server actions: submitRating, deleteRating, addRestaurantDish, proposeDish — thin wrappers around services with Zod and revalidatePath for /[city]/best-[dish] and /[city]/r/[slug] (those pages come next phase; revalidate by path string now).
 7. Route handlers for the same operations under /api/v1 (ratings, restaurant-dishes, proposals, uploads/sign, me/ratings).
@@ -129,9 +129,9 @@ Implement Phase 3 from docs/08 using docs/04 (abuse rules, recomputeOne) and doc
 10. /admin/users (admin only): search by email, toggle isPanel through PATCH /api/v1/admin/users/:id; the panel flag is never accepted from any non-admin input.
 
 Acceptance:
-- On a 375px viewport, rating a dish for an existing restaurant takes 4 taps after search and finishes in < 30 s.
+- On a 360px viewport, rating a dish for an existing restaurant takes 4 taps after search and finishes in < 30 s (Playwright, tests/e2e/rate.spec.ts).
 - Second rating by the same user on the same dish replaces the first and adds a RatingHistory row.
-- The 5th rating within 24h from 5 new accounts is HELD and a SUSPICIOUS_RATINGS review item exists.
+- The 5th rating within 24h from 5 new accounts holds all five and a SUSPICIOUS_RATINGS review item lists them.
 - pnpm test passes.
 
 Commit as: feat(rating): rating flow, abuse controls, incremental ranking

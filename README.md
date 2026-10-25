@@ -43,7 +43,8 @@ production `pnpm start` exits with code 1 and names every missing variable.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application). Authorized JavaScript origin `http://localhost:3000`; authorized redirect URI `http://localhost:3000/api/auth/callback/google` |
 | `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
 | `CRON_SECRET` | output of `openssl rand -hex 32` |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (needed from Phase 3; local storage uses the preview project) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (local storage uses the preview project) |
+| `SUPABASE_S3_*` (four) | optional: dish photo uploads (Phase 3, docs/10 "Photo storage"); without them `/rate` hides the photo step |
 | `ANTHROPIC_*` | optional; used from Phases 1 and 5 |
 
 Commands (same as `CLAUDE.md`):
@@ -55,12 +56,13 @@ pnpm start            # production server (requires every required env var)
 pnpm lint             # eslint
 pnpm typecheck        # next typegen && tsc --noEmit
 pnpm test             # vitest; DB tests use their own database (see below), never the dev one
-pnpm test:e2e         # playwright, Chromium only
+pnpm test:e2e         # playwright, Chromium at 360 px: builds and starts the app on port 3100 against dishrank_test
 pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
 pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import
+pnpm dev:demo [-- --undo]                                     # local demo data (see below)
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # Phase 4
 ```
@@ -68,6 +70,18 @@ pnpm rankings:recompute                                       # Phase 4
 Tests never touch the dev database: `pnpm test` creates `dishrank_test` on the same server as `DATABASE_URL`
 (or uses `TEST_DATABASE_URL`), applies the migrations and seeds it, and test files that write empty its app
 tables. Any database whose name does not end in `_test` is refused (`tests/setup/test-database.ts`).
+`pnpm test:e2e` uses the same test database: `tests/e2e/setup/prepare.ts` migrates it, empties it and creates
+a restaurant, a diner and a real Better Auth session; the spec sets that session's signed cookie (no sign-in
+bypass in the app). It runs `next build` + `next start` on port 3100 (it writes `.next`, never `.next/dev`, so
+a running `pnpm dev` is fine).
+
+Demo data for trying the rating flow before any candidate is reviewed (needs `pnpm overture:sync -- --city=islamabad`
+first): `pnpm dev:demo` creates 30 restaurants from the most confident Overture candidates in F-7, F-6,
+Blue Area and G-9 (names end in "(demo)"), 13 demo users (`@dev-demo.invalid`, one on the panel), about 120
+ratings and one review item of each Phase 3 kind. Sign in with your own Google account to rate, see `/me`,
+or (as ADMIN) turn the panel on for yourself on `/admin/users` and work through `/admin/review`.
+`pnpm dev:demo -- --undo` removes all of it, also restaurants or dishes created from demo suggestions, and
+puts the candidates back to NEW. It refuses `NODE_ENV=production`, Vercel, and any database not on this machine.
 
 CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`: Node from `.nvmrc`, `pnpm install`,
 a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and test.

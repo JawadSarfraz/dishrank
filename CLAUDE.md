@@ -46,6 +46,7 @@ pnpm db:studio        # prisma studio
 pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import; never writes a restaurant
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
+pnpm dev:demo [-- --undo]                                     # local demo data in F-7/F-6/Blue Area/G-9; --undo removes it (local DB only)
 ```
 
 ## Non-negotiable rules

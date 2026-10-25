@@ -10,13 +10,14 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Admin/owner services take the current user and call `requireRole()` themselves (a page without a check still gets FORBIDDEN)
 - [ ] `src/env.ts` validates every required env var; a production start with one missing fails
 - [ ] All inputs parsed with Zod; string lengths bounded (comment ≤ 280, names ≤ 120)
-- [ ] Storage paths validated (prefix + owner); uploads only through Supabase signed upload URLs from `/api/v1/uploads/sign` (fixed 2 h validity, one path each); dish photos public under random cuid names, menus in the private bucket; max 5 MB; JPEG/WebP only
+- [ ] Storage paths validated (prefix + owner); uploads only through presigned S3 `PUT` URLs from `/api/v1/uploads/sign` (ADR-14: 10 minutes, one object key, content type signed); a rating's photo is checked on the server (exists, ≤ 5 MB, JPEG/WebP, on no other rating); dish photos public under `<userId>/<random>.<ext>`, menus in the private bucket
 - [ ] Client-side resize re-encodes every photo, so EXIF/GPS metadata never reaches storage (check one uploaded file with `exiftool`)
 - [ ] Rate limits applied to every write path and search
 - [ ] Owner cannot rate own restaurant; owner cannot see rater identities
 - [ ] Security headers set; no secrets in client bundles (`grep NEXT_PUBLIC` review)
 - [ ] `pnpm audit` has no high/critical
-- [ ] Dev-only scripts refuse to run when `NODE_ENV=production`
+- [ ] Dev-only scripts refuse to run when `NODE_ENV=production`; `pnpm dev:demo` also refuses Vercel and any database URL that is not on this machine
+- [ ] No sign-in bypass in app code: e2e tests sign in with a real session row and its signed cookie (`tests/e2e/setup/prepare.ts`)
 
 ## Data policy
 - [ ] No Google Places anywhere: no Places client, key, endpoint or cron (`tests/unit/ops/no-google-places.test.ts` passes); Google is only the sign-in provider
@@ -32,8 +33,9 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Rank numbers only for eligible rows; thresholds enforced in service, not UI
 - [ ] Bootstrap mode label shown when active
 - [ ] "Not enough votes yet" section present and ordered by votes
-- [ ] Re-rating replaces and logs history
-- [ ] Burst detection, HELD ratings excluded from compute
+- [ ] Re-rating replaces and logs history; an edit keeps HELD/HIDDEN
+- [ ] Burst detection (panel exempt) and comment holds; HELD ratings excluded from compute
+- [ ] `rankInCity` re-ranked after every recompute, status change and merge (docs/03 6f)
 - [ ] Stale marking works (test by backdating a row)
 - [ ] Copy contains no hygiene/health claims; dispute page linked in footer
 

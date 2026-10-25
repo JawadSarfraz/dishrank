@@ -537,7 +537,7 @@ model Rating {
   comment          String? // <= 280 chars
   photoPath        String? // storage path
   status           RatingStatus @default(ACTIVE)
-  weight           Float        @default(1) // trust weight at write time (decay applied at compute)
+  weight           Float        @default(1) // rater's trustScore at write time, for the record only; scores use trust at compute time (docs/04)
   ipHash           String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -711,9 +711,9 @@ CREATE INDEX IF NOT EXISTS dish_alias_trgm ON "DishAlias" USING gin ("alias" gin
 
 ## Invariants (enforce in services + tests)
 
-1. One active `Rating` per `(restaurantDishId, userId)`. Re-rating updates the row and appends `RatingHistory`.
+1. One active `Rating` per `(restaurantDishId, userId)`. Re-rating updates the row and appends `RatingHistory` (the previous score and comment, dated when that version was given). A re-rating keeps a `HELD` or `HIDDEN` status: only admins change it. `Rating.updatedAt` (the decay clock, docs/04) moves only when the user submits; status changes are written with plain SQL.
 2. `RestaurantDish.cityId` always equals `restaurant.cityId`.
-3. `RestaurantDish.score` is `NULL` until `ratingCount > 0`; `rankInCity` is `NULL` unless eligible.
+3. `RestaurantDish.score`, `rawMean` and `lastRatedAt` are `NULL` while no rating counts (`ratingCount = 0`); `rankInCity` is `NULL` unless eligible. `lastRatedAt` = the latest `updatedAt` of the counted ratings (ACTIVE, rater not banned).
 4. Owner cannot rate dishes of a restaurant they claimed (`claimedByUserId == userId` → reject).
 5. `User.trustScore` ∈ [0.3, 1.5].
 6. A `Restaurant` with `status != ACTIVE` never appears in rankings or search.
