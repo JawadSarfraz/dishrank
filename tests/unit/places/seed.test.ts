@@ -90,9 +90,7 @@ describe("planning run (ids only)", () => {
 
   it("stops at a page-1 client error (bad key, disabled API) instead of failing every area", async () => {
     const { client } = scriptedPlaces({
-      "Chicken Karahi F-6 Islamabad": [
-        new PlacesApiError(403, "PERMISSION_DENIED", "API key not valid"),
-      ],
+      "Chicken Karahi F-6 Islamabad": [new PlacesApiError(403, "PERMISSION_DENIED")],
     });
     const run = await runPlanningQueries(client, planSeedQueries(target));
     expect(run.stoppedEarly).toBe("Google answered 403 PERMISSION_DENIED");
@@ -103,13 +101,13 @@ describe("planning run (ids only)", () => {
     const { client } = scriptedPlaces({
       "Chicken Karahi F-6 Islamabad": [
         { places: [fakePlace("a")], next: "t2" },
-        new PlacesApiError(400, "INVALID_ARGUMENT", "Invalid page token"),
+        new PlacesApiError(400, "INVALID_ARGUMENT"),
       ],
       "Chicken Karahi F-7 Islamabad": [{ places: [fakePlace("e")] }],
     });
     const run = await runPlanningQueries(client, planSeedQueries(target));
     expect(run.uniquePlaces).toBe(2);
-    expect(run.areas[0]?.error).toBe("400 INVALID_ARGUMENT: Invalid page token");
+    expect(run.areas[0]?.error).toBe("400 INVALID_ARGUMENT");
     expect(run.stoppedEarly).toBeUndefined();
   });
 });

@@ -5,12 +5,12 @@ import Image from "next/image";
  * Maps logo, Google's own file unmodified (public/attribution: the non-outlined gray logo for a
  * plain background, from Google_Maps_Attribution_Assets.zip), 16-19 dp high, with clear space of
  * 10 dp left, right and top and 5 dp at the bottom, labelled "Google Maps", in the same container
- * as the data. Shown only on /admin/import, the one page that displays Google data.
+ * as the data: each result's Google block on /admin/import, the one page that displays Google data.
  */
 export function GoogleMapsAttribution() {
   return (
     <div className="flex flex-wrap items-center text-xs text-muted-foreground">
-      <span>Search results from</span>
+      <span>From</span>
       <span className="inline-flex px-[10px] pt-[10px] pb-[5px]">
         <Image
           src="/attribution/google-maps-logo-gray.svg"

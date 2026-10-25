@@ -54,6 +54,29 @@ describe("/admin/import live search (docs/07 §2, test DB)", () => {
     expect(box.low.lat < area.lat && area.lat < box.high.lat).toBe(true);
     expect(box.low.lng < area.lng && area.lng < box.high.lng).toBe(true);
     expect(page.results.map((r) => r.status)).toEqual(["imported", "possible_duplicate", "new"]);
+    // Nothing derived (no suggested area, no distance): exactly these fields, per result and page.
+    for (const result of page.results) {
+      expect(Object.keys(result).sort()).toEqual([
+        "attributions",
+        "displayName",
+        "duplicates",
+        "existing",
+        "formattedAddress",
+        "googlePlaceId",
+        "lat",
+        "lng",
+        "mapsUrl",
+        "status",
+      ]);
+    }
+    expect(Object.keys(page).sort()).toEqual([
+      "area",
+      "city",
+      "dish",
+      "fetchedAt",
+      "nextPageToken",
+      "results",
+    ]);
     expect(page.results[0]?.existing).toMatchObject({ id: linked.id, hasDish: false });
     expect(page.results[1]?.duplicates.map((d) => [d.name, d.areaName, d.similarity])).toEqual([
       ["Fixture Karahi", "F-7", 0.65], // 15 of 23 trigrams shared
@@ -90,7 +113,7 @@ describe("/admin/import live search (docs/07 §2, test DB)", () => {
     const { area } = await place("islamabad", "f-7");
     const input = { dishSlug: "chicken-karahi", areaId: area.id };
     const { client } = scriptedPlaces({
-      [QUERY]: [new PlacesApiError(403, "PERMISSION_DENIED", "Fixture error detail")],
+      [QUERY]: [new PlacesApiError(403, "PERMISSION_DENIED")],
     });
     await expect(searchPlacesForImport(USER, input, client)).rejects.toMatchObject({
       code: "FORBIDDEN",
@@ -101,7 +124,56 @@ describe("/admin/import live search (docs/07 §2, test DB)", () => {
     const error = await searchPlacesForImport(ADMIN, input, client).catch((e: unknown) => e);
     expect(error).toMatchObject({ code: "PLACES_ERROR", status: 502 });
     expect((error as Error).message).toContain("403 PERMISSION_DENIED");
-    expect((error as Error).message).not.toContain("Fixture error detail");
+  });
+
+  it("compares names with restaurants of every area inside the search rectangle, in both cities", async () => {
+    const { area: f7 } = await place("islamabad", "f-7");
+    const { area: i10 } = await place("islamabad", "i-10");
+    await makeRestaurant("Fixture Karahi", { areaSlug: "f-6" }); // F-6 centre is inside the F-7 box
+    await makeRestaurant("Fixture Karahi", { areaSlug: "g-9" }); // G-9 is outside it
+    await makeRestaurant("Fixture Karahi", {
+      citySlug: "rawalpindi",
+      areaSlug: "satellite-town", // inside the I-10 box, across the city line
+      googlePlaceId: "ChIJfixtureother",
+    });
+    const near = scriptedPlaces({
+      [QUERY]: [{ places: [fakePlace("x", { displayName: "Fixture Karahi" })] }],
+    });
+    const f7Page = await searchPlacesForImport(
+      ADMIN,
+      { dishSlug: "chicken-karahi", areaId: f7.id },
+      near.client,
+    );
+    expect(f7Page.results[0]?.duplicates.map((d) => [d.areaName, d.cityName])).toEqual([
+      ["F-6", "Islamabad"],
+    ]);
+
+    const twin = scriptedPlaces({
+      "Chicken Karahi I-10 Islamabad": [
+        { places: [fakePlace("y", { displayName: "Fixture Karahi" })] },
+      ],
+    });
+    const i10Page = await searchPlacesForImport(
+      ADMIN,
+      { dishSlug: "chicken-karahi", areaId: i10.id },
+      twin.client,
+    );
+    expect(i10Page.results[0]?.duplicates).toMatchObject([
+      { areaName: "Satellite Town", cityName: "Rawalpindi", otherGooglePlace: true },
+    ]);
+  });
+
+  it("shows a result without a location but marks it as not importable", async () => {
+    const { area } = await place("islamabad", "f-7");
+    const { client } = scriptedPlaces({
+      [QUERY]: [{ places: [fakePlace("noloc", { lat: null, lng: null })] }],
+    });
+    const page = await searchPlacesForImport(
+      ADMIN,
+      { dishSlug: "chicken-karahi", areaId: area.id },
+      client,
+    );
+    expect(page.results).toMatchObject([{ status: "no_location", lat: null, lng: null }]);
   });
 
   it("Create saves the typed name and address, the place id, location and fetch time, and a CANDIDATE dish", async () => {

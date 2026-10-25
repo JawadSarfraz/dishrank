@@ -4,8 +4,14 @@
 import { z } from "zod";
 
 export const PLACES_POLICY = {
-  /** Google lat/lng may be kept at most 30 days; older Google data cannot be saved. */
+  /** Google lat/lng may be kept at most 30 days (Places Service Specific Terms). */
   maxAgeDays: 30,
+  /**
+   * Create and Link accept a search result at most this old (a live result is minutes old), so
+   * coordinates saved even from a stale page are refreshed long before the 30-day limit.
+   */
+  // DECISION-PENDING: 24 hours.
+  maxSaveAgeHours: 24,
   /** refresh-places selects rows whose googleSyncedAt is NULL or older than this. */
   refreshAfterDays: 25,
   /** A failed refresh (other than NOT_FOUND) nulls lat/lng once the row is this old. */
@@ -31,7 +37,7 @@ export type FetchedAtCheck =
 
 const isoDateTime = z.iso.datetime({ offset: true });
 
-/** docs/07 §2: a missing, unparseable, future or older-than-30-days fetchedAt cannot be imported. */
+/** docs/07 §2: a missing, unparseable, future or older-than-24-hours fetchedAt cannot be saved. */
 export function checkFetchedAt(value: string | null | undefined, now: Date): FetchedAtCheck {
   if (!value || !value.trim()) return { ok: false, reason: "fetchedAt is missing" };
   if (!isoDateTime.safeParse(value.trim()).success) {
@@ -42,10 +48,11 @@ export function checkFetchedAt(value: string | null | undefined, now: Date): Fet
   if (ageDays * 24 * 60 < -PLACES_POLICY.futureToleranceMinutes) {
     return { ok: false, reason: "fetchedAt is in the future" };
   }
-  if (ageDays > PLACES_POLICY.maxAgeDays) {
+  if (ageDays * 24 > PLACES_POLICY.maxSaveAgeHours) {
+    const age = ageDays >= 2 ? `${Math.floor(ageDays)} days` : `${Math.floor(ageDays * 24)} hours`;
     return {
       ok: false,
-      reason: `Fetched ${Math.floor(ageDays)} days ago: Google data older than ${PLACES_POLICY.maxAgeDays} days cannot be saved. Search again in /admin/import.`,
+      reason: `Fetched ${age} ago: Google data older than ${PLACES_POLICY.maxSaveAgeHours} hours cannot be saved. Search again in /admin/import.`,
     };
   }
   return { ok: true, fetchedAt, ageDays };

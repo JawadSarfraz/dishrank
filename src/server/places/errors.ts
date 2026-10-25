@@ -1,15 +1,14 @@
 /**
- * A failed Places API call. `describe()` gives only the HTTP status and Google's status code
- * ("404 NOT_FOUND"): the one form stored in review items or written to logs. Google's free-text
- * error message stays in `message`, for the operator's terminal only (pnpm seed:places).
+ * A failed Places API call: the HTTP status and Google's status code only ("404 NOT_FOUND").
+ * Google's free-text error message is never read or kept, so no error can carry Google text into
+ * a review item, a log or a terminal (CLAUDE.md rule 2).
  */
 export class PlacesApiError extends Error {
   constructor(
     public readonly httpStatus: number,
     public readonly googleStatus: string,
-    message: string,
   ) {
-    super(message);
+    super(`Places API answered ${httpStatus} ${googleStatus}`);
     this.name = "PlacesApiError";
   }
 
@@ -26,20 +25,16 @@ export class PlacesBudgetError extends Error {
   }
 }
 
-const MAX_MESSAGE = 300;
-
-/** Google APIs answer errors as `{ error: { code, message, status } }`; anything else is summarised. */
+/** Google APIs answer errors as `{ error: { code, message, status } }`; only `status` is read. */
 export async function readGoogleError(response: Response): Promise<PlacesApiError> {
   let status = `HTTP_${response.status}`;
-  let message = response.statusText || "request failed";
   try {
-    const body = (await response.json()) as { error?: { status?: unknown; message?: unknown } };
+    const body = (await response.json()) as { error?: { status?: unknown } };
     if (typeof body.error?.status === "string" && /^[A-Z_]{1,64}$/.test(body.error.status)) {
       status = body.error.status;
     }
-    if (typeof body.error?.message === "string") message = body.error.message;
   } catch {
-    // not JSON: keep the HTTP status line
+    // not JSON: keep the HTTP status
   }
-  return new PlacesApiError(response.status, status, message.slice(0, MAX_MESSAGE));
+  return new PlacesApiError(response.status, status);
 }

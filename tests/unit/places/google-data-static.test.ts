@@ -49,8 +49,40 @@ describe("Google data rules in the source", () => {
     expect(read("src/components/admin/RestaurantCreateFields.tsx")).not.toMatch(
       /displayName|formattedAddress/,
     );
-    expect(read("src/components/admin/ImportClient.tsx")).not.toMatch(
-      /defaultValue=\{[^}]*(displayName|formattedAddress)/,
+    // Google's name, address and credits may appear only where the result card displays them:
+    // any other use (a Create payload, a prefill, a prop) adds a line and fails here.
+    const googleLines = read("src/components/admin/ImportClient.tsx")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => /displayName|formattedAddress|attributions/.test(line));
+    expect(googleLines).toEqual([
+      '<p className="font-medium">{result.displayName || "(no name)"}</p>',
+      '<p className="text-sm text-muted-foreground">{result.formattedAddress || "(no address)"}</p>',
+      "{result.attributions.length > 0 && (",
+      "{result.attributions.map((a, i) => (",
+    ]);
+  });
+
+  it("keeps no module-level store that could hold Google results between requests", () => {
+    const googleModules = files.filter(
+      (f) =>
+        f.startsWith(path.join("src", "server", "places")) ||
+        /(import\.service|places-seed|places-query|places-refresh\.service)\.ts$/.test(f),
     );
+    expect(googleModules.length).toBeGreaterThan(5);
+    const offenders = googleModules.filter((f) =>
+      read(f)
+        .split("\n")
+        .some((line) =>
+          /^(export )?let |^(export )?const \w+ = new (Map|Set|WeakMap)[<(]/.test(line),
+        ),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("turns off the dev-only Next.js caches and logs that would keep Google responses", () => {
+    const config = read("next.config.ts");
+    expect(config).toMatch(/serverComponentsHmrCache:\s*false/); // HMR fetch cache ignores no-store
+    expect(config).toMatch(/serverFunctions:\s*false/); // would print action args (page tokens)
   });
 });

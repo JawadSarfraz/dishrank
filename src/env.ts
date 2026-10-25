@@ -24,7 +24,7 @@ const schema = z.object({
   ADMIN_EMAIL: z.email().optional(),
 
   CRON_SECRET: z.string().min(32, "must be at least 32 characters"),
-  // Phase 2: seed script and the daily refresh-places cron (docs/07).
+  // Phase 2: /admin/import live search, the planning script and the daily refresh-places cron (docs/07).
   GOOGLE_PLACES_API_KEY: z.string().min(1),
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
 

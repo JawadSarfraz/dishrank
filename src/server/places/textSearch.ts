@@ -7,12 +7,13 @@ import type { LatLng } from "@/lib/geo";
 export const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
 /**
- * /admin/import: id, displayName, formattedAddress and location (Text Search Pro). Nothing from
- * Enterprise (rating, userRatingCount, priceLevel, phone, website, hours, reviews). nextPageToken
- * must be in the mask, otherwise the response carries no token and only page 1 comes back.
+ * /admin/import: id, displayName, formattedAddress and location (Text Search Pro), plus the data
+ * provider attributions Google requires to be shown with a result (IDs Only group, no extra
+ * charge). Nothing from Enterprise (rating, userRatingCount, priceLevel, phone, website, hours,
+ * reviews). nextPageToken must be in the mask, otherwise only page 1 ever comes back.
  */
 export const TEXT_SEARCH_FIELD_MASK =
-  "places.id,places.displayName,places.formattedAddress,places.location,nextPageToken";
+  "places.id,places.displayName,places.formattedAddress,places.location,places.attributions,nextPageToken";
 
 /** pnpm seed:places: place ids only (Text Search Essentials IDs Only, no charge). */
 export const TEXT_SEARCH_IDS_FIELD_MASK = "places.id,nextPageToken";
@@ -75,14 +76,16 @@ export type PlaceResult = {
   googlePlaceId: string;
   displayName: string;
   formattedAddress: string;
-  lat: number;
-  lng: number;
+  /** null when Google gives no location: shown, but it cannot be imported. */
+  lat: number | null;
+  lng: number | null;
+  /** Data providers Google requires to be credited next to this result (display only). */
+  attributions: { provider: string; providerUri: string | null }[];
 };
 
 export type TextSearchPage = {
+  /** Every result Google returned, in Google's order (search results are shown unmodified). */
   places: PlaceResult[];
-  /** Results without a location: they cannot be linked to a restaurant, so they are dropped. */
-  withoutLocation: number;
   nextPageToken?: string;
   /** Time the response arrived: googleSyncedAt for a Create or Link from this page. */
   fetchedAt: Date;
@@ -102,6 +105,9 @@ const responseSchema = z.object({
         displayName: z.object({ text: z.string() }).optional(),
         formattedAddress: z.string().optional(),
         location: z.object({ latitude: z.number(), longitude: z.number() }).optional(),
+        attributions: z
+          .array(z.object({ provider: z.string(), providerUri: z.string().optional() }))
+          .optional(),
       }),
     )
     .optional(),
@@ -110,22 +116,18 @@ const responseSchema = z.object({
 
 export function parseTextSearchResponse(json: unknown, fetchedAt: Date): TextSearchPage {
   const body = responseSchema.parse(json);
-  const places: PlaceResult[] = [];
-  let withoutLocation = 0;
-  for (const p of body.places ?? []) {
-    if (!p.location) {
-      withoutLocation++;
-      continue;
-    }
-    places.push({
-      googlePlaceId: p.id,
-      displayName: p.displayName?.text ?? "",
-      formattedAddress: p.formattedAddress ?? "",
-      lat: p.location.latitude,
-      lng: p.location.longitude,
-    });
-  }
-  return { places, withoutLocation, nextPageToken: body.nextPageToken || undefined, fetchedAt };
+  const places = (body.places ?? []).map((p): PlaceResult => ({
+    googlePlaceId: p.id,
+    displayName: p.displayName?.text ?? "",
+    formattedAddress: p.formattedAddress ?? "",
+    lat: p.location?.latitude ?? null,
+    lng: p.location?.longitude ?? null,
+    attributions: (p.attributions ?? []).map((a) => ({
+      provider: a.provider,
+      providerUri: a.providerUri ?? null,
+    })),
+  }));
+  return { places, nextPageToken: body.nextPageToken || undefined, fetchedAt };
 }
 
 const idsSchema = z.object({

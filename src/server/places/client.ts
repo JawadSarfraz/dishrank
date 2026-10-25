@@ -22,6 +22,8 @@ export type PlacesClientOptions = {
   /** Attempts per request; 429 and 5xx (and network failures) are retried with backoff. */
   attempts?: number;
   baseDelayMs?: number;
+  /** Per attempt; a timed-out attempt counts as a network failure and is retried. */
+  timeoutMs?: number;
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
@@ -46,6 +48,7 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
   const now = options.now ?? (() => new Date());
   const attempts = options.attempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 1000;
+  const timeoutMs = options.timeoutMs ?? 10_000;
   let calls = 0;
 
   const backoff = (attempt: number) =>
@@ -59,20 +62,20 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
       calls++;
       let response: Response;
       try {
-        response = await doFetch(url, init);
-      } catch (cause) {
+        // A hung request would otherwise run until the function time limit.
+        response = await doFetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      } catch {
         if (attempt < attempts) {
           await sleep(backoff(attempt));
           continue;
         }
-        const message = cause instanceof Error ? cause.message : "network error";
-        throw new PlacesApiError(0, "NETWORK_ERROR", message);
+        throw new PlacesApiError(0, "NETWORK_ERROR");
       }
       if (response.ok) {
         try {
           return { json: await response.json(), at: now() };
         } catch {
-          throw new PlacesApiError(response.status, "BAD_RESPONSE", "response is not JSON");
+          throw new PlacesApiError(response.status, "BAD_RESPONSE");
         }
       }
       const error = await readGoogleError(response);
@@ -88,7 +91,7 @@ export function createPlacesClient(options: PlacesClientOptions): PlacesClient {
     try {
       return parser(json, at);
     } catch {
-      throw new PlacesApiError(200, "BAD_RESPONSE", "unexpected Places response");
+      throw new PlacesApiError(200, "BAD_RESPONSE");
     }
   }
 

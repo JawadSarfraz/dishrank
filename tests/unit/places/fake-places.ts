@@ -17,6 +17,7 @@ export function fakePlace(id: string, over: Partial<PlaceResult> = {}): PlaceRes
     formattedAddress: `${id} Fixture Road, Test Sector`,
     lat: 33.72,
     lng: 73.05,
+    attributions: [],
     ...over,
   };
 }

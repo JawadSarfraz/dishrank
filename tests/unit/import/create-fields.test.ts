@@ -16,9 +16,16 @@ describe("Create form (docs/07 §2)", () => {
     const html = renderToStaticMarkup(
       createElement(RestaurantCreateFields, {
         idPrefix: "t",
-        areas: [
-          { id: "a1", name: "F-7" },
-          { id: "a2", name: "G-9" },
+        cities: [
+          {
+            id: "c1",
+            name: "Islamabad",
+            areas: [
+              { id: "a1", name: "F-7" },
+              { id: "a2", name: "G-9" },
+            ],
+          },
+          { id: "c2", name: "Rawalpindi", areas: [{ id: "a3", name: "Saddar" }] },
         ],
         defaultAreaId: "a2",
         pending: false,
@@ -31,6 +38,9 @@ describe("Create form (docs/07 §2)", () => {
     expect(nameInput).not.toMatch(/value=/);
     expect(html).toMatch(/<textarea[^>]*name="address"[^>]*><\/textarea>/);
     expect(html).toMatch(/<option value="a2" selected="">G-9<\/option>/);
+    expect(html).toMatch(
+      /<optgroup label="Rawalpindi"><option value="a3">Saddar<\/option><\/optgroup>/,
+    );
     expect(html).toContain("Type the name and address yourself");
     expect(html).toContain("nothing here is copied from Google");
   });

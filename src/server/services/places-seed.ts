@@ -125,8 +125,7 @@ export async function runPlanningQueries(
         result.error = "call budget reached";
         stoppedEarly = `call budget reached after ${error.calls} calls`;
       } else if (error instanceof PlacesApiError) {
-        // Google's error text goes to the operator's terminal only; it is never stored or logged.
-        result.error = `${error.describe()}: ${error.message}`;
+        result.error = error.describe(); // status codes only: Google's error text is never kept
         if (result.pages === 0 && error.httpStatus >= 400 && error.httpStatus < 500) {
           stoppedEarly = `Google answered ${error.describe()}`;
         }

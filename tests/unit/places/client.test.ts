@@ -53,7 +53,7 @@ describe("Places client", () => {
     const error = await places.textSearch(search).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PlacesApiError);
     expect((error as PlacesApiError).describe()).toBe("503 UNAVAILABLE");
-    expect((error as PlacesApiError).message).toBe("Try again"); // terminal output only
+    expect((error as PlacesApiError).message).not.toContain("Try again"); // Google's text is never kept
     expect(places.calls).toBe(3);
     expect(sleeps).toHaveLength(2);
     expect(sleeps[1]).toBeGreaterThan(sleeps[0]!); // exponential
@@ -64,7 +64,24 @@ describe("Places client", () => {
     const error = (await places.textSearch(search).catch((e: unknown) => e)) as PlacesApiError;
     expect(error.describe()).toBe("400 INVALID_ARGUMENT");
     expect(JSON.stringify(error) + error.describe() + error.message).not.toContain(KEY);
+    expect(error.message).not.toContain("Invalid pageToken"); // Google's error text is never kept
     expect(places.calls).toBe(1);
+  });
+
+  it("gives up on a hung request after the timeout instead of waiting for the function limit", async () => {
+    const hanging = (async (_url: unknown, init?: RequestInit) =>
+      new Promise((_resolve, reject) =>
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)),
+      )) as typeof fetch;
+    const places = createPlacesClient({
+      apiKey: KEY,
+      fetch: hanging,
+      timeoutMs: 5,
+      sleep: async () => {},
+    });
+    const error = (await places.textSearch(search).catch((e: unknown) => e)) as PlacesApiError;
+    expect(error.describe()).toBe("0 NETWORK_ERROR");
+    expect(places.calls).toBe(3);
   });
 
   it("retries a network failure", async () => {

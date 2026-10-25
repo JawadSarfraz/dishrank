@@ -49,8 +49,8 @@ describe("RestaurantService (test DB)", () => {
     ]);
   });
 
-  it("stores googleSyncedAt = fetchedAt and refuses Google data older than 30 days", async () => {
-    const fetchedAt = daysAgo(3);
+  it("stores googleSyncedAt = fetchedAt and refuses Google data older than 24 hours", async () => {
+    const fetchedAt = daysAgo(0.1);
     const { restaurant } = await createRestaurant(
       ADMIN,
       await input("Fixture Pulao House", {
@@ -66,7 +66,7 @@ describe("RestaurantService (test DB)", () => {
         ADMIN,
         await input("Old Row", {
           googlePlaceId: "ChIJ-old-00001",
-          fetchedAt: daysAgo(31).toISOString(),
+          fetchedAt: daysAgo(1.5).toISOString(),
         }),
       ),
     ).rejects.toMatchObject({ code: "GOOGLE_DATA_TOO_OLD" });

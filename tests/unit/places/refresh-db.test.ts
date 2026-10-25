@@ -15,7 +15,7 @@ const ok = (lat: number, lng: number, at = NOW): PlaceDetailsResult => ({
   fetchedAt: at,
 });
 const notFound: PlaceDetailsResult = { kind: "not_found" };
-const unavailable = new PlacesApiError(503, "UNAVAILABLE", "Backend error");
+const unavailable = new PlacesApiError(503, "UNAVAILABLE");
 
 function fakePlaces(answers: Record<string, PlaceDetailsResult | PlacesApiError>) {
   const asked: string[] = [];

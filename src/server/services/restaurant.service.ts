@@ -43,7 +43,7 @@ import {
   moveMenuUploads,
   moveOpenReviewItems,
 } from "@/server/repositories/moderation.repo";
-import { inTransaction, isUniqueViolation, type Tx } from "@/server/repositories/transaction";
+import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
 import type {
   AdminRestaurantInput,
@@ -51,6 +51,7 @@ import type {
   AdminRestaurantUpdateInput,
   RestaurantSearchQuery,
 } from "@/server/validation";
+import { rethrowConflict } from "./conflict";
 import { cleanText } from "./matching/normalize";
 import { ageInDays, checkFetchedAt } from "./places-policy";
 import {
@@ -107,17 +108,6 @@ export function pickUniqueSlug(base: string, taken: ReadonlySet<string>): string
 
 /** Import rows create or link this RestaurantDish (docs/07 table: Google seed = CANDIDATE, 0.4). */
 export const IMPORT_DISH = { source: "GOOGLE_SEARCH", confidence: 0.4 } as const;
-
-function conflict(error: unknown): never {
-  if (isUniqueViolation(error)) {
-    throw new AppError(
-      "CONFLICT",
-      "This changed at the same time elsewhere. Reload and try again.",
-      409,
-    );
-  }
-  throw error;
-}
 
 /** Inside a transaction: checks area and Google place, picks a unique slug, inserts. */
 async function createRestaurantTx(input: AdminRestaurantInput, tx: Tx, now: Date) {
@@ -198,7 +188,7 @@ export async function createRestaurant(
       ? await ensureImportedDish(restaurant, options.dishId, tx)
       : null;
     return { restaurant, restaurantDish };
-  }).catch(conflict);
+  }).catch(rethrowConflict);
   logEvent("restaurant.create", {
     userId: admin.id,
     entityId: result.restaurant.id,
@@ -343,6 +333,11 @@ export async function searchRestaurantsForAdmin(
 /** Merged restaurants point to their survivor; chains are followed this many hops at most. */
 const MAX_MERGE_HOPS = 10;
 
+/**
+ * The public view of a restaurant. It carries no coordinates: for a Google-linked restaurant they
+ * are Google's, which may be cached for our own use but not re-served as data (Maps Platform Terms
+ * 3.2.3(a)); Phase 4 decides how maps and distance work (docs/OPEN-QUESTIONS.md).
+ */
 export type PublicRestaurant = {
   id: string;
   slug: string;
@@ -350,8 +345,6 @@ export type PublicRestaurant = {
   city: { slug: string; name: string };
   area: { slug: string; name: string } | null;
   address: string | null;
-  lat: number | null;
-  lng: number | null;
   phone: string | null;
   priceBand: number | null;
 };
@@ -423,8 +416,6 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
       city: { slug: restaurant.city.slug, name: restaurant.city.name },
       area: restaurant.area ? { slug: restaurant.area.slug, name: restaurant.area.name } : null,
       address: restaurant.address,
-      lat: restaurant.lat,
-      lng: restaurant.lng,
       phone: restaurant.phone,
       priceBand: restaurant.priceBand,
     },
@@ -677,7 +668,7 @@ export async function mergeRestaurants(
     if (Object.keys(targetUpdate).length > 0)
       await updateRestaurantById(targetId, targetUpdate, tx);
     return out;
-  }, 60_000).catch(conflict);
+  }, 60_000).catch(rethrowConflict);
 
   await afterCommit(result.recomputeIds);
   logEvent("restaurant.merge", {

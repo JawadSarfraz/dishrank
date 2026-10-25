@@ -8,6 +8,7 @@ import {
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { requirePageRole } from "@/server/auth";
+import { googleMapsUrl } from "@/server/places";
 import { getRestaurantForAdmin } from "@/server/services/restaurant.service";
 
 const dateFormat = new Intl.DateTimeFormat("en-PK", {
@@ -64,11 +65,25 @@ export default async function AdminRestaurantPage({
         <h2 className="text-lg font-semibold">Google place</h2>
         {r.googlePlaceId ? (
           <>
-            <p>Linked (place id {r.googlePlaceId}).</p>
             <p>
+              Linked (place id {r.googlePlaceId}).{" "}
+              <a
+                href={googleMapsUrl(
+                  r.googlePlaceId,
+                  [r.name, r.area?.name, r.city.name].filter(Boolean).join(" "),
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                Open in Google Maps
+              </a>
+            </p>
+            <p>
+              {/* Google's coordinates are kept for our own use only and are not shown here. */}
               {r.lat === null
                 ? "Location cleared (refresh failed or too old): see the review queue."
-                : `Location ${r.lat.toFixed(5)}, ${r.lng?.toFixed(5)}`}
+                : "Location saved from Google"}
               {r.googleSyncedAt &&
                 ` · from a Google call on ${dateFormat.format(r.googleSyncedAt)} (${syncedDays} days ago; refreshed after 25 days)`}
             </p>

@@ -27,7 +27,7 @@ describe("Text Search request (docs/07 §1-2)", () => {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": KEY,
       "X-Goog-FieldMask":
-        "places.id,places.displayName,places.formattedAddress,places.location,nextPageToken",
+        "places.id,places.displayName,places.formattedAddress,places.location,places.attributions,nextPageToken",
     });
     expect(JSON.parse(init.body)).toEqual({
       textQuery: "Chicken Karahi F-7 Islamabad",
@@ -48,12 +48,13 @@ describe("Text Search request (docs/07 §1-2)", () => {
     expect(buildTextSearchBody(params)).not.toHaveProperty("locationBias");
   });
 
-  it("keeps the import mask to id, name, address and location, and the planning mask to ids", () => {
+  it("keeps the import mask to id, name, address, location and attributions; the planning mask to ids", () => {
     expect(TEXT_SEARCH_FIELD_MASK.split(",")).toEqual([
       "places.id",
       "places.displayName",
       "places.formattedAddress",
       "places.location",
+      "places.attributions", // data providers Google requires us to credit (IDs Only group)
       "nextPageToken", // without it only page 1 ever comes back
     ]);
     expect(TEXT_SEARCH_IDS_FIELD_MASK).toBe("places.id,nextPageToken");
@@ -101,6 +102,7 @@ describe("Text Search responses", () => {
         displayName: { text: "Fixture Karahi House", languageCode: "en" },
         formattedAddress: "Plot 1, Fixture Road",
         location: { latitude: 33.72, longitude: 73.05 },
+        attributions: [{ provider: "Fixture Data Co", providerUri: "https://fixture.example" }],
         rating: 4.9,
       },
       { id: "p2", displayName: { text: "No location" } },
@@ -108,7 +110,7 @@ describe("Text Search responses", () => {
     nextPageToken: "tok-2",
   };
 
-  it("maps results for display and keeps the page token and fetch time", () => {
+  it("maps every result for display, in Google's order, with the page token and fetch time", () => {
     const page = parseTextSearchResponse(fixture, at);
     expect(page.places).toEqual([
       {
@@ -117,9 +119,19 @@ describe("Text Search responses", () => {
         formattedAddress: "Plot 1, Fixture Road",
         lat: 33.72,
         lng: 73.05,
+        attributions: [{ provider: "Fixture Data Co", providerUri: "https://fixture.example" }],
+      },
+      {
+        // kept, not dropped (search results are shown unmodified); it just cannot be imported
+        googlePlaceId: "p2",
+        displayName: "No location",
+        formattedAddress: "",
+        lat: null,
+        lng: null,
+        attributions: [],
       },
     ]);
-    expect(page).toMatchObject({ withoutLocation: 1, nextPageToken: "tok-2", fetchedAt: at });
+    expect(page).toMatchObject({ nextPageToken: "tok-2", fetchedAt: at });
   });
 
   it("reads only place ids for the planning tool, ignoring any name or address sent back", () => {

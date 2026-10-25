@@ -7,6 +7,8 @@ const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text
 
 export type CreateFieldsValues = {
   name: string;
+  /** The city of the chosen area. */
+  cityId: string;
   areaId: string;
   address: string;
   phone?: string;
@@ -21,14 +23,15 @@ export type CreateFieldsValues = {
  */
 export function RestaurantCreateFields({
   idPrefix,
-  areas,
+  cities,
   defaultAreaId,
   pending,
   error,
   onSubmit,
 }: {
   idPrefix: string;
-  areas: { id: string; name: string }[];
+  /** Both cities with their areas: a search near the city line can find a place in the other city. */
+  cities: { id: string; name: string; areas: { id: string; name: string }[] }[];
   /** The area that was searched; the admin can change it. */
   defaultAreaId: string;
   pending: boolean;
@@ -41,9 +44,11 @@ export function RestaurantCreateFields({
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const value = (key: string) => String(form.get(key) ?? "").trim();
+    const areaId = value("areaId");
     onSubmit({
       name: value("name"),
-      areaId: value("areaId"),
+      cityId: cities.find((c) => c.areas.some((a) => a.id === areaId))?.id ?? "",
+      areaId,
       address: value("address"),
       ...(value("phone") ? { phone: value("phone") } : {}),
       ...(value("priceBand") ? { priceBand: Number(value("priceBand")) } : {}),
@@ -65,17 +70,21 @@ export function RestaurantCreateFields({
         <Input id={fieldId("name")} name="name" required maxLength={120} autoComplete="off" />
       </label>
       <label htmlFor={fieldId("area")} className="flex flex-col gap-1 text-sm">
-        Area
+        Area (where the restaurant really is; results can come from neighbouring areas)
         <select
           id={fieldId("area")}
           name="areaId"
           defaultValue={defaultAreaId}
           className={selectClass}
         >
-          {areas.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
+          {cities.map((c) => (
+            <optgroup key={c.id} label={c.name}>
+              {c.areas.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>

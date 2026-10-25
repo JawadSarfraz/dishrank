@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { searchRestaurantsAdminAction } from "@/server/actions/admin-restaurants";
@@ -32,11 +32,18 @@ export function RestaurantPicker({
   const [results, setResults] = useState<PickedRestaurant[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const inputId = useId();
 
   function search(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     startTransition(async () => {
-      const res = await searchRestaurantsAdminAction({ cityId, q, excludeId });
+      let res;
+      try {
+        res = await searchRestaurantsAdminAction({ cityId, q, excludeId });
+      } catch {
+        setError("The search did not reach the server. Try again.");
+        return;
+      }
       if (res.error) {
         setError(describeActionError(res.error));
         setResults(null);
@@ -50,11 +57,11 @@ export function RestaurantPicker({
   return (
     <div className="flex flex-col gap-2">
       <form onSubmit={search} className="flex gap-2" role="search">
-        <label className="sr-only" htmlFor={`picker-${excludeId ?? cityId}`}>
+        <label className="sr-only" htmlFor={inputId}>
           Restaurant name
         </label>
         <Input
-          id={`picker-${excludeId ?? cityId}`}
+          id={inputId}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by name"

@@ -1,7 +1,9 @@
 // /admin/import (docs/07 §2): live Places search, then Create / Link / Skip one result at a time.
-// Google names and addresses are display only: they are returned to the admin's browser and
-// nothing else. They are never saved, logged, cached or used to prefill (Maps Platform Terms
-// 3.2.3(a)(iii)); only the place id, lat/lng and fetch time are saved, on Create or Link.
+// Google names, addresses and data-provider credits are display only: they are returned to the
+// admin's browser and nothing else. They are never saved, logged, cached or used to prefill (Maps
+// Platform Terms 3.2.3(a)(iii)); only the place id, lat/lng and fetch time are saved, on Create or
+// Link. Google's coordinates are never an input for anything here (3.2.3(c)(iv)).
+import type { LatLng } from "@/lib/geo";
 import { similarity } from "@/lib/trigram";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
@@ -16,7 +18,7 @@ import {
   findRestaurantByGooglePlaceId,
   findRestaurantById,
   findRestaurantsByGooglePlaceIds,
-  listRestaurantsForDedupe,
+  listRestaurantsInAreas,
   lockRestaurants,
   updateRestaurantById,
 } from "@/server/repositories/restaurant.repo";
@@ -25,13 +27,14 @@ import { findDishBySlug, listDishesForPicker } from "@/server/repositories/taxon
 import { inTransaction } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
 import type { ImportCreateInput, ImportLinkInput, PlacesSearchInput } from "@/server/validation";
+import { rethrowConflict } from "./conflict";
 import { cleanText } from "./matching/normalize";
 import { checkFetchedAt } from "./places-policy";
 import { buildPlacesSearch } from "./places-query";
 import { createRestaurant, ensureImportedDish } from "./restaurant.service";
 
 export const IMPORT_RULES = {
-  /** docs/07 §2: trigram similarity on the name within the searched area. */
+  /** docs/07 §2: trigram similarity on the name, against restaurants near the searched area. */
   nameSimilarity: 0.6,
   maxDuplicates: 3,
 } as const;
@@ -41,24 +44,19 @@ export type DedupeRestaurant = {
   slug: string;
   name: string;
   aliases: string[];
-  areaId: string | null;
   googlePlaceId: string | null;
   area: { name: string } | null;
+  city: { name: string };
 };
 
 /**
- * Our restaurants in the same area whose name (or another name) has trigram similarity ≥ 0.6 with
- * a result's name. The result's name is compared in memory only.
+ * Our restaurants whose name (or another name) has trigram similarity ≥ 0.6 with a result's name.
+ * The result's name is compared in memory only.
  */
-export function findNameDuplicates(
-  name: string,
-  areaId: string,
-  restaurants: readonly DedupeRestaurant[],
-) {
+export function findNameDuplicates(name: string, restaurants: readonly DedupeRestaurant[]) {
   const text = cleanText(name);
   if (!text) return [];
   return restaurants
-    .filter((r) => r.areaId === areaId)
     .map((r) => ({
       restaurant: r,
       similarity: Math.max(...[r.name, ...r.aliases].map((n) => similarity(cleanText(n), text))),
@@ -70,24 +68,51 @@ export function findNameDuplicates(
     .slice(0, IMPORT_RULES.maxDuplicates);
 }
 
+/**
+ * Areas, of either city, whose centre lies inside the search rectangle: a search can return places
+ * from all of them. Only our own area centres and the rectangle built from them are used, never a
+ * Google coordinate.
+ */
+export function areasInside(
+  box: { low: LatLng; high: LatLng },
+  areas: readonly { id: string; lat: number; lng: number }[],
+): string[] {
+  return areas
+    .filter(
+      (a) =>
+        a.lat >= box.low.lat &&
+        a.lat <= box.high.lat &&
+        a.lng >= box.low.lng &&
+        a.lng <= box.high.lng,
+    )
+    .map((a) => a.id);
+}
+
 export type ImportRestaurantRef = {
   id: string;
   slug: string;
   name: string;
   areaName: string | null;
+  cityName: string;
+  /** It already has a different Google place, so a Link from this result is refused. */
+  otherGooglePlace: boolean;
 };
 
 export type ImportSearchResult = {
   googlePlaceId: string;
-  /** Google's name and address: display only. */
+  /** Google's name, address and data-provider credits: display only. */
   displayName: string;
   formattedAddress: string;
-  /** Saved only with a Create or Link (googleSyncedAt = the page's fetchedAt). */
-  lat: number;
-  lng: number;
+  attributions: { provider: string; providerUri: string | null }[];
+  /** Saved only with a Create or Link (googleSyncedAt = the page's fetchedAt); null: no location. */
+  lat: number | null;
+  lng: number | null;
   mapsUrl: string;
-  /** imported: a restaurant already has this place id; possible_duplicate: a name match in the area. */
-  status: "new" | "imported" | "possible_duplicate";
+  /**
+   * no_location: Google gives no location, so the result is shown but cannot be imported;
+   * imported: a restaurant already has this place id; possible_duplicate: a similar name nearby.
+   */
+  status: "new" | "imported" | "possible_duplicate" | "no_location";
   existing: (ImportRestaurantRef & { hasDish: boolean }) | null;
   duplicates: (ImportRestaurantRef & { similarity: number })[];
 };
@@ -99,7 +124,6 @@ export type ImportSearchPage = {
   /** Time of the Google response: sent back with a Create or Link from this page. */
   fetchedAt: string;
   results: ImportSearchResult[];
-  withoutLocation: number;
   nextPageToken: string | null;
 };
 
@@ -147,55 +171,67 @@ export async function searchPlacesForImport(
       )
     ).map((p) => p.restaurantId),
   );
-  const cityRestaurants = await listRestaurantsForDedupe(area.city.id);
+  const allAreas = (await listCitiesWithAreas()).flatMap((c) => c.areas);
+  const nearby = await listRestaurantsInAreas([
+    ...new Set([area.id, ...areasInside(params.restriction, allAreas)]),
+  ]);
 
   const results = page.places.map((place: PlaceResult): ImportSearchResult => {
-    const base = {
+    const same = existingByPlace.get(place.googlePlaceId);
+    const duplicates = same
+      ? []
+      : findNameDuplicates(place.displayName, nearby).map(({ restaurant: r, similarity: s }) => ({
+          id: r.id,
+          slug: r.slug,
+          name: r.name,
+          areaName: r.area?.name ?? null,
+          cityName: r.city.name,
+          otherGooglePlace: Boolean(r.googlePlaceId && r.googlePlaceId !== place.googlePlaceId),
+          similarity: Math.round(s * 100) / 100,
+        }));
+    const status =
+      place.lat === null || place.lng === null
+        ? "no_location"
+        : same
+          ? "imported"
+          : duplicates.length > 0
+            ? "possible_duplicate"
+            : "new";
+    return {
       googlePlaceId: place.googlePlaceId,
       displayName: place.displayName,
       formattedAddress: place.formattedAddress,
+      attributions: place.attributions,
       lat: place.lat,
       lng: place.lng,
       mapsUrl: googleMapsUrl(place.googlePlaceId, params.textQuery),
-    };
-    const same = existingByPlace.get(place.googlePlaceId);
-    if (same) {
-      return {
-        ...base,
-        status: "imported",
-        existing: {
-          id: same.id,
-          slug: same.slug,
-          name: same.name,
-          areaName: same.area?.name ?? null,
-          hasDish: served.has(same.id),
-        },
-        duplicates: [],
-      };
-    }
-    const duplicates = findNameDuplicates(place.displayName, area.id, cityRestaurants).map((d) => ({
-      id: d.restaurant.id,
-      slug: d.restaurant.slug,
-      name: d.restaurant.name,
-      areaName: d.restaurant.area?.name ?? null,
-      similarity: Math.round(d.similarity * 100) / 100,
-    }));
-    return {
-      ...base,
-      status: duplicates.length > 0 ? "possible_duplicate" : "new",
-      existing: null,
+      status,
+      existing: same
+        ? {
+            id: same.id,
+            slug: same.slug,
+            name: same.name,
+            areaName: same.area?.name ?? null,
+            cityName: same.city.name,
+            otherGooglePlace: false,
+            hasDish: served.has(same.id),
+          }
+        : null,
       duplicates,
     };
   });
 
+  const count = (status: ImportSearchResult["status"]) =>
+    results.filter((r) => r.status === status).length;
   logEvent("import.search", {
     userId: admin.id,
     dishSlug: dish.slug,
     areaSlug: area.slug,
     nextPage: Boolean(input.pageToken),
     results: results.length,
-    imported: results.filter((r) => r.status === "imported").length,
-    possibleDuplicates: results.filter((r) => r.status === "possible_duplicate").length,
+    imported: count("imported"),
+    possibleDuplicates: count("possible_duplicate"),
+    noLocation: count("no_location"),
   });
   return {
     dish: { slug: dish.slug, name: dish.name },
@@ -203,7 +239,6 @@ export async function searchPlacesForImport(
     city: area.city,
     fetchedAt: page.fetchedAt.toISOString(),
     results,
-    withoutLocation: page.withoutLocation,
     nextPageToken: page.nextPageToken ?? null,
   };
 }
@@ -314,7 +349,7 @@ export async function importLink(
       placeLinked,
       restaurantDish,
     };
-  });
+  }).catch(rethrowConflict);
 
   logEvent("import.link", {
     userId: admin.id,

@@ -40,9 +40,11 @@ export async function findRestaurantsByGooglePlaceIds(ids: readonly string[], cl
 }
 
 /** Every restaurant of a city that can still be matched (not merged away), for import dedupe. */
-export async function listRestaurantsForDedupe(cityId: string, client: Client = db) {
+/** Restaurants of these areas that can still be matched (not merged away), for import dedupe. */
+export async function listRestaurantsInAreas(areaIds: readonly string[], client: Client = db) {
+  if (areaIds.length === 0) return [];
   return client.restaurant.findMany({
-    where: { cityId, status: { not: "DUPLICATE" } },
+    where: { areaId: { in: [...areaIds] }, status: { not: "DUPLICATE" } },
     select: {
       id: true,
       slug: true,
@@ -52,6 +54,7 @@ export async function listRestaurantsForDedupe(cityId: string, client: Client = 
       status: true,
       googlePlaceId: true,
       area: { select: { name: true } },
+      city: { select: { name: true } },
     },
   });
 }
