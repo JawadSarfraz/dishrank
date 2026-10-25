@@ -180,3 +180,34 @@ export async function listRestaurantsPage(input: {
 export async function lockSlugBase(base: string, tx: Tx) {
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${base}))`;
 }
+
+const refreshSelect = {
+  id: true,
+  googlePlaceId: true,
+  googleSyncedAt: true,
+  lat: true,
+  lng: true,
+} as const;
+
+/** Rows still holding coordinates from a Google call older than `cutoff` (refresh catch-up). */
+export async function listGoogleCoordinatesSyncedBefore(cutoff: Date) {
+  return db.restaurant.findMany({
+    where: {
+      googleSyncedAt: { lt: cutoff },
+      OR: [{ lat: { not: null } }, { lng: { not: null } }],
+    },
+    select: refreshSelect,
+  });
+}
+
+/** Rows with a googlePlaceId whose googleSyncedAt is NULL or older than `cutoff`, oldest first. */
+export async function listRestaurantsDueForRefresh(cutoff: Date) {
+  return db.restaurant.findMany({
+    where: {
+      googlePlaceId: { not: null },
+      OR: [{ googleSyncedAt: null }, { googleSyncedAt: { lt: cutoff } }],
+    },
+    orderBy: [{ googleSyncedAt: { sort: "asc", nulls: "first" } }, { id: "asc" }],
+    select: refreshSelect,
+  });
+}

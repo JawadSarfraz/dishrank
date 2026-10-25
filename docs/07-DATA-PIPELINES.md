@@ -96,7 +96,8 @@ CLAUDE.md rule 2 allows Google `lat/lng` for at most 30 days. The job runs daily
 3. For each: `GET https://places.googleapis.com/v1/places/{googlePlaceId}` with header `X-Goog-FieldMask: location` (no `places.` prefix for Place Details; Essentials). Success → update `lat/lng`, `googleSyncedAt = now()`.
 4. `NOT_FOUND` means the place ID is obsolete: set `lat/lng = NULL` at once and open a `PLACE_REFRESH_FAILED` review item. Any other error (after retries with backoff): keep the coordinates and retry on the next run, unless `googleSyncedAt` is already 28 days old or more; then set `lat/lng = NULL` and open the review item. Coordinates therefore stay under 30 days old as long as the job runs once a day.
 5. One OPEN review item per restaurant; a later successful refresh resolves it automatically.
-6. Stop before the function time limit (250 s) and leave the rest for the next run. `JobRun.summary` records `{ selected, calls, ok, notFound, errors, nulled, reviewItems, skippedForTime }`.
+6. Stop before the function time limit (250 s: no new call once 235 s have passed, keeping room for one slow call with retries) and leave the rest for the next run. `JobRun.summary` records `{ selected, calls, ok, notFound, errors, nulled, caughtUp, reviewItems, resolvedReviewItems, skippedForTime, error? }`.
+7. A row nulled by the catch-up is still due, so the same run refreshes it: success restores its coordinates and resolves the item. A failure on a row whose `googleSyncedAt` is NULL (unknown age) counts as 28+ days. Without `GOOGLE_PLACES_API_KEY` the catch-up still runs and every due row counts as a failure (so the 28-day rule still holds); the run is then marked failed (`JobRun.ok = false`, HTTP 500).
 
 A restaurant with NULL `lat/lng` stays listed; it only loses the map link and distance.
 

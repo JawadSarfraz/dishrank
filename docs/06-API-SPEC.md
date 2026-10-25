@@ -117,7 +117,7 @@ Errors: `OWNER_SELF_RATING`, `RATE_LIMITED`, `RESTAURANT_INACTIVE`, `HELD_FOR_RE
 - `GET /api/cron/refresh-places` — daily (`0 22 * * *` UTC): restaurants with a `googlePlaceId` whose `googleSyncedAt` is NULL or older than 25 days get Place Details (field mask `location`); failures follow docs/07 §5.
 - `GET /api/cron/mark-stale` — not scheduled; for manual runs only (recompute already does it).
 
-All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` when `CRON_SECRET` is unset or empty, `401` when the bearer token does not match. Compare with `crypto.timingSafeEqual` on equal-length buffers (length mismatch → 401). Handlers are idempotent, write `JobRun` (including external API call counts) and return `{ ok, summary }`.
+All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` when `CRON_SECRET` is unset or empty, `401` when the bearer token does not match. Compare with `crypto.timingSafeEqual` on equal-length buffers (length mismatch → 401). Handlers are idempotent, write `JobRun` (including external API call counts) and return `{ ok, summary }`; `ok: false` answers HTTP 500 (refresh-places: rows were due but `GOOGLE_PLACES_API_KEY` is missing, or the job threw).
 
 ## Zod schemas (`src/server/validation/`)
 
