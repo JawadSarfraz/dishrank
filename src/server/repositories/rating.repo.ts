@@ -93,8 +93,8 @@ export async function findRatingWithPlace(id: string, client: Client = db) {
 }
 
 /**
- * docs/04 burst rule: ratings of a dish row updated since `since` by non-panel accounts created
- * after `newAccountsSince` (HIDDEN ones are already dealt with).
+ * docs/04 burst rule: ratings that arrived on a dish row since `since` (createdAt: an edit is not a
+ * new arrival) from non-panel accounts created after `newAccountsSince`; HIDDEN ones are settled.
  */
 export async function listBurstRatings(
   restaurantDishId: string,
@@ -105,7 +105,7 @@ export async function listBurstRatings(
   return tx.rating.findMany({
     where: {
       restaurantDishId,
-      updatedAt: { gte: since },
+      createdAt: { gte: since },
       status: { in: ["ACTIVE", "HELD"] },
       user: { isPanel: false, createdAt: { gt: newAccountsSince } },
     },

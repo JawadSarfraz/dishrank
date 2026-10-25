@@ -7,13 +7,8 @@ import { listCities } from "@/server/services/dish.service";
 export async function GET(request: Request) {
   try {
     await assertRateLimit(`ip:${ipHash(clientIp(request.headers))}:api`, RATE_LIMITS.api);
-    return jsonData(
-      (await listCities()).map(({ slug, name, areas }) => ({
-        slug,
-        name,
-        areas: areas.map(({ slug: s, name: n }) => ({ slug: s, name: n })),
-      })),
-    );
+    // Ids are included: a restaurant proposal (POST /api/v1/proposals) needs cityId and areaId.
+    return jsonData(await listCities());
   } catch (error) {
     return jsonError(error);
   }

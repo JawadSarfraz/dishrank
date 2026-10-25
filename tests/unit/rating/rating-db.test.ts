@@ -256,6 +256,42 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
     });
   });
 
+  it("a held rating cannot be deleted by its author (it would undo the hold)", async () => {
+    const user = await oldUser();
+    const r = await makeRestaurant("Fixture Held Delete");
+    const held = await rate(user, r.id, "chai", { comment: "call 0300 1234567" });
+    await expect(deleteOwn(actorOf(user), held.ratingId, { now: NOW })).rejects.toMatchObject({
+      code: "RATING_UNDER_REVIEW",
+      status: 409,
+    });
+    expect(await db.rating.count()).toBe(1);
+  });
+
+  it("burst rule counts arrivals: young accounts editing ratings older than 24 h do not trigger it", async () => {
+    const r = await makeRestaurant("Fixture Old Arrivals");
+    const users = [];
+    for (let i = 0; i < 5; i++) {
+      const u = await newUser(`Young ${i}`, { createdAt: daysAgo(5, NOW) });
+      users.push(u);
+      await rate(u, r.id, "pizza");
+    }
+    // Five arrivals today held them all; pretend they arrived two days ago and were released.
+    await db.rating.updateMany({ data: { status: "ACTIVE", createdAt: daysAgo(2, NOW) } });
+    await db.reviewItem.deleteMany();
+    for (const u of users) expect((await rate(u, r.id, "pizza", { score: 9 })).held).toBe(false);
+    expect(await db.reviewItem.count()).toBe(0);
+  });
+
+  it("a rating that adds a dish row does not spend the add-dish limit", async () => {
+    const user = await oldUser();
+    const r = await makeRestaurant("Fixture Adds");
+    await used(`user:${user.id}:add-dish`, 10);
+    await expect(rate(user, r.id, "haleem")).resolves.toMatchObject({ created: true });
+    await expect(
+      addRestaurantDish(actorOf(user), { restaurantId: r.id, dishId: await dishId("broast") }),
+    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+  });
+
   it("refuses a REMOVED dish row, revives a STALE one, and checks the photo's owner", async () => {
     const user = await oldUser();
     const r = await makeRestaurant("Fixture Lifecycle");

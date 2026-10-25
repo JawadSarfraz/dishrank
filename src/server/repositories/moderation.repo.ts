@@ -97,6 +97,20 @@ export async function findOpenItemForDishRow(
   });
 }
 
+/** Ratings an admin released from SUSPICIOUS_RATINGS items of one dish row: never held again. */
+export async function listReleasedRatingIds(restaurantDishId: string, client: Client = db) {
+  const items = await client.reviewItem.findMany({
+    where: {
+      type: "SUSPICIOUS_RATINGS",
+      status: "RESOLVED",
+      resolution: { startsWith: "released" },
+      payload: { path: ["restaurantDishId"], equals: restaurantDishId },
+    },
+    select: { payload: true },
+  });
+  return new Set(items.flatMap((i) => (i.payload as { ratingIds?: string[] }).ratingIds ?? []));
+}
+
 /** One person's OPEN items of a type (to avoid filing the same suggestion twice). */
 export async function listOpenItemsCreatedBy(type: ReviewItemType, userId: string) {
   return db.reviewItem.findMany({

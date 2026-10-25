@@ -57,4 +57,16 @@ describe("helpers", () => {
     expect(safeCallbackPath("//evil.example")).toBe("/");
     expect(safeCallbackPath(undefined)).toBe("/");
   });
+
+  it("keeps a /rate step with its query, and refuses what Better Auth would refuse", () => {
+    expect(safeCallbackPath("/rate?city=islamabad&r=butt-karahi-f-7&d=chicken-karahi")).toBe(
+      "/rate?city=islamabad&r=butt-karahi-f-7&d=chicken-karahi",
+    );
+    expect(safeCallbackPath("/\t/evil.example")).toBe("/");
+    expect(safeCallbackPath("/a\\b")).toBe("/");
+    expect(safeCallbackPath("/\\evil.example")).toBe("/");
+    expect(safeCallbackPath("/%2F%2Fevil.example")).toBe("/");
+    expect(safeCallbackPath("/x%5cy")).toBe("/");
+    expect(safeCallbackPath("/me?next=%2F%2Fok")).toBe("/me?next=%2F%2Fok"); // only the path is checked
+  });
 });

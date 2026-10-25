@@ -34,15 +34,30 @@ export function assertRole(
   return actor;
 }
 
-/** Only relative paths on this site are allowed after sign-in (no open redirects). */
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
+const ENCODED_PATH_SEPARATOR = /%2[fF]|%5[cC]/;
+const PARSER_ORIGIN = "https://dishrank.invalid";
+
+/**
+ * Only root-relative paths on this site are allowed after sign-in (no open redirects). The same
+ * rules as Better Auth's own callback check, so a value we accept is never refused at sign-in:
+ * no "//", no backslash, no control character, no encoded "/" or "\\" in the path, same origin.
+ */
 export function safeCallbackPath(value: unknown): string {
   if (
     typeof value !== "string" ||
     !value.startsWith("/") ||
     value.startsWith("//") ||
-    value.startsWith("/\\")
+    value.includes("\\") ||
+    CONTROL_CHARACTERS.test(value)
   ) {
     return "/";
   }
-  return value;
+  const pathEnd = value.search(/[?#]/);
+  if (ENCODED_PATH_SEPARATOR.test(pathEnd === -1 ? value : value.slice(0, pathEnd))) return "/";
+  try {
+    return new URL(value, PARSER_ORIGIN).origin === PARSER_ORIGIN ? value : "/";
+  } catch {
+    return "/";
+  }
 }

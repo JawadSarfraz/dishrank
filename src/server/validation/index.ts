@@ -55,8 +55,6 @@ export const proposalInput = z.discriminatedUnion("type", [
     name: text(120, 2),
     /** The restaurant the diner was rating when the dish was missing (docs/07 §6 payload). */
     restaurantId: id.optional(),
-    cityId: id.optional(),
-    areaId: id.optional(),
     note: optionalText(280),
   }),
   z.strictObject({

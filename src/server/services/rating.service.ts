@@ -11,6 +11,7 @@ import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
   createReviewItem,
   findOpenItemForDishRow,
+  listReleasedRatingIds,
   updateReviewItemPayload,
 } from "@/server/repositories/moderation.repo";
 import { lockRestaurantDish } from "@/server/repositories/ranking.repo";
@@ -153,12 +154,17 @@ async function applyBurstRule(
   now: Date,
   tx: Tx,
 ): Promise<string[]> {
-  const ratings = await listBurstRatings(
-    rd.id,
-    new Date(now.getTime() - BURST.windowHours * 3_600_000),
-    new Date(now.getTime() - BURST.newAccountDays * DAY_MS),
-    tx,
-  );
+  // Ratings an admin already released for this row were judged genuine: they neither count nor
+  // get held again.
+  const released = await listReleasedRatingIds(rd.id, tx);
+  const ratings = (
+    await listBurstRatings(
+      rd.id,
+      new Date(now.getTime() - BURST.windowHours * 3_600_000),
+      new Date(now.getTime() - BURST.newAccountDays * DAY_MS),
+      tx,
+    )
+  ).filter((r) => !released.has(r.id));
   if (ratings.length < BURST.ratings) return [];
   // Ratings already HELD (e.g. for their comment) keep their own review item.
   const toHold = ratings.filter((r) => r.status === "ACTIVE").map((r) => r.id);
@@ -219,9 +225,6 @@ export async function createOrReplace(
     rater.isPanel ? RATE_LIMITS.ratingRestaurantPanel : RATE_LIMITS.ratingRestaurant,
     now,
   );
-  if (!existingRow) {
-    await assertRateLimit(`user:${rater.id}:add-dish`, RATE_LIMITS.addDish, now);
-  }
   const flag = screenComment(input.comment);
 
   const written = await inTransaction(async (tx) => {
@@ -376,6 +379,16 @@ export async function deleteOwn(
   // Someone else's rating answers like a missing one, so ids reveal nothing.
   if (!rating || rating.userId !== user.id) {
     throw new AppError("NOT_FOUND", "Rating not found", 404);
+  }
+  // A held or hidden rating stays until an admin decides; deleting it and rating again would undo
+  // the hold or the hide.
+  // DECISION-PENDING: held and hidden ratings cannot be deleted by their author (no soft delete yet).
+  if (rating.status !== "ACTIVE") {
+    throw new AppError(
+      "RATING_UNDER_REVIEW",
+      "This rating is under review and cannot be deleted now",
+      409,
+    );
   }
   await assertRateLimit(`user:${user.id}:rating-delete`, RATE_LIMITS.ratingDelete, now);
   await inTransaction(async (tx) => {
