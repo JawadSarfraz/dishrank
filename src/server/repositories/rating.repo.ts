@@ -67,6 +67,11 @@ export async function updateRating(id: string, data: Prisma.RatingUncheckedUpdat
   return tx.rating.update({ where: { id }, data, select: { id: true, status: true } });
 }
 
+/** The rating that already uses a photo, if any (one photo belongs to one rating). */
+export async function findRatingByPhotoPath(photoPath: string, client: Client = db) {
+  return client.rating.findFirst({ where: { photoPath }, select: { id: true } });
+}
+
 /** A rating with what deleting it or listing it needs. */
 export async function findRatingWithPlace(id: string, client: Client = db) {
   return client.rating.findUnique({

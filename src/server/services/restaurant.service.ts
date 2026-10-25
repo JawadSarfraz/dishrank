@@ -393,7 +393,7 @@ export type PublicRestaurant = {
 };
 
 export type PublicRestaurantDish = {
-  dish: { slug: string; name: string };
+  dish: { id: string; slug: string; name: string };
   restaurantDishId: string;
   score: number | null;
   votes: number;

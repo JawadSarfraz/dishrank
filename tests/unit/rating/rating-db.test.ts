@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { bucketSeconds, RATE_LIMITS } from "@/server/rate-limit";
 import { addRestaurantDish, createOrReplace, deleteOwn } from "@/server/services/rating.service";
 import { resetAppData } from "../../setup/db-reset";
+import { fakeStorage } from "../storage/fake-storage";
 import {
   actorOf,
   daysAgo,
@@ -13,6 +14,7 @@ import {
 } from "../restaurants/fixtures";
 
 const NOW = new Date();
+const photos = fakeStorage();
 
 /** An account old enough to be outside the burst rule (docs/04: younger than 7 days counts). */
 const oldUser = (name = "Diner", over = {}) =>
@@ -29,7 +31,7 @@ async function rate(
   return createOrReplace(
     actorOf(user),
     { restaurantId, dishId: await dishId(dishSlug), score: 8, ...over },
-    { now: NOW },
+    { now: NOW, storage: photos.adapter },
   );
 }
 
@@ -267,10 +269,32 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
     await expect(
       rate(user, r.id, "pizza", { photoPath: "dish-photos/someoneelse0/abc123.webp" }),
     ).rejects.toMatchObject({ code: "PHOTO_NOT_YOURS" });
-    const withPhoto = await rate(user, r.id, "pizza", {
-      photoPath: `dish-photos/${user.id}/abc123.webp`,
+    const path = (name: string) => `dish-photos/${user.id}/${name}`;
+    await expect(
+      rate(user, r.id, "pizza", { photoPath: path("never.webp") }),
+    ).rejects.toMatchObject({
+      code: "PHOTO_NOT_FOUND",
     });
+    photos.objects[`${user.id}/huge.jpg`] = { size: 6 * 1024 * 1024, contentType: "image/jpeg" };
+    await expect(rate(user, r.id, "pizza", { photoPath: path("huge.jpg") })).rejects.toMatchObject({
+      code: "PHOTO_INVALID",
+    });
+    photos.objects[`${user.id}/abc123.webp`] = { size: 300_000, contentType: "image/webp" };
+    const withPhoto = await rate(user, r.id, "pizza", { photoPath: path("abc123.webp") });
     expect(withPhoto.created).toBe(true);
+    await expect(
+      rate(user, r.id, "chai", { photoPath: path("abc123.webp") }),
+    ).rejects.toMatchObject({
+      code: "PHOTO_IN_USE",
+      status: 409,
+    });
+    await expect(
+      createOrReplace(
+        actorOf(user),
+        { restaurantId: r.id, dishId: await dishId("broast"), score: 8, photoPath: path("x.webp") },
+        { now: NOW, storage: null },
+      ),
+    ).rejects.toMatchObject({ code: "UPLOADS_DISABLED" });
     expect(await db.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
       ratingsCount: 2,
       photoRatings: 1,

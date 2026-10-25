@@ -31,6 +31,12 @@ const schema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(), // Phase 3
   SUPABASE_DISH_PHOTOS_BUCKET: z.string().default("dish-photos"),
   SUPABASE_MENUS_BUCKET: z.string().default("menus"),
+  // Phase 3 photo uploads through Supabase's S3 protocol (10-minute presigned URLs). All four or
+  // none: without them the rate flow hides the photo step.
+  SUPABASE_S3_ENDPOINT: z.url().optional(),
+  SUPABASE_S3_REGION: z.string().optional(),
+  SUPABASE_S3_ACCESS_KEY_ID: z.string().optional(),
+  SUPABASE_S3_SECRET_ACCESS_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(), // Phase 1 matcher skips the LLM step without it
   ANTHROPIC_VISION_MODEL: z.string().optional(), // Phase 5
   ANTHROPIC_MATCH_MODEL: z.string().optional(), // Phase 1

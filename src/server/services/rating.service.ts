@@ -16,6 +16,7 @@ import {
 import { lockRestaurantDish } from "@/server/repositories/ranking.repo";
 import {
   addRatingHistory,
+  findRatingByPhotoPath,
   findRatingOfUser,
   findRatingWithPlace,
   insertRating,
@@ -33,11 +34,13 @@ import { findDishById } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { adjustRatingCounters, findRater } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
+import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { MeRatingsQuery, RatingInput } from "@/server/validation";
 import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, DAY_MS, USER_DISH } from "./ranking.constants";
 import { recomputeOne, type Thresholds } from "./ranking.service";
+import { verifyUploadedPhoto } from "./upload.service";
 
 /** Why a rating is held: its comment (docs/04 control 5) or a burst of new accounts (control 3). */
 export type HoldReason = "COMMENT" | "BURST";
@@ -59,7 +62,12 @@ export type RatingResult = {
   dish: { id: string; slug: string; name: string };
 };
 
-export type RatingContext = { ipHash?: string; now?: Date };
+export type RatingContext = {
+  ipHash?: string;
+  now?: Date;
+  /** Photo storage; defaults to the configured one (null when uploads are not set up). */
+  storage?: StorageAdapter | null;
+};
 
 const SIGNED_IN = ["USER", "OWNER", "ADMIN"] as const;
 
@@ -184,8 +192,20 @@ export async function createOrReplace(
   const rater = await loadRater(actor);
   const restaurant = await loadRateableRestaurant(input.restaurantId, rater.id);
   const dish = await loadDish(input.dishId);
-  if (input.photoPath && !input.photoPath.startsWith(`dish-photos/${rater.id}/`)) {
-    throw new AppError("PHOTO_NOT_YOURS", "That photo was not uploaded by you", 400);
+  const existingRow = await findRestaurantDish(restaurant.id, dish.id);
+  if (input.photoPath) {
+    const previous = existingRow ? await findRatingOfUser(existingRow.id, rater.id) : null;
+    if (input.photoPath !== previous?.photoPath) {
+      await verifyUploadedPhoto(
+        input.photoPath,
+        rater.id,
+        ctx.storage === undefined ? getStorage() : ctx.storage,
+      );
+      const user = await findRatingByPhotoPath(input.photoPath);
+      if (user && user.id !== previous?.id) {
+        throw new AppError("PHOTO_IN_USE", "That photo is already on another rating", 409);
+      }
+    }
   }
 
   // docs/04 control 2: every submission counts, new or replaced (panel members get more).
@@ -199,7 +219,6 @@ export async function createOrReplace(
     rater.isPanel ? RATE_LIMITS.ratingRestaurantPanel : RATE_LIMITS.ratingRestaurant,
     now,
   );
-  const existingRow = await findRestaurantDish(restaurant.id, dish.id);
   if (!existingRow) {
     await assertRateLimit(`user:${rater.id}:add-dish`, RATE_LIMITS.addDish, now);
   }

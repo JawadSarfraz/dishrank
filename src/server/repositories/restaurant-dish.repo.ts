@@ -85,7 +85,7 @@ export async function listDishesOfRestaurant(restaurantId: string, client: Clien
       ratingCount: true,
       score: true,
       rankInCity: true,
-      dish: { select: { slug: true, name: true } },
+      dish: { select: { id: true, slug: true, name: true } },
     },
   });
 }
