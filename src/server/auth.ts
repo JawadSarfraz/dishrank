@@ -1,12 +1,15 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { env } from "@/env";
 import { db } from "./db";
+import { logEvent } from "./log";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
+import { SITE_MODE, newAccountDecision } from "./site";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -35,13 +38,23 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // The first admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
         before: async (user) => {
-          const adminEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
-          if (adminEmail && user.email.toLowerCase() === adminEmail) {
-            return { data: { ...user, role: "ADMIN" } };
+          // Private beta: only invited Google accounts get an account (BETA_ALLOWED_EMAILS, docs/10);
+          // the OAuth callback sends anyone else to /sign-in?error=BETA_INVITE_ONLY. The first
+          // admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
+          const decision = newAccountDecision(user, {
+            mode: SITE_MODE,
+            allowed: env.BETA_ALLOWED_EMAILS,
+            adminEmail: env.ADMIN_EMAIL,
+          });
+          if (!decision.allowed) {
+            logEvent("auth.signup_refused", { reason: "beta_invite_only" }, "warn");
+            throw new APIError("FORBIDDEN", {
+              code: "BETA_INVITE_ONLY",
+              message: "DishRank is a private beta and this Google account is not invited.",
+            });
           }
-          return { data: user };
+          return { data: decision.admin ? { ...user, role: "ADMIN" } : user };
         },
       },
     },

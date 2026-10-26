@@ -11,7 +11,12 @@ export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
   async function signIn() {
     setPending(true);
     setError(null);
-    const { error } = await authClient.signIn.social({ provider: "google", callbackURL });
+    const { error } = await authClient.signIn.social({
+      provider: "google",
+      callbackURL,
+      // A refused sign-in (e.g. not invited to the beta) comes back to /sign-in with ?error=.
+      errorCallbackURL: `/sign-in?callbackUrl=${encodeURIComponent(callbackURL)}`,
+    });
     if (error) {
       setError(error.message ?? "Google sign-in is not available right now.");
       setPending(false);

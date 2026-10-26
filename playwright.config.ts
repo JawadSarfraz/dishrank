@@ -45,6 +45,10 @@ export default defineConfig({
       GOOGLE_CLIENT_ID: "e2e-google-client-id",
       GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
       CRON_SECRET: E2E.cronSecret,
+      // The journeys check the public site (robots, sitemap); beta mode is unit-tested.
+      SITE_MODE: "live",
+      OPERATOR_NAME: "",
+      CONTACT_EMAIL: "",
       // Empty values win over .env: no admin bootstrap, no LLM, no photo uploads.
       ADMIN_EMAIL: "",
       ANTHROPIC_API_KEY: "",
