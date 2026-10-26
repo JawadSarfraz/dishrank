@@ -1,5 +1,6 @@
-// RankingService (docs/04): rating weights, the Bayesian score, eligibility (bootstrap-aware) and
-// the per-row recompute that runs after every rating write. recomputeAll arrives in Phase 4.
+// RankingService (docs/04): rating weights, the Bayesian score, eligibility (bootstrap-aware), the
+// per-row recompute that runs after every rating write, and the ranking page's list (getRanking).
+// The nightly recomputeAll lives in ranking-nightly.service.ts.
 import type { RestaurantDishStatus } from "@/generated/prisma/enums";
 import { logEvent } from "@/server/log";
 import {
@@ -16,7 +17,10 @@ import {
   rerankCityDish,
   updateRestaurantDishAggregates,
 } from "@/server/repositories/ranking.repo";
+import { findCityBySlug, listRankingRows } from "@/server/repositories/public.repo";
+import { findDishBySlug } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
+import { haversineKm } from "@/lib/geo";
 import { DAY_MS, RANKING, TRUST } from "./ranking.constants";
 
 // ---------- math (pure) ----------
@@ -95,16 +99,20 @@ export type TrustStats = {
   hiddenRatings: number;
   /** Upheld flags against the user's ratings. */
   upheldFlags: number;
+  /** The user's latest ratings, newest first, any status (docs/04 abuse control 4). */
+  recentRatings: readonly { score: number; restaurantId: string }[];
 };
 
 /**
  * docs/04 trust table, in this order: panel 1.3 (fixed) → ≥ 2 ratings hidden by an admin 0.3 →
- * ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2 → ≥ 3 active and ≥ 1 with a photo 1.0 → 0.6.
+ * the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2 → ≥ 3
+ * active and ≥ 1 with a photo 1.0 → 0.6.
  */
 // DECISION-PENDING: docs/04 gives no order for overlapping rows; this one puts penalties first.
 export function trustFor(s: TrustStats): number {
   if (s.isPanel) return TRUST.panel;
   if (s.hiddenRatings >= TRUST.penalised.minHidden) return TRUST.penalised.trust;
+  if (isExtremePattern(s.recentRatings)) return TRUST.newAccount;
   const { trusted, established } = TRUST;
   if (
     s.activeRatings >= trusted.minActive &&
@@ -117,6 +125,19 @@ export function trustFor(s: TrustStats): number {
     return established.trust;
   }
   return TRUST.newAccount;
+}
+
+/**
+ * docs/04 abuse control 4: the user's last 10 ratings (newest first, any status) are all 10s or all
+ * 1s, at more than one restaurant. Trust stays at the new-account value while this holds; there is
+ * no review item yet.
+ */
+// DECISION-PENDING: "until reviewed" has no review flow yet, and "across different restaurants" is read as "more than one".
+export function isExtremePattern(last: readonly { score: number; restaurantId: string }[]) {
+  if (last.length < TRUST.extremeScores.lastRatings) return false;
+  const recent = last.slice(0, TRUST.extremeScores.lastRatings);
+  const extreme = recent.every((r) => r.score === 10) || recent.every((r) => r.score === 1);
+  return extreme && new Set(recent.map((r) => r.restaurantId)).size > 1;
 }
 
 export type CountedRating = { userId: string; score: number; updatedAt: Date; trust: number };
@@ -161,8 +182,8 @@ export type RecomputeResult = {
   promoted: boolean;
 };
 
-/** Call with the (city, dish) lock held. */
-async function rerank(cityId: string, dishId: string, t: Thresholds, tx: Tx) {
+/** Re-ranks one (city, dish) list with the given thresholds. Call with the list's lock held. */
+export async function rerankList(cityId: string, dishId: string, t: Thresholds, tx: Tx) {
   await rerankCityDish(
     {
       cityId,
@@ -178,11 +199,13 @@ async function rerank(cityId: string, dishId: string, t: Thresholds, tx: Tx) {
 /**
  * docs/04 recomputeOne: rebuilds one dish row from its counted ratings (decay at `now`), promotes
  * CANDIDATE → USER_CONFIRMED at 3 distinct raters, then re-ranks that (city, dish) list so rank
- * numbers are never stale. Runs after every rating write, delete and review decision.
+ * numbers are never stale. Runs after every rating write, delete and review decision, and for
+ * every rated row in the nightly job (which re-ranks each list once afterwards instead).
  */
 export async function recomputeOne(
   restaurantDishId: string,
   now: Date = new Date(),
+  options: { rerank?: boolean } = {},
 ): Promise<RecomputeResult | null> {
   const started = Date.now();
   const result = await inTransaction(async (tx) => {
@@ -216,7 +239,8 @@ export async function recomputeOne(
       tx,
     );
     const t = thresholdsFor(city?.launchedAt ?? null, now);
-    await rerank(rd.cityId, rd.dishId, t, tx);
+    // The nightly job re-ranks each list once after all its rows (rerank: false).
+    if (options.rerank !== false) await rerankList(rd.cityId, rd.dishId, t, tx);
     const ranked = await findRankInCity(rd.id, tx);
     const row = {
       status: updated.status,
@@ -260,7 +284,7 @@ async function rerankLists(
   // All locks first, in the global order, then the re-ranks.
   for (const g of await lockCityDishLists(lists, tx)) {
     const city = await findCityLaunch(g.cityId, tx);
-    await rerank(g.cityId, g.dishId, thresholdsFor(city?.launchedAt ?? null, now), tx);
+    await rerankList(g.cityId, g.dishId, thresholdsFor(city?.launchedAt ?? null, now), tx);
   }
 }
 
@@ -298,4 +322,155 @@ export async function rerankCityDishes(
   now: Date = new Date(),
 ) {
   await inTransaction(async (tx) => rerankLists(lists, now, tx));
+}
+
+// ---------- ranking page (docs/04 "Query for a ranking page", docs/06 GET /api/v1/rankings) ----------
+
+export type RankingRestaurant = {
+  slug: string;
+  name: string;
+  area: { slug: string; name: string } | null;
+  priceBand: number | null;
+  /** Our own coordinates (Overture, admin-typed or panel GPS); null when unknown. */
+  lat: number | null;
+  lng: number | null;
+};
+
+type RankingRowBase = {
+  restaurantDishId: string;
+  restaurant: RankingRestaurant;
+  votes: number;
+  price: number | null;
+  variantTags: string[];
+  status: RestaurantDishStatus;
+  lastRatedAt: string | null;
+  /** Only when the caller passed a location: km from it by our own coordinates. */
+  distanceKm: number | null;
+};
+
+export type RankedRow = RankingRowBase & {
+  /** City-wide rank (rankInCity): no filter or sort renumbers it. */
+  rank: number;
+  score: number;
+  rawMean: number | null;
+};
+
+export type InsufficientRow = RankingRowBase & {
+  /** More 0.6-trust raters it needs before it can rank. */
+  ratingsNeeded: number;
+};
+
+export type Ranking = {
+  city: { slug: string; name: string };
+  dish: { id: string; slug: string; name: string };
+  mode: Thresholds["mode"];
+  thresholds: { minRaters: number; minWeight: number };
+  eligible: RankedRow[];
+  insufficient: InsufficientRow[];
+  computedAt: string;
+};
+
+export type RankingOptions = {
+  citySlug: string;
+  dishSlug: string;
+  /** GET /api/v1/rankings only: the page filters and sorts in the browser. */
+  areaSlug?: string;
+  sort?: "score" | "votes" | "price";
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  limit?: number;
+};
+
+const toNumber = (d: { toString(): string } | null) => (d === null ? null : Number(d.toString()));
+
+/**
+ * One (city, dish) list: the ranked restaurants (rank = rankInCity, kept current by the re-rank)
+ * and "Not enough votes yet" (ordered by votes, then the latest rating), with the mode and the
+ * thresholds. Null when the city or dish does not exist. Ranks are always city-wide: area,
+ * distance and sort only narrow or reorder (docs/04, Decided 2026-10-22).
+ */
+export async function getRanking(
+  options: RankingOptions,
+  now: Date = new Date(),
+): Promise<Ranking | null> {
+  const [city, dish] = await Promise.all([
+    findCityBySlug(options.citySlug),
+    findDishBySlug(options.dishSlug),
+  ]);
+  if (!city || !dish) return null;
+  const t = thresholdsFor(city.launchedAt, now);
+  const limit = options.limit ?? 100;
+  const rows = await listRankingRows(city.id, dish.id, 400);
+  const from = options.lat !== undefined && options.lng !== undefined ? options : null;
+
+  const base = (r: (typeof rows)[number]): RankingRowBase => {
+    const { lat, lng } = r.restaurant;
+    return {
+      restaurantDishId: r.id,
+      restaurant: {
+        slug: r.restaurant.slug,
+        name: r.restaurant.name,
+        area: r.restaurant.area,
+        priceBand: r.restaurant.priceBand,
+        lat,
+        lng,
+      },
+      votes: r.distinctRaters,
+      price: r.price,
+      variantTags: r.variantTags,
+      status: r.status,
+      lastRatedAt: r.lastRatedAt?.toISOString() ?? null,
+      distanceKm:
+        from && lat !== null && lng !== null
+          ? Math.round(haversineKm({ lat: from.lat!, lng: from.lng! }, { lat, lng }) * 10) / 10
+          : null,
+    };
+  };
+  const keep = (row: RankingRowBase) =>
+    (!options.areaSlug || row.restaurant.area?.slug === options.areaSlug) &&
+    (options.radiusKm === undefined ||
+      (row.distanceKm !== null && row.distanceKm <= options.radiusKm));
+
+  let eligible = rows
+    .filter((r) => r.rankInCity !== null && r.score !== null)
+    .map((r): RankedRow => ({
+      ...base(r),
+      rank: r.rankInCity!,
+      score: toNumber(r.score)!,
+      rawMean: toNumber(r.rawMean),
+    }))
+    .sort((a, b) => a.rank - b.rank)
+    .filter(keep);
+  if (options.sort === "votes")
+    eligible = [...eligible].sort((a, b) => b.votes - a.votes || a.rank - b.rank);
+  if (options.sort === "price") {
+    eligible = [...eligible].sort(
+      (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || a.rank - b.rank,
+    );
+  }
+
+  const insufficient = rows
+    .filter((r) => r.rankInCity === null)
+    .map((r): InsufficientRow => ({
+      ...base(r),
+      ratingsNeeded: ratingsNeeded({ distinctRaters: r.distinctRaters, weightSum: r.weightSum }, t),
+    }))
+    .sort(
+      (a, b) =>
+        b.votes - a.votes ||
+        (b.lastRatedAt ?? "").localeCompare(a.lastRatedAt ?? "") ||
+        a.restaurant.name.localeCompare(b.restaurant.name),
+    )
+    .filter(keep);
+
+  return {
+    city: { slug: city.slug, name: city.name },
+    dish: { id: dish.id, slug: dish.slug, name: dish.name },
+    mode: t.mode,
+    thresholds: { minRaters: t.minRaters, minWeight: t.minWeight },
+    eligible: eligible.slice(0, limit),
+    insufficient: insufficient.slice(0, limit),
+    computedAt: now.toISOString(),
+  };
 }

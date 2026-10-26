@@ -95,6 +95,7 @@ describe("ranking math (docs/04)", () => {
       activePhotoRatings: 0,
       hiddenRatings: 0,
       upheldFlags: 0,
+      recentRatings: [],
     };
     expect(trustFor(base)).toBe(0.6);
     expect(trustFor({ ...base, activeRatings: 3, activePhotoRatings: 1 })).toBe(1.0);
@@ -108,5 +109,30 @@ describe("ranking math (docs/04)", () => {
       0.3,
     );
     expect(trustFor({ ...base, isPanel: true, hiddenRatings: 5 })).toBe(1.3);
+  });
+
+  it("ten 10s (or ten 1s) in a row at more than one restaurant cap trust at 0.6 (abuse control 4)", () => {
+    const base = {
+      isPanel: false,
+      activeRatings: 40,
+      activePhotoRatings: 40,
+      hiddenRatings: 0,
+      upheldFlags: 0,
+    };
+    const tens = (restaurants: number) =>
+      Array.from({ length: 10 }, (_, i) => ({ score: 10, restaurantId: `r${i % restaurants}` }));
+    expect(trustFor({ ...base, recentRatings: tens(1) })).toBe(1.2); // one restaurant: no pattern
+    expect(trustFor({ ...base, recentRatings: tens(2) })).toBe(0.6);
+    expect(trustFor({ ...base, recentRatings: tens(2).map((r) => ({ ...r, score: 1 })) })).toBe(
+      0.6,
+    );
+    expect(
+      trustFor({ ...base, recentRatings: [{ score: 9, restaurantId: "x" }, ...tens(2)] }),
+    ).toBe(
+      1.2, // the newest rating breaks the pattern
+    );
+    expect(trustFor({ ...base, recentRatings: tens(2).slice(0, 9) })).toBe(1.2); // fewer than 10
+    expect(trustFor({ ...base, hiddenRatings: 2, recentRatings: tens(2) })).toBe(0.3);
+    expect(trustFor({ ...base, isPanel: true, recentRatings: tens(2) })).toBe(1.3);
   });
 });

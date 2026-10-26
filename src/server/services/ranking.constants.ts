@@ -21,6 +21,13 @@ export const RANKING = {
     "MENU_VERIFIED",
     "OWNER_VERIFIED",
   ] as const satisfies readonly RestaurantDishStatus[],
+  /**
+   * Nightly step 4: a row with no rating or verification for this long becomes STALE. Age runs
+   * from the latest of lastRatedAt, lastVerifiedAt and createdAt.
+   */
+  staleDays: { unverified: 270, verified: 365 },
+  /** Nightly step 6: the top rows of each list, kept weekly (Sunday in Pakistan). */
+  snapshotTop: 50,
 } as const;
 
 /** docs/04 trust table. */
@@ -36,6 +43,11 @@ export const TRUST = {
   penalised: { trust: 0.3, minHidden: 2 },
   min: 0.3,
   max: 1.5,
+  /**
+   * docs/04 abuse control 4: when the user's last 10 ratings are all 10s or all 1s, across more
+   * than one restaurant, trust is at most the new-account value while the pattern lasts.
+   */
+  extremeScores: { lastRatings: 10 },
 } as const;
 
 /** docs/04 abuse control 3. */

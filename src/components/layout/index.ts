@@ -1,3 +1,4 @@
-// Footer (data sources link); Nav and CityPicker arrive in Phase 4.
+// Footer (trust pages, data sources) and the JSON-LD script tag.
 export { Footer } from "./Footer";
+export { JsonLd } from "./JsonLd";
 export { CDLA_PERMISSIVE_2_URL, OvertureCredit } from "./OvertureCredit";

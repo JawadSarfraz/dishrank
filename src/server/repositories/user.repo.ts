@@ -1,6 +1,7 @@
 import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Role } from "@/server/roles";
+import { TRUST } from "@/server/services/ranking.constants";
 import type { Client, Tx } from "./transaction";
 
 export async function countUsersByRole(): Promise<Record<Role, number>> {
@@ -51,6 +52,12 @@ export async function findTrustStats(userId: string, client: Client = db) {
   const activePhotoRatings = await client.rating.count({
     where: { userId, status: "ACTIVE", photoPath: { not: null } },
   });
+  const last = await client.rating.findMany({
+    where: { userId },
+    orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+    take: TRUST.extremeScores.lastRatings,
+    select: { score: true, restaurantDish: { select: { restaurantId: true } } },
+  });
   const count = (status: string) => byStatus.find((r) => r.status === status)?._count._all ?? 0;
   return {
     isPanel: user.isPanel,
@@ -60,7 +67,55 @@ export async function findTrustStats(userId: string, client: Client = db) {
     // DECISION-PENDING: a Flag points at a dish row, not a rating, so "upheld flags against their
     // ratings" cannot be counted yet; 0 until flags carry the rating they target.
     upheldFlags: 0,
+    recentRatings: last.map((r) => ({
+      score: r.score,
+      restaurantId: r.restaurantDish.restaurantId,
+    })),
   };
+}
+
+/**
+ * The nightly trust step's first pass: every user who is not on the panel or banned, with the
+ * docs/04 table's inputs from one scan of the ratings and their current trust. The step re-checks
+ * each user whose trust would change under the user's row lock (findTrustStats).
+ */
+export async function listTrustSnapshot(client: Client = db) {
+  return client.$queryRaw<
+    {
+      id: string;
+      trustScore: number;
+      activeRatings: number;
+      activePhotoRatings: number;
+      hiddenRatings: number;
+      recentRatings: { score: number; restaurantId: string }[] | null;
+    }[]
+  >`
+    WITH counts AS (
+      SELECT "userId",
+        count(*) FILTER (WHERE status = 'ACTIVE')::int AS active,
+        count(*) FILTER (WHERE status = 'ACTIVE' AND "photoPath" IS NOT NULL)::int AS photos,
+        count(*) FILTER (WHERE status = 'HIDDEN')::int AS hidden
+      FROM "Rating" GROUP BY "userId"
+    ), ordered AS (
+      SELECT rt."userId", rt.score, rd."restaurantId",
+        row_number() OVER (PARTITION BY rt."userId" ORDER BY rt."updatedAt" DESC, rt.id DESC) AS n
+      FROM "Rating" rt JOIN "RestaurantDish" rd ON rd.id = rt."restaurantDishId"
+    ), recent AS (
+      SELECT "userId",
+        json_agg(json_build_object('score', score, 'restaurantId', "restaurantId") ORDER BY n)
+          AS ratings
+      FROM ordered WHERE n <= ${TRUST.extremeScores.lastRatings} GROUP BY "userId"
+    )
+    SELECT u.id, u."trustScore",
+      coalesce(c.active, 0) AS "activeRatings",
+      coalesce(c.photos, 0) AS "activePhotoRatings",
+      coalesce(c.hidden, 0) AS "hiddenRatings",
+      r.ratings AS "recentRatings"
+    FROM "User" u
+    LEFT JOIN counts c ON c."userId" = u.id
+    LEFT JOIN recent r ON r."userId" = u.id
+    WHERE u."isPanel" = false AND u."bannedAt" IS NULL
+    ORDER BY u.id`;
 }
 
 /** Dish rows where the user has a rating that counts (their trust feeds those rows' weights). */

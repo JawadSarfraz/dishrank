@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SITE_URL } from "@/server/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,6 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Relative canonical and Open Graph URLs resolve against the site's own address.
+  metadataBase: new URL(SITE_URL),
   title: "DishRank",
   description: "Restaurants ranked dish by dish in Islamabad and Rawalpindi.",
 };
