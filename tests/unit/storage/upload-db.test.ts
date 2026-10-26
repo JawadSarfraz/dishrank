@@ -83,7 +83,7 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
     );
   });
 
-  it("the Supabase S3 adapter signs a 10-minute PUT bound to the content type, and inspects objects", async () => {
+  it("the Supabase S3 adapter signs a 10-minute PUT bound to the content type, inspects and deletes objects", async () => {
     const storage = supabaseS3Storage(
       {
         endpoint: "https://proj.storage.supabase.co/storage/v1/s3",
@@ -120,7 +120,12 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
           headers: { "content-length": "123456", "content-type": "image/webp" },
         }),
       )
-      .mockResolvedValueOnce(new Response(null, { status: 404 }));
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response("<Error><Code>NoSuchKey</Code></Error>", { status: 404 }))
+      .mockResolvedValueOnce(
+        new Response("<Error><Code>NoSuchBucket</Code></Error>", { status: 404 }),
+      );
     try {
       expect(await storage.inspect({ bucket: "dish-photos", key: "u1/abc.webp" })).toEqual({
         size: 123456,
@@ -128,6 +133,14 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
       });
       expect(fetchMock.mock.calls[0][1]?.method).toBe("HEAD");
       expect(await storage.inspect({ bucket: "dish-photos", key: "u1/missing.webp" })).toBeNull();
+      // Deleted (204), or gone already (404 NoSuchKey); a wrong bucket name is an error.
+      await storage.remove({ bucket: "dish-photos", key: "u1/abc.webp" });
+      const del = new URL(String(fetchMock.mock.calls[2][0]));
+      expect(fetchMock.mock.calls[2][1]?.method).toBe("DELETE");
+      expect(del.pathname).toBe("/storage/v1/s3/dish-photos/u1/abc.webp");
+      expect(del.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
+      await storage.remove({ bucket: "dish-photos", key: "u1/gone.webp" });
+      await expect(storage.remove({ bucket: "no-such", key: "u1/x.webp" })).rejects.toThrow("404");
     } finally {
       fetchMock.mockRestore();
     }

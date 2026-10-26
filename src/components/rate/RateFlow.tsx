@@ -537,14 +537,18 @@ function ScoreStep({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const touched = useRef(false);
+  // Only a photo the diner picked or removed is sent; otherwise the server keeps the earlier one.
+  const photoTouched = useRef(false);
 
-  // An earlier rating found after the step opened fills the form, unless the user already started.
+  // An earlier rating found after the step opened fills the form, unless the user already started;
+  // its photo always shows unless the diner changed the photo.
   useEffect(() => {
-    if (!existing || touched.current) return;
+    if (!existing) return;
+    if (!photoTouched.current) setPhotoPath(existing.photoPath);
+    if (touched.current) return;
     setScore(existing.score);
     setSubs({ taste: existing.taste, portion: existing.portion, value: existing.value });
     setComment(existing.comment ?? "");
-    setPhotoPath(existing.photoPath);
   }, [existing]);
 
   function submit() {
@@ -559,7 +563,7 @@ function ScoreStep({
           score,
           ...Object.fromEntries(Object.entries(subs).filter(([, v]) => v !== null)),
           ...(comment.trim() ? { comment: comment.trim() } : {}),
-          ...(photoPath ? { photoPath } : {}),
+          ...(photoPath ? { photoPath } : photoTouched.current ? { photoPath: null } : {}),
         });
       } catch {
         setError("The rating did not reach the server. Check the connection and try again.");
@@ -660,6 +664,7 @@ function ScoreStep({
               current={photoPath}
               onUploaded={(path) => {
                 touched.current = true;
+                photoTouched.current = true;
                 setPhotoPath(path);
               }}
               onBusy={setUploading}

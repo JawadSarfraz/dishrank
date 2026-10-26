@@ -25,7 +25,7 @@ const amzDate = (d: Date) =>
     .replace(/\.\d{3}/, "");
 
 export type PresignRequest = {
-  method: "GET" | "PUT" | "HEAD";
+  method: "GET" | "PUT" | "HEAD" | "DELETE";
   /** The object URL without a query string. */
   url: string;
   expiresInSeconds: number;

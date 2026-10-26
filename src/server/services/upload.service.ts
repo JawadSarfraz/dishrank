@@ -6,6 +6,7 @@ import { env } from "@/env";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
+import { findRatingByPhotoPath } from "@/server/repositories/rating.repo";
 import { findRater } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import { getStorage, type StorageAdapter } from "@/server/storage";
@@ -18,6 +19,9 @@ export const UPLOAD = {
   maxBytes: 5 * 1024 * 1024,
 } as const;
 
+/** A rating's photoPath is this prefix + the object key in the dish-photos bucket. */
+const PHOTO_PREFIX = "dish-photos/";
+
 /**
  * A rating's photo must be the user's own upload that really arrived: in their folder, present in
  * storage, ≤ 5 MB and JPEG or WebP (the bucket limits check the same, docs/10). A photo counts toward
@@ -28,13 +32,13 @@ export async function verifyUploadedPhoto(
   userId: string,
   storage: StorageAdapter | null,
 ) {
-  if (!path.startsWith(`dish-photos/${userId}/`)) {
+  if (!path.startsWith(`${PHOTO_PREFIX}${userId}/`)) {
     throw new AppError("PHOTO_NOT_YOURS", "That photo was not uploaded by you", 400);
   }
   if (!storage) throw new AppError("UPLOADS_DISABLED", "Photo uploads are not set up yet", 400);
   const object = await storage.inspect({
     bucket: env.SUPABASE_DISH_PHOTOS_BUCKET,
-    key: path.slice("dish-photos/".length),
+    key: path.slice(PHOTO_PREFIX.length),
   });
   if (!object) throw new AppError("PHOTO_NOT_FOUND", "The photo did not finish uploading", 400);
   const types: readonly string[] = Object.keys(UPLOAD.extensions);
@@ -75,10 +79,43 @@ export async function signPhotoUpload(
   });
   logEvent("upload.sign", { userId: user.id, storage: storage.name, bytes: input.sizeBytes });
   return {
-    path: `dish-photos/${key}`,
+    path: `${PHOTO_PREFIX}${key}`,
     uploadUrl: signed.uploadUrl,
     method: "PUT" as const,
     headers: signed.headers,
     expiresAt: signed.expiresAt.toISOString(),
   };
+}
+
+/**
+ * Deletes photo files no rating uses any more: after a rating was deleted, its photo replaced or
+ * removed, or the rating merged away. Called after the database change committed, so it never fails
+ * the request: a failure is logged with the path for a manual clean-up. A path that a rating uses
+ * again by now is kept.
+ */
+export async function deleteUnusedPhotos(
+  paths: readonly (string | null | undefined)[],
+  storage: StorageAdapter | null = getStorage(),
+) {
+  const unique = new Set(paths.filter((p): p is string => Boolean(p?.startsWith(PHOTO_PREFIX))));
+  for (const path of unique) {
+    try {
+      if (await findRatingByPhotoPath(path)) continue;
+      if (!storage) {
+        logEvent("photo.delete_skipped", { path, reason: "storage not configured" }, "warn");
+        continue;
+      }
+      await storage.remove({
+        bucket: env.SUPABASE_DISH_PHOTOS_BUCKET,
+        key: path.slice(PHOTO_PREFIX.length),
+      });
+      logEvent("photo.delete", { path });
+    } catch (error) {
+      logEvent(
+        "photo.delete_failed",
+        { path, error: error instanceof Error ? error.message : String(error) },
+        "error",
+      );
+    }
+  }
 }

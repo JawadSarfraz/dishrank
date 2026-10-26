@@ -65,6 +65,8 @@ import type {
 } from "@/server/validation";
 import { rethrowConflict } from "./conflict";
 import { recomputeEach, rerankRestaurant } from "./ranking.service";
+import { deleteUnusedPhotos } from "./upload.service";
+import type { StorageAdapter } from "@/server/storage";
 import { cleanText } from "./matching/normalize";
 import {
   planClaimMerge,
@@ -555,6 +557,8 @@ export type MergeResult = {
   locationMoved: boolean;
   /** Kept rows whose ratings changed: recomputeOne runs on them after commit. */
   recomputeIds: string[];
+  /** Photos of the dropped (older) ratings: their files are deleted after commit. */
+  droppedPhotoPaths: string[];
   /** Dishes of the source, whose ranking pages change. */
   dishSlugs: string[];
 };
@@ -618,6 +622,8 @@ export async function mergeRestaurants(
   sourceId: string,
   targetId: string,
   afterCommit: (recomputeIds: readonly string[]) => Promise<void> = recomputeAfterMerge,
+  /** Photo storage; defaults to the configured one (tests pass their own). */
+  storage?: StorageAdapter | null,
 ): Promise<MergeResult> {
   const admin = assertRole(actor, "ADMIN");
   if (sourceId === targetId) {
@@ -682,6 +688,7 @@ export async function mergeRestaurants(
       overtureIdMoved: false,
       locationMoved: false,
       recomputeIds: [],
+      droppedPhotoPaths: [],
       dishSlugs: sourceDishes.map((rd) => rd.dish.slug),
     };
 
@@ -714,7 +721,11 @@ export async function mergeRestaurants(
         // The user keeps one rating where they had two.
         const delta = counterDeltas.get(older.userId) ?? { ratings: 0, photos: 0 };
         delta.ratings -= 1;
-        if (photoOf.get(older.id)) delta.photos -= 1;
+        const photo = photoOf.get(older.id);
+        if (photo) {
+          delta.photos -= 1;
+          out.droppedPhotoPaths.push(photo);
+        }
         counterDeltas.set(older.userId, delta);
         out.mergedRatings.push({ keptId: kept.id, droppedId: older.id });
       }
@@ -810,6 +821,9 @@ export async function mergeRestaurants(
     return out;
   }, 60_000).catch(rethrowConflict);
 
+  // No rating uses the dropped ratings' photos any more. First, so a failure in the steps below
+  // never leaves them behind (best effort: failures are logged with the path).
+  await deleteUnusedPhotos(result.droppedPhotoPaths, storage);
   await afterCommit(result.recomputeIds);
   // The target now holds the source's dish rows: re-rank its lists (names break ties).
   await rerankRestaurant(targetId);

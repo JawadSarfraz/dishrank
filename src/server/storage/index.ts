@@ -24,6 +24,8 @@ export interface StorageAdapter {
   }): Promise<SignedUpload>;
   /** Size and type of a stored object, or null when it does not exist. */
   inspect(input: { bucket: string; key: string }): Promise<StoredObject | null>;
+  /** Deletes an object; a key that does not exist is not an error. */
+  remove(input: { bucket: string; key: string }): Promise<void>;
 }
 
 export type S3Config = {
@@ -83,6 +85,24 @@ export function supabaseS3Storage(
         size: Number(res.headers.get("content-length") ?? "0"),
         contentType: res.headers.get("content-type") ?? "",
       };
+    },
+    async remove({ bucket, key }) {
+      const url = presignS3({
+        method: "DELETE",
+        endpoint: config.endpoint,
+        bucket,
+        key,
+        expiresInSeconds: 60,
+        signedHeaders: {},
+        credentials,
+        now: now(),
+      });
+      const res = await fetch(url, { method: "DELETE", cache: "no-store" });
+      if (res.ok) return; // 204, also for a missing key on current Supabase Storage
+      // Older versions answer 404 NoSuchKey for a missing key: gone already. A missing bucket is a
+      // configuration error and must not pass silently.
+      if (res.status === 404 && !(await res.text()).includes("NoSuchBucket")) return;
+      throw new Error(`Storage answered ${res.status}`);
     },
   };
 }

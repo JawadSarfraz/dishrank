@@ -115,20 +115,30 @@ describe("review follow-ups (test DB)", () => {
     expect(await db.rating.count({ where: { status: "HELD" } })).toBe(5);
   });
 
-  it("a merge keeps each user's counters right and moves held-rating items to the kept row", async () => {
+  it("a merge keeps each user's counters right, deletes only the dropped rating's photo, and moves held-rating items", async () => {
     const realAdmin = admin;
     const source = await makeRestaurant("Fixture Merge Source");
     const target = await makeRestaurant("Fixture Merge Target");
     const both = await oldUser("Rated Both");
-    await rate(both, source.id, "chai", {}, new Date(NOW.getTime() - 2 * HOUR));
-    await rate(both, target.id, "chai", {}, new Date(NOW.getTime() - HOUR));
+    const photo = (name: string) => {
+      photos.objects[`${both.id}/${name}`] = { size: 100_000, contentType: "image/webp" };
+      return { photoPath: `dish-photos/${both.id}/${name}` };
+    };
+    await rate(both, source.id, "chai", photo("older.webp"), new Date(NOW.getTime() - 2 * HOUR));
+    await rate(both, target.id, "chai", photo("newer.webp"), new Date(NOW.getTime() - HOUR));
+    photos.removed.length = 0;
     // A held comment on each restaurant's chai: two open COMMENT items.
     const s = await rate(await oldUser("S"), source.id, "chai", { comment: "www.a.pk" });
     const t = await rate(await oldUser("T"), target.id, "chai", { comment: "www.b.pk" });
     expect((await db.user.findUniqueOrThrow({ where: { id: both.id } })).ratingsCount).toBe(2);
 
-    await mergeRestaurants(realAdmin, source.id, target.id);
-    expect((await db.user.findUniqueOrThrow({ where: { id: both.id } })).ratingsCount).toBe(1);
+    await mergeRestaurants(realAdmin, source.id, target.id, undefined, photos.adapter);
+    expect(await db.user.findUniqueOrThrow({ where: { id: both.id } })).toMatchObject({
+      ratingsCount: 1,
+      photoRatings: 1,
+    });
+    // The newer rating is kept with its photo; the older one's photo file goes.
+    expect(photos.removed).toEqual([`${both.id}/older.webp`]);
     const open = await openItems();
     expect(open).toHaveLength(1);
     expect(open[0].payload).toMatchObject({

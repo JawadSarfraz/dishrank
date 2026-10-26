@@ -51,7 +51,7 @@ import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, USER_DISH } from "./ranking.constants";
 import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
-import { verifyUploadedPhoto } from "./upload.service";
+import { deleteUnusedPhotos, verifyUploadedPhoto } from "./upload.service";
 
 /** Why a rating is held: its comment (docs/04 control 5) or a burst of new accounts (control 3). */
 export type HoldReason = "COMMENT" | "BURST";
@@ -230,9 +230,12 @@ export async function createOrReplace(
   const restaurant = await loadRateableRestaurant(input.restaurantId, rater.id);
   const dish = await loadDish(input.dishId);
   const existingRow = await findRestaurantDish(restaurant.id, dish.id);
+  // Set when the photo was checked here; skipped when the rating already had that photo.
+  let photoChecked = false;
   if (input.photoPath) {
     const previous = existingRow ? await findRatingOfUser(existingRow.id, rater.id) : null;
     if (input.photoPath !== previous?.photoPath) {
+      photoChecked = true;
       await verifyUploadedPhoto(
         input.photoPath,
         rater.id,
@@ -276,6 +279,11 @@ export async function createOrReplace(
     // Locked: an admin decision on this rating is either already committed (and kept below) or
     // waits until this edit commits.
     const previous = await lockRatingOfUser(rd.id, rater.id, tx);
+    // The rating changed since the photo check above was skipped for it (an edit in another tab):
+    // that photo may be deleted by now, so ask for a retry, which checks it.
+    if (input.photoPath && !photoChecked && input.photoPath !== previous?.photoPath) {
+      throw new AppError("CONFLICT", "This changed at the same time elsewhere. Try again.", 409);
+    }
     // An admin's HELD or HIDDEN decision survives an edit; a flagged comment holds an active one.
     const status: RatingStatus =
       previous && previous.status !== "ACTIVE" ? previous.status : flag ? "HELD" : "ACTIVE";
@@ -285,7 +293,8 @@ export async function createOrReplace(
       portion: input.portion ?? null,
       value: input.value ?? null,
       comment: input.comment ?? null,
-      photoPath: input.photoPath ?? null,
+      // Missing keeps the earlier photo; null removes it.
+      photoPath: input.photoPath === undefined ? (previous?.photoPath ?? null) : input.photoPath,
       status,
       weight: rater.trustScore, // trust at write time, for the record (docs/03)
       ipHash: ctx.ipHash ?? null,
@@ -358,6 +367,9 @@ export async function createOrReplace(
       restaurantDishId: rd.id,
       created: !previous,
       rowCreated: ensured.created,
+      // The edit replaced or removed the photo: its file is deleted after the commit.
+      droppedPhotoPath:
+        previous?.photoPath && previous.photoPath !== fields.photoPath ? previous.photoPath : null,
       // A held or hidden rating does not count; the diner sees "under review" or "not counted".
       held: finalStatus !== "ACTIVE",
       heldReason,
@@ -384,6 +396,10 @@ export async function createOrReplace(
     );
     return undefined;
   });
+  await deleteUnusedPhotos(
+    [written.droppedPhotoPath],
+    ctx.storage === undefined ? getStorage() : ctx.storage,
+  );
   logEvent("rating.write", {
     userId: rater.id,
     entityId: written.ratingId,
@@ -442,7 +458,7 @@ export async function deleteOwn(
     );
   }
   await assertRateLimit(`user:${user.id}:rating-delete`, RATE_LIMITS.ratingDelete, now);
-  const rowId = await inTransaction(async (tx) => {
+  const { rowId, photoPath } = await inTransaction(async (tx) => {
     // The shared lock order (restaurant → dish row → rating): a merge that moved this rating
     // meanwhile is seen, and the row recomputed below is the one it is on now.
     const row = await findRatingRow(rating.id, tx);
@@ -464,9 +480,11 @@ export async function deleteOwn(
     }
     await deleteRating(live.id, tx); // its history goes with it (cascade)
     await adjustRatingCounters(user.id, { ratings: -1, photos: live.photoPath ? -1 : 0 }, tx);
-    return row.restaurantDishId;
+    return { rowId: row.restaurantDishId, photoPath: live.photoPath };
   });
   await recomputeEach([rowId], now); // the delete is committed: a failure is only logged
+  // Its photo file goes too (best effort: a failure is logged, the delete stands).
+  await deleteUnusedPhotos([photoPath], ctx.storage === undefined ? getStorage() : ctx.storage);
   logEvent("rating.delete", { userId: user.id, entityId: rating.id });
   const [page] = await listDishPagesOfRows([rowId]);
   return {

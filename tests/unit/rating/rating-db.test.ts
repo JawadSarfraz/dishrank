@@ -233,26 +233,50 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
     expect(RATE_LIMITS.ratingPanel.limit).toBe(30);
   });
 
-  it("deleteOwn removes only the user's own rating, with its history, and recomputes", async () => {
+  it("deleteOwn removes only the user's own rating, with its history and photo files, and recomputes", async () => {
     const user = await oldUser();
     const other = await oldUser("Other");
     const r = await makeRestaurant("Fixture Delete");
-    const mine = await rate(user, r.id, "haleem", { score: 6 });
-    await rate(user, r.id, "haleem", { score: 7 }); // history row
-    const theirs = await rate(other, r.id, "haleem");
-    await expect(deleteOwn(actorOf(other), mine.ratingId, { now: NOW })).rejects.toMatchObject({
-      code: "NOT_FOUND",
+    const photo = (name: string) => {
+      photos.objects[`${user.id}/${name}`] = { size: 200_000, contentType: "image/webp" };
+      return { photoPath: `dish-photos/${user.id}/${name}` };
+    };
+    photos.removed.length = 0;
+    const mine = await rate(user, r.id, "haleem", { score: 6, ...photo("first.webp") });
+    // An edit with a new photo keeps a history row; nothing uses the first photo any more.
+    await rate(user, r.id, "haleem", { score: 7, ...photo("second.webp") });
+    expect(photos.removed).toEqual([`${user.id}/first.webp`]);
+    // An edit that sends no photo keeps it (the form may not have loaded it yet); null removes it.
+    await rate(user, r.id, "haleem", { score: 8 });
+    expect(photos.removed).toHaveLength(1);
+    const r2 = await makeRestaurant("Fixture Delete Two"); // 3 a day at one restaurant
+    const chai = await rate(user, r2.id, "chai", photo("third.webp"));
+    await rate(user, r2.id, "chai", { photoPath: null });
+    expect(photos.removed).toEqual([`${user.id}/first.webp`, `${user.id}/third.webp`]);
+    expect(await db.rating.findUniqueOrThrow({ where: { id: chai.ratingId } })).toMatchObject({
+      photoPath: null,
     });
-    const deleted = await deleteOwn(actorOf(user), mine.ratingId, { now: NOW });
+    photos.removed.length = 0;
+    const theirs = await rate(other, r.id, "haleem");
+    await expect(
+      deleteOwn(actorOf(other), mine.ratingId, { now: NOW, storage: photos.adapter }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(photos.removed).toHaveLength(0);
+    const deleted = await deleteOwn(actorOf(user), mine.ratingId, {
+      now: NOW,
+      storage: photos.adapter,
+    });
     expect(deleted).toMatchObject({ id: mine.ratingId, dishSlug: "haleem" });
+    expect(photos.removed).toEqual([`${user.id}/second.webp`]);
     expect(await db.rating.findUnique({ where: { id: mine.ratingId } })).toBeNull();
-    expect(await db.ratingHistory.count()).toBe(0);
+    expect(await db.ratingHistory.count({ where: { ratingId: mine.ratingId } })).toBe(0);
     const row = await db.restaurantDish.findUniqueOrThrow({
       where: { id: theirs.restaurantDishId },
     });
     expect(row).toMatchObject({ ratingCount: 1 });
     expect(await db.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({
-      ratingsCount: 0,
+      ratingsCount: 1, // the chai rating, now without a photo
+      photoRatings: 0,
     });
   });
 

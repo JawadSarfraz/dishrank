@@ -34,9 +34,11 @@ export const ratingInput = z.strictObject({
   portion: subScore,
   value: subScore,
   comment: optionalText(280),
+  /** On an edit: missing keeps the earlier photo, null removes it (its file is deleted). */
   photoPath: z
     .string()
     .regex(/^dish-photos\/[a-z0-9]+\/[a-z0-9]+\.(jpg|jpeg|webp)$/, "Invalid photo path")
+    .nullable()
     .optional(),
 });
 export type RatingInput = z.infer<typeof ratingInput>;
