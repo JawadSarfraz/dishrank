@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PanelToggle } from "@/components/admin/PanelToggle";
+import { TrustOverride } from "@/components/admin/TrustOverride";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
     <main className="flex flex-col gap-4">
       <h1 className="text-2xl font-bold">Users</h1>
       <p className="text-sm">
-        Panel members are trusted early raters: trust fixed at 1.3, 30 ratings a day and 10 per
-        restaurant, never held by the new-account burst rule, still blocked from their own
-        restaurants (docs/04). Turning the panel off returns trust to the docs/04 table.
+        Panel members are trusted early raters: trust 1.3, 30 ratings a day and 10 per restaurant,
+        never held by the new-account burst rule, still blocked from their own restaurants
+        (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand
+        (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table.
       </p>
       <form className="flex flex-wrap items-end gap-2" role="search">
         <label className="flex flex-col gap-1 text-sm">
@@ -66,11 +68,15 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
                 {u.bannedAt && <Badge variant="destructive">Banned</Badge>}
               </span>
               <span className="text-muted-foreground">
-                {u.email} · trust {u.trustScore.toFixed(1)} · {u.ratingsCount} ratings · joined{" "}
-                {date.format(u.createdAt)}
+                {u.email} · trust {u.trustScore.toFixed(2)}
+                {u.trustOverride !== null ? " (set by hand)" : ""} · {u.ratingsCount} ratings ·
+                joined {date.format(u.createdAt)}
               </span>
             </div>
-            <PanelToggle userId={u.id} isPanel={u.isPanel} name={u.name} />
+            <div className="flex flex-col items-end gap-2">
+              <PanelToggle userId={u.id} isPanel={u.isPanel} name={u.name} />
+              <TrustOverride userId={u.id} trustOverride={u.trustOverride} name={u.name} />
+            </div>
           </li>
         ))}
         {items.length === 0 && <li className="p-3 text-sm">No users match.</li>}

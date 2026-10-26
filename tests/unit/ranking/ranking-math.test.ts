@@ -90,6 +90,7 @@ describe("ranking math (docs/04)", () => {
 
   it("trust follows the docs/04 table: panel first, then the 2-hidden penalty, then 1.2, 1.0, 0.6", () => {
     const base = {
+      trustOverride: null,
       isPanel: false,
       activeRatings: 0,
       activePhotoRatings: 0,
@@ -109,10 +110,15 @@ describe("ranking math (docs/04)", () => {
       0.3,
     );
     expect(trustFor({ ...base, isPanel: true, hiddenRatings: 5 })).toBe(1.3);
+    // An admin's override wins over every row, the panel included, within 0.3..1.5.
+    expect(trustFor({ ...base, trustOverride: 1.1, hiddenRatings: 5 })).toBe(1.1);
+    expect(trustFor({ ...base, trustOverride: 0.4, isPanel: true })).toBe(0.4);
+    expect(trustFor({ ...base, trustOverride: 9 })).toBe(1.5);
   });
 
   it("ten 10s (or ten 1s) in a row at more than one restaurant cap trust at 0.6 (abuse control 4)", () => {
     const base = {
+      trustOverride: null,
       isPanel: false,
       activeRatings: 40,
       activePhotoRatings: 40,

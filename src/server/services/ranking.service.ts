@@ -93,6 +93,8 @@ export function ratingsNeeded(
 }
 
 export type TrustStats = {
+  /** Set by an admin on /admin/users: wins over every row of the table, also the nightly job. */
+  trustOverride: number | null;
   isPanel: boolean;
   activeRatings: number;
   activePhotoRatings: number;
@@ -104,12 +106,13 @@ export type TrustStats = {
 };
 
 /**
- * docs/04 trust table, in this order: panel 1.3 (fixed) → ≥ 2 ratings hidden by an admin 0.3 →
- * the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2 → ≥ 3
- * active and ≥ 1 with a photo 1.0 → 0.6.
+ * docs/04 trust table, in this order: an admin's override → panel 1.3 → ≥ 2 ratings hidden by an
+ * admin 0.3 → the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2
+ * → ≥ 3 active and ≥ 1 with a photo 1.0 → 0.6.
  */
-// DECISION-PENDING: docs/04 gives no order for overlapping rows; this one puts penalties first.
+// DECISION-PENDING: docs/04 gives no order for overlapping rows; this one puts the admin's override first, then penalties.
 export function trustFor(s: TrustStats): number {
+  if (s.trustOverride !== null) return Math.min(TRUST.max, Math.max(TRUST.min, s.trustOverride));
   if (s.isPanel) return TRUST.panel;
   if (s.hiddenRatings >= TRUST.penalised.minHidden) return TRUST.penalised.trust;
   if (isExtremePattern(s.recentRatings)) return TRUST.newAccount;

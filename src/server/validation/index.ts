@@ -2,6 +2,7 @@
 // Rules that need the database or the session (ownership, roles, rate limits) are enforced in
 // services, not here.
 import { z } from "zod";
+import { TRUST } from "@/server/services/ranking.constants";
 import {
   CandidateSkipReason,
   FlagReason,
@@ -192,11 +193,16 @@ export const adminUserListQuery = z.object({
 });
 export type AdminUserListQuery = z.infer<typeof adminUserListQuery>;
 
-/**
- * PATCH /api/v1/admin/users/:id. Phase 3 changes only the panel flag; the flag is never accepted
- * from any non-admin input (docs/09 Prompt 4).
- */
-export const adminUserUpdateInput = z.strictObject({ isPanel: z.boolean() });
+/** The panel flag; never accepted from any non-admin input (docs/09 Prompt 4). */
+export const adminPanelInput = z.strictObject({ isPanel: z.boolean() });
+
+/** A trust score an admin sets by hand (docs/04 trust range), or null to return to the table. */
+export const adminTrustInput = z.strictObject({
+  trustOverride: z.number().min(TRUST.min).max(TRUST.max).nullable(),
+});
+
+/** PATCH /api/v1/admin/users/:id: one change per request, the panel flag or the trust override. */
+export const adminUserUpdateInput = z.union([adminPanelInput, adminTrustInput]);
 export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateInput>;
 
 /** /admin/rankings "Launch city": sets City.launchedAt once (docs/06 admin cities launch). */

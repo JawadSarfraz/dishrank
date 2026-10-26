@@ -42,7 +42,10 @@ export async function lockUser(id: string, tx: Tx) {
  * another: inside a transaction they share one connection.
  */
 export async function findTrustStats(userId: string, client: Client = db) {
-  const user = await client.user.findUnique({ where: { id: userId }, select: { isPanel: true } });
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: { isPanel: true, trustOverride: true },
+  });
   if (!user) return null;
   const byStatus = await client.rating.groupBy({
     by: ["status"],
@@ -60,6 +63,7 @@ export async function findTrustStats(userId: string, client: Client = db) {
   });
   const count = (status: string) => byStatus.find((r) => r.status === status)?._count._all ?? 0;
   return {
+    trustOverride: user.trustOverride,
     isPanel: user.isPanel,
     activeRatings: count("ACTIVE"),
     activePhotoRatings,
@@ -76,14 +80,15 @@ export async function findTrustStats(userId: string, client: Client = db) {
 
 /**
  * The nightly trust step's first pass: every user who is not on the panel or banned, with the
- * docs/04 table's inputs from one scan of the ratings and their current trust. The step re-checks
- * each user whose trust would change under the user's row lock (findTrustStats).
+ * docs/04 table's inputs from one scan of the ratings, their override and their current trust. The
+ * step re-checks each user whose trust would change under the user's row lock (findTrustStats).
  */
 export async function listTrustSnapshot(client: Client = db) {
   return client.$queryRaw<
     {
       id: string;
       trustScore: number;
+      trustOverride: number | null;
       activeRatings: number;
       activePhotoRatings: number;
       hiddenRatings: number;
@@ -106,7 +111,7 @@ export async function listTrustSnapshot(client: Client = db) {
           AS ratings
       FROM ordered WHERE n <= ${TRUST.extremeScores.lastRatings} GROUP BY "userId"
     )
-    SELECT u.id, u."trustScore",
+    SELECT u.id, u."trustScore", u."trustOverride",
       coalesce(c.active, 0) AS "activeRatings",
       coalesce(c.photos, 0) AS "activePhotoRatings",
       coalesce(c.hidden, 0) AS "hiddenRatings",
@@ -134,6 +139,7 @@ export type AdminUserRow = {
   role: Role;
   isPanel: boolean;
   trustScore: number;
+  trustOverride: number | null;
   ratingsCount: number;
   bannedAt: Date | null;
   createdAt: Date;
@@ -170,6 +176,7 @@ export async function listUsersPage(input: {
         role: true,
         isPanel: true,
         trustScore: true,
+        trustOverride: true,
         ratingsCount: true,
         bannedAt: true,
         createdAt: true,
@@ -188,6 +195,6 @@ export async function updateUserById(
   return client.user.update({
     where: { id },
     data,
-    select: { id: true, isPanel: true, trustScore: true },
+    select: { id: true, isPanel: true, trustScore: true, trustOverride: true },
   });
 }

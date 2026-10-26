@@ -29,6 +29,10 @@ const TRUST_ROWS: [string, string][] = [
     TRUST.penalised.trust.toFixed(1),
   ],
   ["Banned account", "ratings no longer count"],
+  [
+    "Set by our team for one rater, in exceptional cases",
+    `${TRUST.min.toFixed(1)} to ${TRUST.max.toFixed(1)}, until we clear it`,
+  ],
 ];
 
 export default function HowRankingsWorkPage() {
@@ -111,8 +115,8 @@ export default function HowRankingsWorkPage() {
         </tbody>
       </table>
       <p className="text-sm text-muted-foreground">
-        Trust levels are worked out again every night. A rater whose last 10 ratings are all 10s or
-        all 1s counts as a new account until that changes.
+        Trust levels are worked out again every night, except one our team set by hand. A rater
+        whose last 10 ratings are all 10s or all 1s counts as a new account until that changes.
       </p>
 
       <h2 className="text-lg font-semibold">Keeping it fair</h2>
