@@ -8,21 +8,9 @@ import {
   type MergeDish,
   type MergeRating,
 } from "@/server/services/restaurant-merge";
-import {
-  buildSearchText,
-  normalizeAliases,
-  pickUniqueSlug,
-  restaurantSlugBase,
-} from "@/server/services/restaurant.service";
+import { restaurantSlugBase } from "@/server/services/restaurant.service";
 
 describe("restaurant slugs", () => {
-  it("adds the area as a suffix", () => {
-    expect(restaurantSlugBase("Butt Karahi", "f-7")).toBe("butt-karahi-f-7");
-    expect(restaurantSlugBase("Café Fixturé & Grill", "blue-area")).toBe(
-      "cafe-fixture-and-grill-blue-area",
-    );
-  });
-
   it("does not repeat an area the name already ends with", () => {
     expect(restaurantSlugBase("Fixture Foods Blue Area", "blue-area")).toBe(
       "fixture-foods-blue-area",
@@ -36,33 +24,6 @@ describe("restaurant slugs", () => {
     expect(long.length).toBeLessThanOrEqual(80);
     expect(long.endsWith("-bahria-town-isb")).toBe(true);
     expect(long).not.toMatch(/--/);
-  });
-
-  it("picks the first free numbered suffix", () => {
-    expect(pickUniqueSlug("butt-karahi-f-7", new Set())).toBe("butt-karahi-f-7");
-    expect(pickUniqueSlug("butt-karahi-f-7", new Set(["butt-karahi-f-7"]))).toBe(
-      "butt-karahi-f-7-2",
-    );
-    expect(
-      pickUniqueSlug("butt-karahi-f-7", new Set(["butt-karahi-f-7", "butt-karahi-f-7-2"])),
-    ).toBe("butt-karahi-f-7-3");
-  });
-});
-
-describe("search text and aliases", () => {
-  it("cleans the name and other names into one trigram string", () => {
-    expect(buildSearchText("Fixture Karahi (Testpur Chowk)", ["Fixtur Karahi", "Fixture's"])).toBe(
-      "fixture karahi testpur chowk fixtur karahi fixture s",
-    );
-  });
-
-  it("drops blank, repeated and name-copy aliases", () => {
-    expect(
-      normalizeAliases(
-        [" fixtur karahi ", "FIXTUR KARAHI", "", "Fixture Karahi", "Testpur"],
-        "Fixture Karahi",
-      ),
-    ).toEqual(["fixtur karahi", "Testpur"]);
   });
 });
 

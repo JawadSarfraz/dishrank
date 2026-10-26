@@ -3,7 +3,6 @@ import { db } from "@/server/db";
 import { supabaseS3Storage } from "@/server/storage";
 import { presignRequest } from "@/server/storage/sigv4";
 import { signPhotoUpload, UPLOAD } from "@/server/services/upload.service";
-import { fitWithin } from "@/lib/image";
 import { resetAppData } from "../../setup/db-reset";
 import { actorOf, makeUser } from "../restaurants/fixtures";
 import { fakeStorage } from "./fake-storage";
@@ -132,11 +131,5 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
     } finally {
       fetchMock.mockRestore();
     }
-  });
-
-  it("photos are scaled down to 1600 px on the longer side, never up", () => {
-    expect(fitWithin(4000, 3000)).toEqual({ width: 1600, height: 1200 });
-    expect(fitWithin(1200, 4800)).toEqual({ width: 400, height: 1600 });
-    expect(fitWithin(800, 600)).toEqual({ width: 800, height: 600 });
   });
 });

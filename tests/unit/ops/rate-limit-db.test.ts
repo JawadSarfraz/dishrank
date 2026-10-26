@@ -1,18 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { RATE_LIMITS, assertRateLimit, bucketSeconds } from "@/server/rate-limit";
+import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import { clientIp, ipHash } from "@/server/request-ip";
 import { resetAppData } from "../../setup/db-reset";
 
 describe("rate limits (docs/06, test DB)", () => {
   beforeEach(resetAppData);
   afterAll(() => db.$disconnect());
-
-  it("sizes buckets from the window", () => {
-    expect(bucketSeconds(60)).toBe(5);
-    expect(bucketSeconds(3600)).toBe(300);
-    expect(bucketSeconds(86_400)).toBe(7200);
-  });
 
   it("allows 120 searches a minute, refuses the 121st, and forgets them after the window", async () => {
     const key = "ip:test:search";

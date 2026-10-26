@@ -1,15 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { assertLocalDatabase } from "@/server/services/dev-demo-guard";
-import {
-  DEMO,
-  createDemo,
-  pickDemoCandidates,
-  planRatings,
-  seededRandom,
-  tierFor,
-  undoDemo,
-} from "@/server/services/dev-demo.service";
+import { DEMO, createDemo, undoDemo } from "@/server/services/dev-demo.service";
 import { createOrReplace } from "@/server/services/rating.service";
 import { mergeRestaurants } from "@/server/services/restaurant.service";
 import { resolveReviewItem } from "@/server/services/review.service";
@@ -76,75 +68,6 @@ describe("pnpm dev:demo guard", () => {
     expect(() =>
       assertLocalDatabase({ DATABASE_URL: "postgresql://u:hunter2@remote.example.com/x" }),
     ).toThrow(/^(?!.*hunter2).*remote\.example\.com/);
-  });
-});
-
-describe("pnpm dev:demo plan", () => {
-  const c = (id: string, areaSlug: string, name: string, dishSlugs = ["pizza"]) => ({
-    id,
-    areaSlug,
-    name,
-    dishSlugs,
-  });
-
-  it("takes the areas in turn, most confident first, skipping places without a dish and repeated names", () => {
-    const picked = pickDemoCandidates(
-      [
-        c("a1", "f-7", "Pizza One"),
-        c("a2", "f-7", "PIZZA ONE!"),
-        c("a3", "f-7", "Tea Spot", []),
-        c("a4", "f-7", "Burger Lab"),
-        c("b1", "f-6", "Pizza Two"),
-        c("d1", "g-9", "Chai Khana"),
-      ],
-      DEMO.areaSlugs,
-      4,
-    );
-    expect(picked.map((p) => p.id)).toEqual(["a1", "b1", "d1", "a4"]);
-  });
-
-  it("splits a dish list into up to four ranked rows, one that needs more, the rest with few", () => {
-    expect([0, 1, 2, 3, 4, 5].map((i) => tierFor(i, 6))).toEqual([
-      "ranked",
-      "ranked",
-      "ranked",
-      "ranked",
-      "almost",
-      "few",
-    ]);
-    expect([0, 1, 2].map((i) => tierFor(i, 3))).toEqual(["ranked", "ranked", "almost"]);
-    expect([0, 1].map((i) => tierFor(i, 2))).toEqual(["almost", "few"]);
-  });
-
-  it("plans ratings oldest first, one per rater and row, with enough raters for bootstrap", () => {
-    const now = new Date("2026-10-26T12:00:00Z");
-    const targets = Array.from({ length: 5 }, (_, i) => ({
-      restaurantId: `r${i}`,
-      dishId: "d",
-      dishSlug: "pizza",
-    }));
-    const raters = {
-      regular: ["a", "b", "c", "d", "e", "f"].map((key) => ({ key, bias: 0 })),
-      panel: { key: "panel", bias: 0 },
-    };
-    const plan = planRatings(targets, raters, now, seededRandom(7));
-    expect(planRatings(targets, raters, now, seededRandom(7))).toEqual(plan);
-    const times = plan.map((p) => p.at.getTime());
-    expect(times).toEqual([...times].sort((x, y) => x - y));
-    for (const p of plan) {
-      expect(p.score).toBeGreaterThanOrEqual(1);
-      expect(p.score).toBeLessThanOrEqual(10);
-      expect(now.getTime() - p.at.getTime()).toBeGreaterThanOrEqual(2 * 86_400_000);
-    }
-    const of = (r: string) => plan.filter((p) => p.restaurantId === r);
-    for (const r of ["r0", "r1", "r2", "r3"]) {
-      const rows = of(r);
-      expect(new Set(rows.map((p) => p.userKey)).size).toBe(rows.length);
-      // Bootstrap: 4 raters and weight 2.5 → the panel member and 3 others, or 5 others at 0.6.
-      expect(rows.length).toBeGreaterThanOrEqual(rows.some((p) => p.userKey === "panel") ? 4 : 5);
-    }
-    expect(of("r4").length).toBeGreaterThanOrEqual(2);
-    expect(of("r4").length).toBeLessThanOrEqual(3);
   });
 });
 

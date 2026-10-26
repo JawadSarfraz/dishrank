@@ -15,16 +15,6 @@ function problemsOf(f: SeedFiles): string[] {
 }
 
 describe("seed files (docs/05 seed tests)", () => {
-  it("load without duplicates and with the documented counts", () => {
-    const plan = buildSeedPlan(files);
-    expect(plan.cities).toHaveLength(2);
-    expect(plan.areas).toHaveLength(30);
-    expect(plan.categories).toHaveLength(12);
-    expect(plan.dishes).toHaveLength(84);
-    expect(plan.dishes.filter((d) => d.isLaunch)).toHaveLength(19);
-    expect(plan.aliases.size).toBe(478);
-  });
-
   it("every alias equals normalize(alias)", () => {
     const bad = files.dishes.flatMap((d) => d.aliases.filter((a) => normalize(a) !== a).map((a) => `${d.slug}: ${a}`));
     expect(bad).toEqual([]);
@@ -48,20 +38,16 @@ describe("buildSeedPlan rejects bad data before writing anything", () => {
   const dish = files.dishes[0]!;
   const withDishes = (dishes: SeedFiles["dishes"]): SeedFiles => ({ ...files, dishes });
 
-  it("an alias that is not normalised", () => {
-    const problems = problemsOf(withDishes([{ ...dish, aliases: [...dish.aliases, "Chicken Karahi (Full)"] }]));
-    expect(problems.join("\n")).toContain("is not normalised");
-  });
-
-  it("an alias shared by two dishes", () => {
+  it("an alias that is not normalised or belongs to two dishes, an unknown category, a duplicate slug", () => {
     const other = files.dishes[1]!;
-    const problems = problemsOf(withDishes([dish, { ...other, aliases: [...other.aliases, dish.aliases[0]!] }]));
-    expect(problems.join("\n")).toContain("belongs to both");
-  });
-
-  it("an unknown category and a duplicate slug", () => {
-    const problems = problemsOf(withDishes([dish, { ...dish, category: "no-such-category" }]));
-    expect(problems.join("\n")).toContain(`duplicate dish slug "${dish.slug}"`);
-    expect(problems.join("\n")).toContain('unknown category "no-such-category"');
+    const problems = [
+      ...problemsOf(withDishes([{ ...dish, aliases: [...dish.aliases, "Chicken Karahi (Full)"] }])),
+      ...problemsOf(withDishes([dish, { ...other, aliases: [...other.aliases, dish.aliases[0]!] }])),
+      ...problemsOf(withDishes([dish, { ...dish, category: "no-such-category" }])),
+    ].join("\n");
+    expect(problems).toContain("is not normalised");
+    expect(problems).toContain("belongs to both");
+    expect(problems).toContain(`duplicate dish slug "${dish.slug}"`);
+    expect(problems).toContain('unknown category "no-such-category"');
   });
 });

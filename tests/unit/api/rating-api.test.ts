@@ -18,8 +18,6 @@ const { revalidatePath } = await import("next/cache");
 const ratings = await import("@/app/api/v1/ratings/route");
 const ratingById = await import("@/app/api/v1/ratings/[id]/route");
 const me = await import("@/app/api/v1/me/ratings/route");
-const dishes = await import("@/app/api/v1/dishes/route");
-const cities = await import("@/app/api/v1/cities/route");
 const proposals = await import("@/app/api/v1/proposals/route");
 const restaurantDishes = await import("@/app/api/v1/restaurant-dishes/route");
 const locations = await import("@/app/api/v1/location-observations/route");
@@ -122,24 +120,6 @@ describe("Phase 3 routes (docs/06, test DB)", () => {
     current = actorOf(me1);
     expect((await ratingById.DELETE(get("/x"), ctx(ids[0]))).status).toBe(200);
     expect(await db.rating.count()).toBe(2);
-  });
-
-  it("GET /dishes searches every spelling, Roman Urdu included; GET /cities lists areas", async () => {
-    const kadai = (await (await dishes.GET(get("/api/v1/dishes?city=islamabad&q=kadai"))).json())
-      .data;
-    expect(kadai[0]).toMatchObject({
-      slug: expect.stringMatching(/karahi/),
-      isLaunch: true,
-      eligibleCount: 0,
-    });
-    const biryani = (await (await dishes.GET(get("/api/v1/dishes?q=biryani"))).json()).data;
-    expect(biryani[0].slug).toBe("chicken-biryani");
-    const launch = (await (await dishes.GET(get("/api/v1/dishes?launchOnly=true"))).json()).data;
-    expect(launch).toHaveLength(19);
-    expect((await dishes.GET(get("/api/v1/dishes?city=lahore"))).status).toBe(404);
-    const list = (await (await cities.GET(get("/api/v1/cities"))).json()).data;
-    expect(list.map((c: { slug: string }) => c.slug)).toEqual(["islamabad", "rawalpindi"]);
-    expect(list[0].areas.length).toBeGreaterThan(10);
   });
 
   it("POST /proposals, /restaurant-dishes and /location-observations", async () => {

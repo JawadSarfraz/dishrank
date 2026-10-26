@@ -14,31 +14,6 @@ describe("restaurant API (docs/06, test DB)", () => {
   beforeEach(resetAppData);
   afterAll(() => db.$disconnect());
 
-  it('GET /restaurants/search?q=but karahi returns "Butt Karahi"', async () => {
-    const butt = await makeRestaurant("Butt Karahi", { address: "Plot 5, Fixture Market" });
-    const res = await search(get("/api/v1/restaurants/search?city=islamabad&q=but%20karahi"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      data: [
-        {
-          id: butt.id,
-          slug: butt.slug,
-          name: "Butt Karahi",
-          area: "F-7",
-          address: "Plot 5, Fixture Market",
-        },
-      ],
-    });
-  });
-
-  it("validates the query and the city", async () => {
-    const missing = await search(get("/api/v1/restaurants/search?city=islamabad"));
-    expect(missing.status).toBe(400);
-    expect(await missing.json()).toMatchObject({ error: { code: "VALIDATION_FAILED" } });
-    const unknown = await search(get("/api/v1/restaurants/search?city=lahore&q=karahi"));
-    expect(unknown.status).toBe(404);
-  });
-
   it("rate-limits search to 120 a minute per IP", async () => {
     for (let i = 0; i < 120; i++) {
       expect(

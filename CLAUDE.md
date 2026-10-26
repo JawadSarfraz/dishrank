@@ -72,12 +72,19 @@ pnpm dev:demo [-- --undo]                                     # local demo data 
 - Timestamps stored in UTC; display in `Asia/Karachi`.
 - Errors: throw `AppError(code, message, status)` from services; actions/handlers map to `{ error: { code, message } }`.
 - Tests: pure logic (`matching`, `ranking`, `slug`, `normalize`) must have unit tests. Every migration must have a seed that still runs.
-- Commits per task: `feat(scope): …`, `fix(scope): …`, `chore: …`. Run `pnpm lint && pnpm typecheck && pnpm test` before each commit.
+- Commits per task: `feat(scope): …`, `fix(scope): …`, `chore: …`. Run `pnpm lint && pnpm typecheck` before each commit (see Testing policy).
+
+## Testing policy
+
+- While working, run only the tests for the code you changed (one file, or `pnpm exec vitest related <files>`). Lint and typecheck before each commit are fine.
+- Run the full unit suite, e2e and build only once, at the end of the task. CI runs everything on every push anyway.
+- Use quiet test output (failures and the summary only, e.g. `--reporter=dot`); don't paste long logs.
+- Only write tests for logic that can really break and would hurt: ranking math, eligibility, abuse rules, auth and role checks, cron auth, data-source rules, merge, matching. No tests for copy text, styling, simple getters, constants or framework behaviour. Keep e2e to a few key journeys.
 
 ## Definition of done (any task)
 
 - Code + tests + docs updated if behavior changed + migration if schema changed
-- `pnpm lint && pnpm typecheck && pnpm test` pass
+- `pnpm lint && pnpm typecheck` pass on every commit; the full unit suite, e2e and build pass at the end of the task
 - No `TODO` in code without a matching line in `docs/OPEN-QUESTIONS.md`
 - Short summary of what changed and how to verify it
 
