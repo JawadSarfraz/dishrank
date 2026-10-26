@@ -18,6 +18,9 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] `pnpm audit` has no high/critical
 - [ ] Dev-only scripts refuse to run when `NODE_ENV=production`; `pnpm dev:demo` also refuses Vercel and any database URL that is not on this machine
 - [ ] No sign-in bypass in app code: e2e tests sign in with a real session row and its signed cookie (`tests/e2e/setup/prepare.ts`)
+- [ ] Supabase connections use verified TLS (`src/server/db-ssl.ts`; no `sslmode` in `DATABASE_URL`), "Enforce SSL" is on and the Data API is off
+- [ ] In beta only invited Google accounts can sign up (`BETA_ALLOWED_EMAILS`): a Gmail not on the list gets the invite-only message
+- [ ] Admin trust overrides are admin-only, validated (0.3 to 1.5) and kept by the nightly job
 
 ## Data policy
 - [ ] No Google Places anywhere: no Places client, key, endpoint or cron (`tests/unit/ops/no-google-places.test.ts` passes); Google is only the sign-in provider
@@ -28,6 +31,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
 - [ ] Privacy page states what we store (email, ratings, comments, photos, panel members' shared locations) and how to delete; privacy and terms stay marked as drafts until a lawyer reviewed them
 - [ ] Restaurant pages link to Google Maps only as a plain URL built from our own coordinates (no embedded map, no Maps API call)
+- [ ] Deleting a rating (or replacing its photo) deletes the photo file from Storage; /privacy and /terms show `OPERATOR_NAME` and `CONTACT_EMAIL`, not placeholders
 
 ## Product rules
 - [ ] No free-text dish creation by users (only via admin resolve)
@@ -51,6 +55,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Unique title/description per ranking page; canonical; OG image
 - [ ] JSON-LD ItemList (ranking) and Restaurant (restaurant page) validate
 - [ ] `sitemap.xml` and `robots.txt` present; non-public routes disallowed
+- [ ] While `SITE_MODE=beta`: every page noindex, an `X-Robots-Tag` header on every response, robots.txt `Disallow: /`, the "Beta" label; `SITE_MODE=live` at launch removes all of it
 - [ ] Ranking pages that rank nobody and restaurant pages without a rating are `noindex` and left out of the sitemap; JSON-LD never carries an `aggregateRating`
 - [ ] URLs stable: `/[city]/best-[dish]`, `/[city]/r/[slug]`; a merged restaurant's URL redirects permanently to the surviving one
 

@@ -63,6 +63,7 @@ pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phas
 pnpm db:studio        # prisma studio
 pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import
 pnpm dev:demo [-- --undo]                                     # local demo data (see below)
+pnpm prod:bootstrap                                           # new production database (docs/DEPLOY-CHECKLIST.md)
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
 pnpm rankings:recompute                                       # the nightly recompute, now (writes a JobRun)
 ```
@@ -107,7 +108,7 @@ a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and 
 8. `docs/07-DATA-PIPELINES.md` — how restaurants/dishes get in (Overture candidates reviewed by an admin, menu photos, owners)
 9. `docs/08-IMPLEMENTATION-PLAN.md` — phases with acceptance criteria
 10. `docs/09-CLAUDE-CODE-PROMPTS.md` — **the prompts to paste, in order**
-11. `docs/10-DEPLOYMENT.md` — accounts, env vars, crons, costs
+11. `docs/10-DEPLOYMENT.md` — accounts, env vars, crons, costs; `docs/DEPLOY-CHECKLIST.md` — the first deploy (private beta), step by step
 12. `docs/11-REVIEW-CHECKLIST.md` — tick after every phase
 
 ## 3. Build

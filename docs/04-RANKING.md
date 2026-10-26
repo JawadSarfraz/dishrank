@@ -60,13 +60,14 @@ Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCou
 | New account | 0.6 |
 | ≥ 3 active ratings AND ≥ 1 with photo | 1.0 |
 | ≥ 20 active ratings, no upheld flags against their ratings, ≥ 30% with photo | 1.2 |
+| Set by hand (`User.trustOverride`, admin only, /admin/users) | that value (0.3 to 1.5), also over the panel; the nightly job keeps it |
 | Panel member (`User.isPanel`, set by admin only) | 1.3, fixed: the nightly job skips panel users |
 | ≥ 2 of their ratings hidden by admin | 0.3 |
 | Banned | ratings set HIDDEN |
 
-Trust is recomputed by the nightly job from these rules; admin can override `trustScore` (cap 1.5).
+Trust is recomputed by the nightly job from these rules. An admin can set a user's trust by hand: it is stored in `trustOverride`, apart from the computed `trustScore`, so the nightly job keeps it; clearing it returns the user to the table at once.
 
-The rows are checked in this order: banned → panel → ≥ 2 hidden (0.3) → extreme-score pattern (0.6, abuse control 4) → 1.2 → 1.0 → 0.6 (DECISION-PENDING, docs/OPEN-QUESTIONS.md). "Upheld flags against their ratings" counts as none for now, because a `Flag` points at a dish row, not a rating. The nightly job (Phase 4) recomputes it for everyone; the admin decisions that change these inputs also apply the table at once: turning the panel off, hiding ratings and banning. Phase 3 builds only the panel toggle; a lasting `trustScore` override for non-panel users needs a decision first, since the nightly job would recompute it.
+The rows are checked in this order: banned → set by hand → panel → ≥ 2 hidden (0.3) → extreme-score pattern (0.6, abuse control 4) → 1.2 → 1.0 → 0.6 (DECISION-PENDING, docs/OPEN-QUESTIONS.md). "Upheld flags against their ratings" counts as none for now, because a `Flag` points at a dish row, not a rating. The nightly job (Phase 4) recomputes it for everyone; the admin decisions that change these inputs also apply the table at once: turning the panel off, setting or clearing a trust by hand, hiding ratings and banning.
 
 ## Abuse controls (in RatingService, before compute)
 

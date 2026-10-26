@@ -47,6 +47,7 @@ pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--marg
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 pnpm dev:demo [-- --undo]                                     # local demo data in F-7/F-6/Blue Area/G-9; --undo removes it (local DB only)
+pnpm prod:bootstrap                                           # new production DB: migrate deploy + taxonomy seed + Overture sync, on the shell's DATABASE_URL/DIRECT_URL after typing the host (never .env, never demo data)
 ```
 
 ## Non-negotiable rules
