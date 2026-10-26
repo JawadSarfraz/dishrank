@@ -17,6 +17,7 @@ import {
   lockReviewItem,
   peekReviewItem,
 } from "@/server/repositories/moderation.repo";
+import { listDishGroupsOfRows, lockCityDishLists } from "@/server/repositories/ranking.repo";
 import {
   listDishPagesOfRows,
   lockRestaurantDishes,
@@ -51,7 +52,7 @@ import {
 import { refreshUserTrust } from "./admin-users.service";
 import { invalidateAliasIndex } from "./matching/aliases";
 import { normalize } from "./matching/normalize";
-import { recomputeOne } from "./ranking.service";
+import { recomputeEach } from "./ranking.service";
 import { addAdminDishesTx, insertRestaurantTx, resolveDishSlugs } from "./restaurant.service";
 import type { SuggestionPayload } from "./location.service";
 
@@ -210,6 +211,8 @@ const reject = (input: ReviewResolveInput): Decision => ({
 async function decideHeldRatings(
   item: { id: string; payload: unknown },
   ratings: readonly { id: string; status: string; userId: string; restaurantDishId: string }[],
+  /** The dish rows locked before the item (lockItemParents). */
+  lockedRows: ReadonlySet<string>,
   input: ReviewResolveInput,
   now: Date,
   tx: Tx,
@@ -259,6 +262,9 @@ async function decideHeldRatings(
     // The ratings first, then the user rows in id order: the order every other writer uses
     // (docs/02 Concurrency), so a ban never deadlocks with an edit, a delete or a merge.
     const all = await listRatingsOfUsers(users, tx);
+    // A rating saved or moved since the rows were locked is on a row this decision does not hold:
+    // nothing is decided, the admin tries again (and the next try locks that row too).
+    if (all.some((r) => !lockedRows.has(r.restaurantDishId))) throw itemChanged();
     await setRatingStatus(
       all.filter((r) => r.status !== "HIDDEN").map((r) => r.id),
       "HIDDEN",
@@ -426,6 +432,9 @@ async function lockItemParents(
       const users = [...new Set(ratings.map((r) => r.userId))];
       for (const r of await listRatingsOfUsers(users, tx)) rows.push(r.restaurantDishId);
     }
+    // Their (city, dish) lists first, then the rows (docs/02): a decision never deadlocks with a
+    // recompute that re-ranks one of these lists.
+    await lockCityDishLists(await listDishGroupsOfRows(rows, tx), tx);
     await lockRestaurantDishes(rows, tx);
     return { rows: new Set(rows), restaurantId: null };
   }
@@ -486,7 +495,7 @@ export async function resolveReviewItem(
     }
     const d =
       item.type === "SUSPICIOUS_RATINGS"
-        ? await decideHeldRatings(item, ratings, input, now, tx)
+        ? await decideHeldRatings(item, ratings, locked.rows, input, now, tx)
         : item.type === "DISH_PROPOSAL"
           ? await decideDishProposal(input, tx)
           : item.type === "RESTAURANT_PROPOSAL"
@@ -515,7 +524,7 @@ export async function resolveReviewItem(
   for (const userId of decision.trustUsers) {
     for (const row of (await refreshUserTrust(userId))?.rows ?? []) pages.add(row);
   }
-  for (const row of rows) await recomputeOne(row, now);
+  await recomputeEach(rows, now); // the decision is committed: a failure is only logged
   if (decision.invalidateAliases) invalidateAliasIndex();
   logEvent("admin.review.resolve", {
     userId: admin.id,

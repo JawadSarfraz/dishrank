@@ -50,7 +50,7 @@ import type { MeRatingsQuery, RatingInput } from "@/server/validation";
 import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, USER_DISH } from "./ranking.constants";
-import { recomputeOne, type Thresholds } from "./ranking.service";
+import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
 import { verifyUploadedPhoto } from "./upload.service";
 
 /** Why a rating is held: its comment (docs/04 control 5) or a burst of new accounts (control 3). */
@@ -64,6 +64,8 @@ export type RatingResult = {
   status: RatingStatus;
   held: boolean;
   heldReason: HoldReason | null;
+  /** Saved, but the dish row could not be recomputed yet: the numbers below are not current. */
+  stale: boolean;
   /** The dish row after the recompute. */
   score: number | null;
   votes: number;
@@ -301,14 +303,6 @@ export async function createOrReplace(
         tx,
       );
       ratingId = (await updateRating(previous.id, { ...fields, updatedAt: now }, tx)).id;
-      await adjustRatingCounters(
-        rater.id,
-        {
-          ratings: 0,
-          photos: Number(Boolean(fields.photoPath)) - Number(Boolean(previous.photoPath)),
-        },
-        tx,
-      );
     } else {
       ratingId = (
         await insertRating(
@@ -322,11 +316,6 @@ export async function createOrReplace(
           tx,
         )
       ).id;
-      await adjustRatingCounters(
-        rater.id,
-        { ratings: 1, photos: Number(Boolean(fields.photoPath)) },
-        tx,
-      );
     }
 
     let heldReason: HoldReason | null = null;
@@ -355,6 +344,15 @@ export async function createOrReplace(
     const burstHeld = await applyBurstRule(rd, now, tx);
     if (burstHeld.includes(ratingId)) heldReason = "BURST";
     const finalStatus: RatingStatus = burstHeld.includes(ratingId) ? "HELD" : status;
+    // The user's counters last: user rows come after review items and ratings (docs/02).
+    await adjustRatingCounters(
+      rater.id,
+      {
+        ratings: previous ? 0 : 1,
+        photos: Number(Boolean(fields.photoPath)) - Number(Boolean(previous?.photoPath)),
+      },
+      tx,
+    );
     return {
       ratingId,
       restaurantDishId: rd.id,
@@ -373,7 +371,19 @@ export async function createOrReplace(
     return rethrowConflict(error);
   });
 
-  const ranked = await recomputeOne(written.restaurantDishId, now);
+  // The rating is saved: a failed recompute is logged and reported as `stale`, not as a failed save
+  // (saving again would only repeat the write).
+  const ranked = await recomputeOne(written.restaurantDishId, now).catch((error: unknown) => {
+    logEvent(
+      "ranking.recompute_failed",
+      {
+        entityId: written.restaurantDishId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      "error",
+    );
+    return undefined;
+  });
   logEvent("rating.write", {
     userId: rater.id,
     entityId: written.ratingId,
@@ -391,6 +401,7 @@ export async function createOrReplace(
     status: written.status,
     held: written.held,
     heldReason: written.heldReason,
+    stale: ranked === undefined,
     score: ranked?.score ?? null,
     votes: ranked?.votes ?? 0,
     eligible: ranked?.eligible ?? false,
@@ -455,7 +466,7 @@ export async function deleteOwn(
     await adjustRatingCounters(user.id, { ratings: -1, photos: live.photoPath ? -1 : 0 }, tx);
     return row.restaurantDishId;
   });
-  await recomputeOne(rowId, now);
+  await recomputeEach([rowId], now); // the delete is committed: a failure is only logged
   logEvent("rating.delete", { userId: user.id, entityId: rating.id });
   const [page] = await listDishPagesOfRows([rowId]);
   return {

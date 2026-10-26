@@ -87,6 +87,9 @@ async function fetchRestaurant(slug: string): Promise<RateRestaurant | null> {
 
 export function RateFlow({ data }: { data: RatePageData }) {
   const [citySlug, setCitySlug] = useState(data.citySlug);
+  // The first entry's city: only that entry can lack ?city= (every later one is pushed with it),
+  // and data.citySlug changes when a save revalidates the page.
+  const [entryCity] = useState(data.citySlug);
   const [restaurant, setRestaurant] = useState<RateRestaurant | null>(data.restaurant);
   const [dish, setDish] = useState<DishRef | null>(data.dish);
   const [existing, setExisting] = useState<Existing | null>(data.existing);
@@ -123,7 +126,7 @@ export function RateFlow({ data }: { data: RatePageData }) {
       setResult(null);
       setExisting(null); // the effect below loads the one for this entry
       // The first entry (/rate from the home page or /me) names no city: the server's default.
-      setCitySlug(c && data.cities.some((x) => x.slug === c) ? c : data.citySlug);
+      setCitySlug(c && data.cities.some((x) => x.slug === c) ? c : entryCity);
       if (!r) {
         setRestaurant(null);
         setDish(null);
@@ -148,7 +151,7 @@ export function RateFlow({ data }: { data: RatePageData }) {
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [data.cities, seen]);
+  }, [data.cities, entryCity, seen]);
 
   // A dish the user rated before is prefilled, and the button says "Update".
   useEffect(() => {
@@ -209,11 +212,10 @@ export function RateFlow({ data }: { data: RatePageData }) {
           callbackUrl={rateUrl(citySlug, restaurant, dish)}
           onChangeRestaurant={() => move({ restaurant: null, dish: null })}
           onChangeDish={() => move({ restaurant, dish: null })}
-          onDone={(res) => {
-            // Saved either way; the thank-you step only if the diner is still on this rating's
-            // entry (a slow save must not replace a step they went back or forward to).
-            const now = new URLSearchParams(window.location.search);
-            if (now.get("r") !== res.restaurant.slug || now.get("d") !== res.dish.slug) return;
+          onDone={(res, entry) => {
+            // Saved either way; the thank-you step only if the diner is still on the entry the
+            // save started from (a slow save must not replace a step they went back or forward to).
+            if (window.location.href !== entry) return;
             setResult(res);
             window.scrollTo({ top: 0 });
           }}
@@ -520,7 +522,8 @@ function ScoreStep({
   callbackUrl: string;
   onChangeRestaurant: () => void;
   onChangeDish: () => void;
-  onDone: (result: RatingResult) => void;
+  /** `entry`: the address when the save started. */
+  onDone: (result: RatingResult, entry: string) => void;
 }) {
   const [score, setScore] = useState<number | null>(existing?.score ?? null);
   const [subs, setSubs] = useState<Record<string, number | null>>({
@@ -546,6 +549,7 @@ function ScoreStep({
 
   function submit() {
     if (score === null) return;
+    const entry = window.location.href;
     startTransition(async () => {
       let res;
       try {
@@ -565,7 +569,7 @@ function ScoreStep({
         setError(describeActionError(res.error));
         return;
       }
-      onDone(res.data);
+      onDone(res.data, entry);
     });
   }
 
@@ -710,7 +714,9 @@ function DoneStep({
       <p className="text-base">
         {result.dish.name} at {result.restaurant.name}
       </p>
-      {result.status === "HIDDEN" ? (
+      {result.stale && !result.held ? (
+        <p>Saved. Its score and rank will update in a moment.</p>
+      ) : result.status === "HIDDEN" ? (
         <p>Saved, but it does not count: a moderator hid your rating of this dish.</p>
       ) : result.held ? (
         <p>Your rating is under review. It counts once a moderator has checked it.</p>

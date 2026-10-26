@@ -118,6 +118,16 @@ export async function rerankCityDish(
     WHERE rd.id = e.id AND rd."rankInCity" IS DISTINCT FROM e.rank`;
 }
 
+/** The (city, dish) lists of some dish rows (their locks come before the rows' own). */
+export async function listDishGroupsOfRows(ids: readonly string[], tx: Tx) {
+  if (ids.length === 0) return [];
+  return tx.restaurantDish.findMany({
+    where: { id: { in: [...new Set(ids)] } },
+    distinct: ["cityId", "dishId"],
+    select: { cityId: true, dishId: true },
+  });
+}
+
 /** The (city, dish) lists a restaurant appears in, for re-ranking after a status change or merge. */
 export async function listDishGroupsOfRestaurant(restaurantId: string, tx: Tx) {
   return tx.restaurantDish.findMany({

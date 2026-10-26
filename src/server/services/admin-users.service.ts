@@ -16,7 +16,7 @@ import {
 import { assertRole, type SessionUser } from "@/server/roles";
 import type { AdminUserListQuery } from "@/server/validation";
 import { TRUST } from "./ranking.constants";
-import { recomputeOne, trustFor } from "./ranking.service";
+import { recomputeEach, trustFor } from "./ranking.service";
 
 export const USERS_PAGE_SIZE = 25;
 
@@ -49,7 +49,7 @@ export async function refreshUserTrust(userId: string) {
   });
   if (!updated) return null;
   const rows = await listRatedRowsOfUser(userId);
-  for (const rowId of rows) await recomputeOne(rowId);
+  await recomputeEach(rows); // trust is saved; a row that fails is logged
   return { user: updated, rows };
 }
 
@@ -66,7 +66,7 @@ export async function setPanel(actor: SessionUser | null, userId: string, isPane
   });
   const trustScore = updated.trustScore;
   const rows = await listRatedRowsOfUser(userId);
-  for (const rowId of rows) await recomputeOne(rowId);
+  await recomputeEach(rows);
   logEvent("admin.user.panel", {
     userId: admin.id,
     entityId: userId,

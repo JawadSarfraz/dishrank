@@ -264,6 +264,27 @@ async function rerankLists(
   }
 }
 
+/**
+ * recomputeOne for each row after a commit: a failure is logged and the other rows still run, so a
+ * decision or write that already committed is never reported as failed. Returns the failed ids.
+ */
+export async function recomputeEach(rowIds: Iterable<string>, now: Date = new Date()) {
+  const failed: string[] = [];
+  for (const id of new Set(rowIds)) {
+    try {
+      await recomputeOne(id, now);
+    } catch (error) {
+      failed.push(id);
+      logEvent(
+        "ranking.recompute_failed",
+        { entityId: id, error: error instanceof Error ? error.message : String(error) },
+        "error",
+      );
+    }
+  }
+  return failed;
+}
+
 /** Re-ranks every (city, dish) list a restaurant appears in (after a status change or merge). */
 export async function rerankRestaurant(restaurantId: string, now: Date = new Date()) {
   await inTransaction(async (tx) =>

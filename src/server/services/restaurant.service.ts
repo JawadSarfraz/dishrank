@@ -64,7 +64,7 @@ import type {
   RestaurantSearchQuery,
 } from "@/server/validation";
 import { rethrowConflict } from "./conflict";
-import { recomputeOne, rerankRestaurant } from "./ranking.service";
+import { recomputeEach, rerankRestaurant } from "./ranking.service";
 import { cleanText } from "./matching/normalize";
 import {
   planClaimMerge,
@@ -561,7 +561,7 @@ export type MergeResult = {
 
 /** Step 7: recompute the kept rows whose ratings changed (each recompute re-ranks its list). */
 export async function recomputeAfterMerge(restaurantDishIds: readonly string[]): Promise<void> {
-  for (const id of restaurantDishIds) await recomputeOne(id);
+  await recomputeEach(restaurantDishIds); // the merge is committed: a failure is only logged
 }
 
 type HeldItemPayload = {

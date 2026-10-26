@@ -43,6 +43,13 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "0300\u31641234567",
       "0300\u28001234567",
       "0300\uFE0F1234567",
+      // Written in pairs (not dates: the parts are out of range).
+      "WhatsApp 0300-12-34-567 for orders",
+      "0300/12/34/567",
+      "042-35-67-89-01",
+      "UAN 111-22-33-44",
+      "(0300) 1234567",
+      "+92(300)1234567",
     ]) {
       expect(screenComment(c), c).toBe("PHONE");
     }
@@ -69,6 +76,7 @@ describe("comment screening (docs/04 abuse control 5)", () => {
     }
     expect(screenComment("wa.me/923001234567")).toBe("PHONE"); // the number is found first
     expect(screenComment("mail owner@karahi.pk")).toBe("EMAIL");
+    expect(screenComment("MAIL OWNER@KARAHI.PK")).toBe("EMAIL");
   });
 
   it("lets ordinary comments through: prices, dates, scores and abbreviations", () => {
@@ -100,6 +108,18 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "Ordered karahi.To be honest it was cold",
       "Average.Top dish is the tikka",
       "good.in short",
+      // Bills and price lists joined by list or sum punctuation, thousands separators included.
+      "Bill 3,200 + 450 + 150 = 3,800 for two",
+      "Small/medium/large: Rs 350, 450, 1200",
+      "Rs 3500/- + 450/- + 300/- tax",
+      "Half 1,850 | 3600 | 300 | 150",
+      "11,100 + 2,500 total",
+      "Rs 350/700/1400 for half, full and family",
+      "Rs 300, 600, 1200",
+      // Capitalised words after a missing space are not addresses.
+      "Good taste.Half/full both available",
+      "Visited@7pm.Food was cold",
+      "12/31/2026",
       "",
     ]) {
       expect(screenComment(c), c).toBeNull();
