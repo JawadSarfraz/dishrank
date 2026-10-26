@@ -16,16 +16,17 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `user:{id}:rating` | 15 / day (panel: 30) |
 | `user:{id}:rating:restaurant:{rid}` | 3 / day (panel: 10) |
 | `user:{id}:add-dish` | 10 / day |
-| `user:{id}:flag` | 10 / day |
+| `user:{id}:flag` | 10 / day ("Report a problem", Phase 4; flags in Phase 5) |
 | `user:{id}:proposal` | 5 / day |
 | `user:{id}:upload` | 20 / day |
 | `user:{id}:rating-delete` | 30 / day (DECISION-PENDING) |
 | `user:{id}:location` | 30 / day, panel members' on-site locations (DECISION-PENDING) |
 | `ip:{hash}:search` | 120 / min |
 | `ip:{hash}:api` | 600 / hour (public GETs) |
+| `ip:{hash}:dispute` | 5 / day, the /dispute form (DECISION-PENDING) |
 | `user:{id}:admin-write` | 600 / hour (every admin write: import create/link/skip/reopen, add, edit, status, merge, review decisions, panel toggle) |
 
-Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. Windows roll: hits are counted in buckets of max(5 s, window / 12), so a daily key frees up over 22–24 h. Every call that reaches a check counts, also one that a later check refuses. Rating keys: every submission counts, new or edited (docs/04 abuse control 2); a rating that adds the dish row does not spend `add-dish`, which only `POST /api/v1/restaurant-dishes` spends when it creates a row.
+Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. The nightly job deletes buckets older than 2 days (twice the longest window). Windows roll: hits are counted in buckets of max(5 s, window / 12), so a daily key frees up over 22–24 h. Every call that reaches a check counts, also one that a later check refuses. Rating keys: every submission counts, new or edited (docs/04 abuse control 2); a rating that adds the dish row does not spend `add-dish`, which only `POST /api/v1/restaurant-dishes` spends when it creates a row.
 
 ## Public (no auth)
 
@@ -44,17 +45,18 @@ Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. Windows roll: hits are 
     "dish": {"slug":"chicken-karahi","name":"Chicken Karahi"},
     "mode": "normal | bootstrap",
     "eligible": [
-      { "rank": 1, "restaurant": {"slug":"butt-karahi-f-7","name":"Butt Karahi","area":"F-7","priceBand":2,"lat":..,"lng":..},
+      { "rank": 1, "restaurant": {"slug":"butt-karahi-f-7","name":"Butt Karahi","area":{"slug":"f-7","name":"F-7"},"priceBand":2,"lat":..,"lng":..},
         "restaurantDishId":"...", "score": 8.29, "rawMean": 9.1, "votes": 12, "price": 2200,
         "variantTags":["desi"], "status":"MENU_VERIFIED", "lastRatedAt":"...", "distanceKm": 1.4 }
     ],
-    "insufficient": [ { "restaurant": {...}, "votes": 3, "price": 1900, "status":"CANDIDATE" } ],
+    "insufficient": [ { "restaurant": {...}, "restaurantDishId":"...", "votes": 3, "price": 1900, "variantTags": [],
+        "status":"CANDIDATE", "lastRatedAt":"...", "distanceKm": null, "ratingsNeeded": 5 } ],
     "thresholds": { "minRaters": 8, "minWeight": 5 },
     "computedAt": "..."
   }
 }
 ```
-Distance (`lat`, `lng`, `radiusKm`, `distanceKm`) and the restaurant `lat`/`lng` use our own coordinates (from Overture or typed by an admin, docs/07 §2); a restaurant without a location has `lat`, `lng` and `distanceKm` null and is left out by `radiusKm`. Sort `price` uses `price ASC NULLS LAST` among eligible only. `votes` = `distinctRaters DESC`. `rank` is always the city-wide rank, also when `area`, `sort` or `radiusKm` narrow or reorder the list. The ranking page does not call this endpoint with filters; it filters in the browser.
+Distance (`lat`, `lng`, `radiusKm`, `distanceKm`) and the restaurant `lat`/`lng` use our own coordinates (from Overture or typed by an admin, docs/07 §2); a restaurant without a location has `lat`, `lng` and `distanceKm` null and is left out by `radiusKm`. Sort `price` uses `price ASC NULLS LAST` among eligible only. `votes` = `distinctRaters DESC`. `rank` is always the city-wide rank, also when `area`, `sort` or `radiusKm` narrow or reorder the list. `insufficient` lists every listed row without a rank (also `CANDIDATE` rows), by votes, then the latest rating, then name; `ratingsNeeded` counts fresh new-account ratings (trust 0.6). `dish` also carries its `id`. An unknown city or dish → `404 NOT_FOUND`. Limit: `ip:{hash}:api`. The ranking page does not call this endpoint; it calls `getRanking` on the server and filters in the browser.
 
 ### `GET /api/v1/restaurants/search?city=&q=`
 → `[{ id, slug, name, area, address }]` (max 8; `area` is the area name). Unknown city → `404 CITY_NOT_FOUND`; a `q` with no letters or digits → `[]`. Limits: `ip:{hash}:search` and `ip:{hash}:api`.
@@ -85,7 +87,13 @@ Own ratings of any status, newest first (`limit` ≤ 100, default 50) → `{ dat
 ### `POST /api/v1/restaurant-dishes`
 `{ restaurantId, dishId, menuName?, price? }` → creates CANDIDATE / USER / 0.5 if absent (`201`, spends `add-dish`); an existing row is returned as it is (`200`), except a REMOVED one: `409 DISH_REMOVED` (only an admin revives it). → `{ id, status, created }`. The restaurant must be ACTIVE and not the caller's own.
 
-### `POST /api/v1/flags`
+### `POST /api/v1/reports` (Phase 4, "Report a problem" on restaurant pages)
+`{ restaurantId, reason: CLOSED|WRONG_LOCATION|WRONG_DISH|OTHER, dishId?, note? (≤ 280) }` (strict) → `201 { id }`: one `ReviewItem FLAG` with payload `{ kind: "report", restaurantId, reason, dishId, note }`; nothing changes on the public pages until an admin acts. Banned users → `403 USER_BANNED`; an unknown or merged restaurant → `404 NOT_FOUND`; an unknown dish → `404 DISH_NOT_FOUND`. Limit: `user:{id}:flag`. The page uses the server action `reportProblemAction`.
+
+### `POST /api/v1/disputes` (Phase 4, the /dispute form; no sign-in needed)
+`{ message (10–1000), contact? (≤ 200), page? (≤ 300) }` (strict) → `201 { id }`: one `ReviewItem FLAG` with payload `{ kind: "dispute", message, contact, page }`. No e-mail is sent yet (DECISION-PENDING: no e-mail provider; admins see disputes on /admin/review). Limit: `ip:{hash}:dispute`. The page uses the server action `fileDisputeAction`.
+
+### `POST /api/v1/flags` (Phase 5)
 `{ restaurantDishId, reason: NOT_SERVED|WRONG_DISH|RESTAURANT_CLOSED|DUPLICATE|OTHER, note? }` → creates Flag + `ReviewItem FLAG` (one review item per RD per reason while OPEN).
 
 ### `POST /api/v1/proposals`
@@ -107,7 +115,7 @@ Panel members only (`403 PANEL_ONLY`, read from the database): `{ restaurantId, 
 
 ## Admin (role ADMIN)
 
-- `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=&limit=` → `{ data, nextCursor, counts }` (counts of OPEN items per type). Each item carries a `fingerprint` of what it shows (payload, restaurant, and each listed rating's id, status and `updatedAt`). Phase 3 serves `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION`; the other types arrive with their phases.
+- `GET /api/v1/admin/review-queue?type=&status=OPEN&cursor=&limit=` → `{ data, nextCursor, counts }` (counts of OPEN items per type). Each item carries a `fingerprint` of what it shows (payload, restaurant, and each listed rating's id, status and `updatedAt`). Phase 3 serves `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION`, Phase 4 `FLAG` (reports and disputes: `uphold` marks it done, `dismiss` rejects it); the other types arrive with their phases.
 - `POST /api/v1/admin/review-queue/:id/resolve` `{ action, payload, fingerprint? }` — actions per type (docs/07 §Review queue): `assign_dish`, `ignore`, `create_dish_and_assign`, `create_dish`, `map_to_dish`, `create_restaurant`, `link_restaurant`, `reject`, `uphold`, `dismiss`, `release`, `hide`, `ban_users`, `approve`, `merge`, `keep_both` (type → actions map: `REVIEW_ACTIONS` in `src/server/validation`). An item that is not OPEN → `409 ITEM_CLOSED`; an item that changed since its `fingerprint` (new ratings joined, an edited comment, a better location) → `409 ITEM_CHANGED`, nothing decided (/admin/review always sends it); an action of another type → `400 ACTION_NOT_ALLOWED`; a type of a later phase → `400 NOT_AVAILABLE`; `create_dish` → `409 DISH_EXISTS` or `409 ALIAS_TAKEN`. The decision takes its locks in the shared order (restaurant → dish rows → item). After it the affected dish rows are recomputed, the affected users' trust is refreshed, and the answer's `dishPages` (ranking and restaurant pages of those rows) are revalidated. Limit: `user:{id}:admin-write`.
 - `POST /api/v1/admin/restaurants` — add by hand (`source MANUAL`) `{ name, areaId, address, phone?, website?, priceBand?, aliases?, lat?, lng?, dishSlugs? }`; the city is the area's; `lat` and `lng` go together and become `locationSource ADMIN`; each dish slug becomes a CANDIDATE RestaurantDish (source ADMIN, confidence 0.4). The slug is `<name>-<area slug>` (area not repeated when the name ends with it), then `-2`, `-3`… when taken; it never changes afterwards.
 - `PATCH /api/v1/admin/restaurants/:id` — edit `{ name, areaId, address, phone|null, website|null, priceBand|null, aliases, lat?|null, lng?|null }` (changed coordinates become `locationSource ADMIN`; null clears the location), `{ status: ACTIVE|CLOSED|HIDDEN }`, merge (`{ mergeIntoId }`; one transaction, rules in docs/07 §2; sets `mergedIntoId` and status DUPLICATE). In v1 these admin operations are server actions on /admin pages (`src/server/actions/admin-*.ts`) calling the same services; the JSON routes are not built yet (KICKOFF-REVIEW AP-07).
@@ -115,17 +123,19 @@ Panel members only (`403 PANEL_ONLY`, read from the database): `{ restaurantId, 
 - `PATCH /api/v1/admin/users/:id` — `trustScore`, `role`, `bannedAt`, `isPanel` (setting it pins trust at 1.3; clearing it returns the user to the nightly trust rules). Phase 3 builds only `{ isPanel }` (a strict body): on → trust 1.3; off → the docs/04 trust table at once; then every dish row the user's ratings count in is recomputed and its pages revalidated → the user with `recomputedRows` and `dishPages`. Limit: `user:{id}:admin-write`.
 - `PATCH /api/v1/admin/ratings/:id` — `status: ACTIVE|HELD|HIDDEN`.
 - `POST /api/v1/admin/menu-uploads/:id/parse` — run vision + matching now.
-- `POST /api/v1/admin/rankings/recompute` — `RankingService.recomputeAll()` (async, returns JobRun id).
-- `POST /api/v1/admin/cities/:slug/launch` — sets `City.launchedAt = now()` once (launch day); bootstrap mode applies while it is NULL and for 60 days after.
+- `POST /api/v1/admin/rankings/recompute` — `recomputeAll()`. Phase 4 builds it as the server action `recomputeNowAction` on /admin/rankings (no JSON route yet, as AP-07): it waits for the run and returns `{ jobRunId, ok, summary }`; `409 JOB_RUNNING` while another run is going. Then every page is revalidated.
+- `POST /api/v1/admin/cities/:slug/launch` — sets `City.launchedAt = now()` once (launch day); bootstrap mode applies while it is NULL and for 60 days after. Phase 4 builds it as the server action `launchCityAction { city }` (confirm dialog): an unknown city → `404 CITY_NOT_FOUND`, one launched already → `409 CITY_LAUNCHED`. Limit for both: `user:{id}:admin-write`.
 - `/admin/import` review of Overture candidates (server actions in `src/server/actions/admin-import.ts`; no JSON route yet; docs/07 §2). The page reads `?city=&area=<slug>|none&show=new|skipped|done`. Create `createFromCandidateAction { candidateId, name, areaId, address, phone?, website?, priceBand?, aliases?, dishSlugs? }` (the location comes from the candidate, never from the client) → `{ restaurant, dishesAdded }`; Link `linkCandidateAction { candidateId, restaurantId }` → `{ restaurant, citySlug, overtureIdSet, locationSet }`; Skip `skipCandidateAction { candidateId, reason?: CLOSED|DUPLICATE|NOT_A_RESTAURANT }`; Reopen `reopenCandidateAction { candidateId }`. A candidate that is not `NEW` (not `SKIPPED` for Reopen) answers `409 CANDIDATE_REVIEWED` (`CANDIDATE_NOT_SKIPPED`).
 
 ## Cron (Bearer CRON_SECRET)
 
-- `GET /api/cron/recompute-rankings` — daily 02:00 PKT (`0 21 * * *` UTC); includes stale marking (docs/04 step 5).
-- `GET /api/cron/mark-stale` — not scheduled; for manual runs only (recompute already does it).
+- `GET /api/cron/recompute-rankings` — daily 02:00 PKT (`0 21 * * *` UTC); `recomputeAll()` (docs/04 steps 1–8, including stale marking), then every page is revalidated. → `{ ok, summary }`.
+- `GET /api/cron/mark-stale` — not scheduled; for manual runs only (recompute already does it): stale marking and re-rank of every list, with its own JobRun (`mark-stale`). → `{ ok, summary: { stale, lists, durationMs } }`.
+
+A run while another of the same job is going (an unfinished JobRun younger than 30 minutes) answers `409 { ok: false, error: { code: "JOB_RUNNING" } }`.
 
 All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` when `CRON_SECRET` is unset or empty, `401` when the bearer token does not match. Compare with `crypto.timingSafeEqual` on equal-length buffers (length mismatch → 401). Handlers are idempotent, write `JobRun` (including external API call counts) and return `{ ok, summary }`; `ok: false` answers HTTP 500. When a job throws, the answer is `500 { ok: false, error: { code: "INTERNAL", message } }` and the summary is only in `JobRun`.
 
 ## Zod schemas (`src/server/validation/`)
 
-`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; Phase 3: `locationObservationInput`, `meRatingsQuery`, `dishSearchQuery`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`, `adminUserListQuery`, `adminUserUpdateInput`, `reviewQueueQuery`. Export inferred types; reuse in both actions and handlers.
+`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; Phase 3: `locationObservationInput`, `meRatingsQuery`, `dishSearchQuery`; Phase 4: `reportInput`, `disputeInput`, `cityLaunchInput`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`, `adminUserListQuery`, `adminUserUpdateInput`, `reviewQueueQuery`. Export inferred types; reuse in both actions and handlers.

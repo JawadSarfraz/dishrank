@@ -99,7 +99,7 @@ sequenceDiagram
   participant RK as RankingService
   participant DB as Postgres
   G->>N: GET /islamabad/best-chicken-karahi
-  N->>RK: getRanking(city, dish) (area filter and sort run in the browser)
+  N->>RK: getRanking(city, dish) (area filter, sort and distance run in the browser)
   RK->>DB: SELECT restaurant_dishes JOIN restaurants WHERE city, dish, status IN (...) ORDER BY score DESC
   DB-->>RK: eligible rows + insufficient rows
   RK-->>N: { eligible[], insufficient[], meta }
@@ -202,29 +202,31 @@ dishrank/
 │   │   ├── (public)/
 │   │   │   ├── page.tsx                         # /
 │   │   │   ├── [city]/page.tsx                  # /islamabad
-│   │   │   ├── [city]/best-[dish]/page.tsx      # /islamabad/best-chicken-karahi
+│   │   │   ├── [city]/[slug]/page.tsx           # /islamabad/best-chicken-karahi: no partial segments in Next.js, so only "best-" slugs answer
+│   │   │   ├── [city]/[slug]/opengraph-image.tsx  # dish, city, top 3
 │   │   │   ├── [city]/r/[slug]/page.tsx         # restaurant page
 │   │   │   ├── how-rankings-work/  dispute/  about/ (about/data: data sources and credits)  privacy/  terms/
-│   │   │   ├── layout.tsx                       # public footer
-│   │   │   └── sitemap.ts  robots.ts
-│   │   ├── (app)/
+│   │   │   └── layout.tsx                       # public footer
+│   │   ├── (app)/                           # layout.tsx: the same footer
 │   │   │   ├── rate/page.tsx                    # rating flow
 │   │   │   ├── me/page.tsx
 │   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=)
 │   │   ├── owner/  (layout.tsx and every page call requirePageRole)  claim/  restaurants/[id]/
 │   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  restaurants/  users/  rankings/
 │   │   ├── api/
-│   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ flags/ uploads/ owner/ admin/
+│   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ reports/ disputes/ uploads/ owner/ admin/  (flags/: Phase 5)
 │   │   │   ├── cron/ recompute-rankings/ mark-stale/   # mark-stale: manual only
 │   │   │   └── auth/[...all]/           # Better Auth handler: toNextJsHandler(auth)
 │   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme tokens (Tailwind 4)
+│   │   ├── sitemap.ts  robots.ts  opengraph-image.tsx           # sitemap: indexable pages only
 │   ├── components/
 │   │   ├── ui/            # shadcn
-│   │   ├── ranking/       # RankingList, RankingRow, EligibilityNote, FilterBar
+│   │   ├── ranking/       # RankingBrowser (filter bar + ranked list, client), ShareButton, CityDishGrid, CityPicker, DishSearch
 │   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
 │   │   ├── me/            # DeleteRatingButton
-│   │   ├── restaurant/    # RestaurantHeader, DishScoreList
-│   │   ├── layout/        # Footer, OvertureCredit; Nav, CityPicker (Phase 4)
+│   │   ├── restaurant/    # ReportProblem
+│   │   ├── trust/         # DisputeForm, LegalDraftNotice
+│   │   ├── layout/        # Footer, OvertureCredit, JsonLd
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
 │   │   └── admin/         # import review queue, Create form, restaurant forms, merge dialog (admin pages only)
 │   ├── server/
@@ -232,10 +234,14 @@ dishrank/
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
 │   │   ├── errors.ts               # AppError
 │   │   ├── rate-limit.ts           # DB-backed sliding window
+│   │   ├── cron.ts  revalidate.ts  # cron secret guard; pages revalidated after rating writes
+│   │   ├── seo.ts  site.ts         # JSON-LD builders (no aggregateRating); SITE_URL, canonical URLs
 │   │   ├── storage/                # StorageAdapter; Supabase Storage through S3 presigned URLs (sigv4.ts, ADR-14)
-│   │   ├── actions/                # submitRating, addRestaurantDish, flag, claim, admin*
+│   │   ├── actions/                # rating, report (problem reports, disputes), admin-* (incl. admin-rankings)
 │   │   ├── services/
-│   │   │   ├── ranking.service.ts  # score math, eligibility, recomputeOne/All
+│   │   │   ├── ranking.service.ts  # score math, eligibility, trust table, recomputeOne, getRanking
+│   │   │   ├── ranking-nightly.service.ts  # recomputeAll (cron, CLI, /admin/rankings), markStaleAll
+│   │   │   ├── admin-rankings.service.ts  city-page.service.ts  report.service.ts
 │   │   │   ├── rating.service.ts   # createOrReplace, deleteOwn: docs/04 abuse controls
 │   │   │   ├── comment-screen.ts  proposal.service.ts  location.service.ts  upload.service.ts
 │   │   │   ├── admin-users.service.ts  rate-page.service.ts
@@ -248,17 +254,17 @@ dishrank/
 │   │   │   ├── menu.service.ts
 │   │   │   ├── claim.service.ts
 │   │   │   └── review.service.ts
-│   │   ├── repositories/           # *.repo.ts, Prisma only
+│   │   ├── repositories/           # *.repo.ts, Prisma only (public.repo: public pages; nightly.repo: recomputeAll SQL)
 │   │   ├── vision/                 # parseMenu.ts (Anthropic tool-use JSON schema)
 │   │   └── validation/             # zod schemas shared by actions + API
-│   ├── lib/                        # slug.ts, geo.ts (haversine), dates.ts, cn.ts
+│   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
 │   ├── env.ts                      # Zod-validated env; production fails fast at startup
 │   ├── instrumentation.ts          # register() imports env.ts
 │   └── types/
 ├── tests/
 │   ├── unit/   matching/ ranking/ rating/ restaurants/ import/ admin/ api/ storage/ dev-demo/ …
-│   ├── e2e/    smoke.spec.ts  rate.spec.ts (360 px, real session cookie)  setup/prepare.ts
+│   ├── e2e/    admin.spec.ts  rate.spec.ts  ranking.spec.ts (360 px, real session cookie)  setup/prepare.ts
 │   └── setup/  test database (dishrank_test): create, migrate, seed, reset
 └── tmp/        (gitignored) menu images for local parse
 ```
@@ -270,10 +276,10 @@ dishrank/
 | Auth | Better Auth (ADR-11): Google sign-in, Prisma adapter, database sessions. The session cookie cache stays off, so every check reads the session and `User.role` from the DB and role changes apply at once. `role` is a Better Auth additional field with `input: false`, so no client can set it. `requireUser()` / `requireRole(role)` in `src/server/auth.ts` wrap `auth.api.getSession({ headers })` and throw `AppError` 401/403; actions and handlers call them first. Admin/owner services take the current user (`actor`) as their first argument and call `requireRole` themselves, so a page that forgets its check still cannot read admin data. Layouts and every page under `admin/` and `owner/` call `requirePageRole(role)`: signed-out visitors are redirected to `/sign-in?callbackUrl=…`; signed-in users without the role see the `Forbidden` component (HTTP 200, `noindex`) and no admin data is fetched. Next.js `forbidden()` is not used because it is still experimental (`authInterrupts`). |
 | Validation | Zod schemas in `src/server/validation`, shared by actions and API. |
 | Rate limiting | `rate_limit_buckets` table, sliding window per `(key, action)`. Limits in docs/06. |
-| Caching | Public pages `revalidate = 3600`; `revalidatePath` after rating write for the affected ranking + restaurant pages. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter, sort and distance in the browser and city-wide rank numbers. |
+| Caching | Public pages `revalidate = 3600`; `revalidatePath` after a rating write for the affected ranking, restaurant and city pages and the home page; the nightly cron revalidates every page. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter, sort and distance in the browser and city-wide rank numbers. Their Open Graph images are rendered on each request. |
 | Geo | `lat/lng` columns hold our own coordinates: from Overture (`locationSource OVERTURE`) or typed by an admin (`ADMIN`); NULL = location unknown. They are public data and drive the distance features (haversine, ADR-5). No PostGIS in v1. |
 | Search | `pg_trgm` GIN indexes on `restaurants.name`, `restaurants.search_text` and `dish_alias.alias` (one row per dish spelling; matched one alias at a time, docs/05). |
-| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. One scheduled cron: recompute (with stale marking). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
+| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. One scheduled cron: recompute (with stale marking); one run at a time (an unfinished run younger than 30 minutes refuses a second one with 409 `JOB_RUNNING`). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
 | Env | `src/env.ts` parses `process.env` with Zod. `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
 | Observability | Vercel logs + optional Sentry (free tier). Every service logs `{ action, userId, entityId, durationMs }`. |
 | Concurrency | Writers take locks in one order: restaurant (a rating or a delete takes it shared; an edit, status change, merge or panel location exclusive, so each sees or waits for the others) → the (city, dish) lists' advisory locks, in (city id, dish id) order (re-rank, merge, review decisions) → dish rows in id order (a ban locks the rows of every rating it hides, and refuses with `ITEM_CHANGED` if one appeared since) → the user's rating → review item → user rows last, in id order (counters, ban, trust). Rating writes, deletes, admin decisions, panel locations, merges and trust updates all follow it. If two transactions still collide (a deadlock or serialization failure, reported by Prisma as P2034, or P2010 on raw SQL), `inTransaction` tries once more and then answers `409 CONFLICT` ("try again"). Recomputes after a commit are best effort: a failure is logged and the committed write still succeeds (a rating answers `stale: true`). |

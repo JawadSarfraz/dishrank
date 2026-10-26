@@ -64,15 +64,15 @@ pnpm db:studio        # prisma studio
 pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import
 pnpm dev:demo [-- --undo]                                     # local demo data (see below)
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5
-pnpm rankings:recompute                                       # Phase 4
+pnpm rankings:recompute                                       # the nightly recompute, now (writes a JobRun)
 ```
 
 Tests never touch the dev database: `pnpm test` creates `dishrank_test` on the same server as `DATABASE_URL`
 (or uses `TEST_DATABASE_URL`), applies the migrations and seeds it, and test files that write empty its app
 tables. Any database whose name does not end in `_test` is refused (`tests/setup/test-database.ts`).
 `pnpm test:e2e` uses the same test database: `tests/e2e/setup/prepare.ts` migrates it, empties it and creates
-a restaurant, a diner and a real Better Auth session; the spec sets that session's signed cookie (no sign-in
-bypass in the app). It runs `next build` + `next start` on port 3100 (it writes `.next`, never `.next/dev`, so
+a restaurant, a Pizza list with one ranked restaurant, a diner and a real Better Auth session; the specs set
+that session's signed cookie (no sign-in bypass in the app). It runs `next build` + `next start` on port 3100 (it writes `.next`, never `.next/dev`, so
 a running `pnpm dev` is fine).
 
 Demo data for trying the rating flow before any candidate is reviewed (needs `pnpm overture:sync -- --city=islamabad`
@@ -80,6 +80,12 @@ first): `pnpm dev:demo` creates 30 restaurants from the most confident Overture 
 Blue Area and G-9 (names end in "(demo)"), 13 demo users (`@dev-demo.invalid`, one on the panel), about 120
 ratings and one review item of each Phase 3 kind. Sign in with your own Google account to rate, see `/me`,
 or (as ADMIN) turn the panel on for yourself on `/admin/users` and work through `/admin/review`.
+With demo data, ranking pages such as `/islamabad/best-chicken-karahi` show ranked restaurants and "Not enough
+votes yet" (Islamabad is not launched, so the early-ranking thresholds apply); `/islamabad` lists the dishes.
+`pnpm rankings:recompute` runs the nightly job by hand (trust, city averages, decay, stale rows, ranks,
+Sunday snapshot); pages run under `pnpm dev` show its results at once, a production build at its hourly
+refresh. As ADMIN, `/admin/rankings` shows the last runs, "Recompute now" and the city launch dates. The cron
+route needs the secret: `curl -H "Authorization: Bearer $CRON_SECRET" localhost:3000/api/cron/recompute-rankings`.
 `pnpm dev:demo -- --undo` removes all of it, also restaurants or dishes created from demo suggestions, and
 puts the candidates back to NEW. It refuses `NODE_ENV=production`, Vercel, and any database whose URL is not localhost or a local socket
 (it checks the URLs the database client uses, and the client never falls back to another server; a port

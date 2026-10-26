@@ -71,12 +71,12 @@ Acceptance
 Tasks
 - `RankingService.getRanking` (eligible/insufficient split, bootstrap mode, filters; distance from our own coordinates: Overture or admin-typed)
 - `/[city]/best-[dish]`: list, browser-side filter bar (area, sort, distance when the visitor shares a location; ranks stay city-wide), "Not enough votes yet" section, eligibility note, share button
-- `/[city]/r/[slug]`: restaurant page with dish scores + "Rate" buttons + "Upload menu photo"
-- `/`, `/[city]`: dish grids with eligible counts
-- Metadata: title/description per page, canonical, OpenGraph, JSON-LD `ItemList` + `Restaurant`; `sitemap.ts`, `robots.ts`
-- ISR 3600s + `revalidatePath` after rating writes
-- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (`/about/data`, the data sources and credits page, exists since Phase 2); link the dispute page in the footer
-- `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`, DishStat, stale, snapshot, JobRun)
+- `/[city]/r/[slug]`: restaurant page with dish scores + "Rate" buttons + "Report a problem" (a FLAG review item) + a plain "Open in Google Maps" link from our own coordinates; "Upload menu photo" arrives with Phase 5
+- `/`, `/[city]`: dish grids with eligible counts and the top restaurant per dish, dish search, "Rate a dish"
+- Metadata: title/description per page, canonical, OpenGraph (dynamic image with the top 3), JSON-LD `ItemList` + `Restaurant` (no aggregateRating); `sitemap.ts` (indexable pages only), `robots.ts`; thin pages noindex
+- ISR 3600s + `revalidatePath` after rating writes (ranking, restaurant, city and home pages)
+- Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (drafts marked for legal review; `/about/data`, the data sources and credits page, exists since Phase 2); footer links to all of them
+- `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`: trust, DishStat, rows, stale, re-rank, snapshot, rate-limit cleanup, JobRun) and `/admin/rankings` (last 10 runs, "Recompute now", "Launch city")
 
 Acceptance
 - Lighthouse mobile ≥ 90 performance on the ranking page; JSON-LD validates; cron runs locally with the secret; ranking changes after a rating without redeploy.
@@ -88,7 +88,8 @@ Tasks
 - `scripts/parse-menu.ts`, admin "Parse now" button, nightly parse of PENDING ≤ 20
 - `/admin/review`: queue list by type, resolve actions per docs/07 table
 - `/admin/menu-uploads/[id]`: matched / needs review / ignored
-- Flags + proposals endpoints and UI entry points on restaurant page
+- "Upload menu photo" on the restaurant page
+- Flag rows and their upheld effects (Phase 4's "Report a problem" files FLAG review items only), proposal endpoints and UI entry points on restaurant page
 
 Acceptance
 - Upload a real menu photo → ≥ 80% of items auto-matched for a desi menu; unmatched ones appear in the queue and can be assigned in one click.

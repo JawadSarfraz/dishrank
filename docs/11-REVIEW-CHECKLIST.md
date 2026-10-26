@@ -26,7 +26,8 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] `/about/data` shows Overture's credit lines (release and access date) and links the CDLA Permissive 2.0 text; the public footer links it
 - [ ] No scraping code anywhere (grep for `cheerio`, `puppeteer`, `playwright` outside tests, `foodpanda`)
 - [ ] Rankings computed only from `Rating` rows (grep for any external score field)
-- [ ] Privacy page states what we store (email, ratings, photos) and how to delete
+- [ ] Privacy page states what we store (email, ratings, comments, photos, panel members' shared locations) and how to delete; privacy and terms stay marked as drafts until a lawyer reviewed them
+- [ ] Restaurant pages link to Google Maps only as a plain URL built from our own coordinates (no embedded map, no Maps API call)
 
 ## Product rules
 - [ ] No free-text dish creation by users (only via admin resolve)
@@ -50,6 +51,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Unique title/description per ranking page; canonical; OG image
 - [ ] JSON-LD ItemList (ranking) and Restaurant (restaurant page) validate
 - [ ] `sitemap.xml` and `robots.txt` present; non-public routes disallowed
+- [ ] Ranking pages that rank nobody and restaurant pages without a rating are `noindex` and left out of the sitemap; JSON-LD never carries an `aggregateRating`
 - [ ] URLs stable: `/[city]/best-[dish]`, `/[city]/r/[slug]`; a merged restaurant's URL redirects permanently to the surviving one
 
 ## Accessibility / mobile
@@ -58,7 +60,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [ ] Color contrast AA on score badges
 
 ## Ops
-- [ ] `JobRun` rows for crons; admin can see last runs and trigger recompute
+- [ ] `JobRun` rows for crons; admin can see last runs and trigger recompute; a second recompute while one runs is refused (`409 JOB_RUNNING`)
 - [ ] Error monitoring or at least Vercel log drains checked
 - [ ] Backup plan documented and tested once (restore to a scratch project)
 - [ ] `.env.example` complete; README setup works on a clean machine
