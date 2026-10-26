@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalDraftNotice } from "@/components/trust/LegalDraftNotice";
+import { ContactEmail, OperatorName } from "@/components/trust/Operator";
 
 export const revalidate = 3600;
 
@@ -21,6 +22,12 @@ export default function PrivacyPage() {
       <p>
         This page says what DishRank keeps about you and why. We keep as little as we can, we do not
         sell it, and we show no ads.
+      </p>
+
+      <h2 className="text-lg font-semibold">Who we are</h2>
+      <p>
+        DishRank is run by <OperatorName />. For anything about your data, write to <ContactEmail />
+        .
       </p>
 
       <h2 className="text-lg font-semibold">Your account</h2>
@@ -78,12 +85,13 @@ export default function PrivacyPage() {
         <Link href="/me" className="underline">
           My ratings
         </Link>
-        ; its comment and earlier versions go with it. To delete your whole account, or a photo file
-        we still store, send a request from the{" "}
+        ; its comment, photo and earlier versions go with it (a copy of the photo can stay in a
+        browser or network cache for a short while). To delete your whole account, write to{" "}
+        <ContactEmail /> from the e-mail address you sign in with, or use the{" "}
         <Link href="/dispute" className="underline">
           dispute page
-        </Link>{" "}
-        with the e-mail address you sign in with.
+        </Link>
+        .
       </p>
     </main>
   );

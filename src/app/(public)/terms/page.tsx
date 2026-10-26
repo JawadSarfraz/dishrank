@@ -2,6 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalDraftNotice } from "@/components/trust/LegalDraftNotice";
+import { ContactEmail, OperatorName } from "@/components/trust/Operator";
 
 export const revalidate = 3600;
 
@@ -18,6 +19,9 @@ export default function TermsPage() {
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-4 py-8 text-base">
       <h1 className="text-2xl font-bold">Terms of use</h1>
       <LegalDraftNotice />
+      <p>
+        DishRank is run by <OperatorName />. Questions about these terms: <ContactEmail />.
+      </p>
 
       <h2 className="text-lg font-semibold">Rating dishes</h2>
       <ul className="flex list-disc flex-col gap-1 pl-5">
