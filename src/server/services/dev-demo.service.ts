@@ -3,14 +3,14 @@
 // /admin/import Create path (with the pre-ticked dishes), RatingService (limits, burst rule,
 // recompute), proposals and panel locations. Everything is marked: demo users by their e-mail
 // domain, restaurant names by "(demo)", the rest through them, and each run is recorded as a
-// "dev-demo" job. `undoDemo` removes all of it. Local databases only (`assertLocalDatabase`).
+// "dev-demo" job. `undoDemo` removes all of it. Local databases only: scripts/dev-demo.ts checks
+// the URLs the client uses (dev-demo-guard.ts), and src/server/db.ts never guesses a server.
 import type { Role } from "@/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import {
   countRatingsOfUsers,
   deleteDemoData,
-  findConnectionTarget,
   findCrossMerges,
   findDemoFootprint,
   findDemoRestaurantIds,
@@ -35,7 +35,6 @@ import { propose } from "./proposal.service";
 import { DAY_MS, TRUST } from "./ranking.constants";
 import { recomputeOne, rerankCityDishes } from "./ranking.service";
 import { createOrReplace } from "./rating.service";
-import { assertLocalServerAddress } from "./dev-demo-guard";
 
 export const DEMO = {
   job: "dev-demo",
@@ -49,16 +48,6 @@ export const DEMO = {
   spreadDays: 21,
   seed: 20_261_026,
 } as const;
-
-// ---------- guard ----------
-
-/**
- * The connection the client really opened must reach this machine (scripts/dev-demo.ts already
- * checked the URLs with assertLocalDatabase; this also covers anything they did not show).
- */
-async function assertLocalConnection() {
-  assertLocalServerAddress((await findConnectionTarget()).address);
-}
 
 // ---------- plan (pure) ----------
 
@@ -258,7 +247,6 @@ export async function createDemo(
   options: { restaurants?: number; now?: Date } = {},
 ): Promise<DemoSummary> {
   const now = options.now ?? new Date();
-  await assertLocalConnection();
   if ((await listUsersByEmailDomain(DEMO.emailDomain)).length > 0) {
     throw new AppError(
       "DEMO_EXISTS",
@@ -517,7 +505,6 @@ const restaurantIdsOf = (summary: unknown): string[] => {
  * ranked again, and real users who rated demo dishes get their counters and trust recounted.
  */
 export async function undoDemo(now: Date = new Date()) {
-  await assertLocalConnection();
   const [users, runs] = await Promise.all([
     listUsersByEmailDomain(DEMO.emailDomain),
     listJobRuns(DEMO.job),

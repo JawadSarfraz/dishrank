@@ -50,7 +50,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
   - account age is taken at the rating's time;
   - every qualifying ACTIVE or HELD rating is held, and the 5th triggers it;
   - there is one OPEN `SUSPICIOUS_RATINGS` item per row and reason, which later qualifying ratings join;
-  - ratings an admin released are never held again;
+  - every rating listed in a released BURST item is cleared of the burst rule (never counted or held by it again), also one that stays HELD for its comment; releasing a COMMENT item clears only the comment;
   - a promotion the held ratings caused is not undone.
 - [ ] Q (Phase 3): The decay clock. | Default taken: only the rater's own submission (new or edited) sets `Rating.updatedAt`; holds, releases, hides and bans write the status with plain SQL and keep it, as the merge does. `lastRatedAt` = the latest `updatedAt` of the counted ratings (ACTIVE, rater not banned), NULL with none. No DishStat row → prior 6.5, which is every Phase 3 score. docs/03 and docs/04 updated. Alternative: a separate `Rating.ratedAt` (KICKOFF-REVIEW RK-04).
 - [ ] Q (Phase 3): Held and hidden ratings, and deletes. | Default taken:
@@ -64,7 +64,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
   - until the nightly job (Phase 4), turning the panel off, hiding and banning apply the table at once and recompute the user's rows;
   - a lasting trustScore override for non-panel users is not built, since the nightly job would wipe it (KICKOFF-REVIEW OP-13);
   - `Rating.weight` stores the rater's trust at write time, for the record only.
-- [ ] Q (Phase 3): Comment screen word blocklist. | Default taken: empty (`COMMENT_BLOCKLIST` in comment-screen.ts). Phone numbers (9+ digits, Urdu digits included), links and e-mail addresses are screened.
+- [ ] Q (Phase 3): Comment screen word blocklist. | Default taken: empty (`COMMENT_BLOCKLIST` in comment-screen.ts). Screened: phone numbers (complete Pakistani mobile, landline, UAN and 0800/0900 shapes, + or 00 with 9+ digits, or 10+ digits together; any short punctuation between digit groups; dates and times ignored; Urdu digits, fullwidth and invisible characters normalised), links and e-mail addresses. Not caught on purpose: digits written as letters ("o3oo…"), landlines without their area code, foreign numbers without + or 00.
 - [ ] Q (Phase 3): How far is "far" for a panel location. | Default taken: 150 m between the observation and the restaurant's location (accuracy up to 50 m plus a market block). Accepting saves the most accurate observation.
 - [ ] Q (Phase 3): Photo rules. | Default taken:
   - a rating's photo must exist in storage, be ≤ 5 MB and JPEG or WebP, and be on no other rating (`PHOTO_IN_USE`);

@@ -113,23 +113,24 @@ export async function findOpenItemForDishRow(
 }
 
 /**
- * Ratings an admin released from SUSPICIOUS_RATINGS items of one dish row: never held again. Only
- * the ids the release really set ACTIVE (`releasedRatingIds`), not ones it left HELD because
- * another open item still listed them.
+ * Ratings an admin cleared of a burst on one dish row: every rating listed in a released BURST
+ * item, also one it left HELD because its COMMENT item is still open. The burst rule never counts
+ * or holds them again. Releasing a COMMENT item clears the comment only, not the burst.
  */
-export async function listReleasedRatingIds(restaurantDishId: string, client: Client = db) {
+export async function listBurstClearedRatingIds(restaurantDishId: string, client: Client = db) {
   const items = await client.reviewItem.findMany({
     where: {
       type: "SUSPICIOUS_RATINGS",
       status: "RESOLVED",
       resolution: { startsWith: "released" },
-      payload: { path: ["restaurantDishId"], equals: restaurantDishId },
+      AND: [
+        { payload: { path: ["restaurantDishId"], equals: restaurantDishId } },
+        { payload: { path: ["reason"], equals: "BURST" } },
+      ],
     },
     select: { payload: true },
   });
-  return new Set(
-    items.flatMap((i) => (i.payload as { releasedRatingIds?: string[] }).releasedRatingIds ?? []),
-  );
+  return new Set(items.flatMap((i) => (i.payload as { ratingIds?: string[] }).ratingIds ?? []));
 }
 
 /** Every SUSPICIOUS_RATINGS item of one dish row, any status (a merge moves them to the kept row). */

@@ -24,6 +24,25 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "+44 20 7946 0958",
       "00971 50 123 4567",
       "2 plates, call 0300 1234567",
+      "0300 123 4567",
+      "051-111-222-333",
+      // Verification round: numbers the first redesign missed, and more separators.
+      "92-51-2345678",
+      "Tel 92 51 2345678",
+      "0800-12345",
+      "toll free 0800 78686",
+      "0900-12345",
+      "92512345678",
+      "0300  -  1234567",
+      "0300 ... 1234567",
+      "0300,1234567",
+      "0300|1234567",
+      "0300:1234567",
+      "0300*1234567",
+      "0300\u034F1234567",
+      "0300\u31641234567",
+      "0300\u28001234567",
+      "0300\uFE0F1234567",
     ]) {
       expect(screenComment(c), c).toBe("PHONE");
     }
@@ -45,6 +64,9 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       expect(screenComment(c), c).toBe("LINK");
     }
     expect(screenComment("menu.example/abc")).toBe("LINK"); // any domain with a path
+    for (const c of ["t.me/karahichannel", "youtu.be/abc", "Karahi.pk", "کڑاہی.pk پر آرڈر کریں"]) {
+      expect(screenComment(c), c).toBe("LINK");
+    }
     expect(screenComment("wa.me/923001234567")).toBe("PHONE"); // the number is found first
     expect(screenComment("mail owner@karahi.pk")).toBe("EMAIL");
   });
@@ -66,6 +88,18 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       "Nice taste.Will come again",
       "Mr.Khan recommended it",
       "Best.Pizza in town",
+      // Verification round: dates with times, price lists, word-like endings.
+      "Visited 05/10/2026 19:30, great ginger",
+      "Visited 30/10/2026 19:30",
+      "31.12.2026 20:00",
+      "Came at 7:15 pm on 05-10-2026",
+      "Rs 350/450/550/650 for the four sizes",
+      "Rs 3200 - 3500 - 3800",
+      "Prices: 3500, 4500, 5500, 6500",
+      "Taste was good.In short, worth it",
+      "Ordered karahi.To be honest it was cold",
+      "Average.Top dish is the tikka",
+      "good.in short",
       "",
     ]) {
       expect(screenComment(c), c).toBeNull();

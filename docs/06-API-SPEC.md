@@ -5,7 +5,7 @@ Two surfaces, one set of services:
 - **Server actions** (`src/server/actions/*`) — used by forms in the app. Thin wrappers: `requireUser()` → zod → service → `revalidatePath`.
 - **Route handlers** (`src/app/api/v1/**`) — JSON for the same operations (future mobile app, scripts, admin tools).
 
-All responses: `{ data: ... }` or `{ error: { code, message, details? } }`. Pagination is cursor-based: `?cursor=&limit=` → `{ data, nextCursor }`.
+All responses: `{ data: ... }` or `{ error: { code, message, details? } }`. A write that collides with another one at the same moment (deadlock) is tried once more on the server, then answers `409 CONFLICT`: try again. Pagination is cursor-based: `?cursor=&limit=` → `{ data, nextCursor }`.
 
 Auth: Better Auth session cookie (database session). Roles enforced server-side. Cron endpoints use `Authorization: Bearer ${CRON_SECRET}`.
 

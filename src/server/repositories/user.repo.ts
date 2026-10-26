@@ -31,14 +31,26 @@ export async function adjustRatingCounters(
   await tx.user.update({ where: { id }, data, select: { id: true } });
 }
 
-/** Inputs of the docs/04 trust table for one user, counted from their Rating rows. */
+/** Locks one user row until commit (trust is read and written under it). */
+export async function lockUser(id: string, tx: Tx) {
+  await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+}
+
+/**
+ * Inputs of the docs/04 trust table for one user, counted from their Rating rows. One query after
+ * another: inside a transaction they share one connection.
+ */
 export async function findTrustStats(userId: string, client: Client = db) {
-  const [user, byStatus, activePhotoRatings] = await Promise.all([
-    client.user.findUnique({ where: { id: userId }, select: { isPanel: true } }),
-    client.rating.groupBy({ by: ["status"], where: { userId }, _count: { _all: true } }),
-    client.rating.count({ where: { userId, status: "ACTIVE", photoPath: { not: null } } }),
-  ]);
+  const user = await client.user.findUnique({ where: { id: userId }, select: { isPanel: true } });
   if (!user) return null;
+  const byStatus = await client.rating.groupBy({
+    by: ["status"],
+    where: { userId },
+    _count: { _all: true },
+  });
+  const activePhotoRatings = await client.rating.count({
+    where: { userId, status: "ACTIVE", photoPath: { not: null } },
+  });
   const count = (status: string) => byStatus.find((r) => r.status === status)?._count._all ?? 0;
   return {
     isPanel: user.isPanel,

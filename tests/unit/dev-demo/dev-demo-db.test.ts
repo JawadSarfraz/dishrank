@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
-import { assertLocalDatabase, assertLocalServerAddress } from "@/server/services/dev-demo-guard";
+import { assertLocalDatabase } from "@/server/services/dev-demo-guard";
 import {
   DEMO,
   createDemo,
@@ -49,13 +49,6 @@ describe("pnpm dev:demo guard", () => {
       assertLocalDatabase({ DATABASE_URL: "postgresql://u@localhost/x?host=/tmp&host=localhost" })
         .host,
     ).toBe("localhost:5432");
-  });
-
-  it("checks the address of the live connection: a Unix socket or loopback only", () => {
-    expect(() => assertLocalServerAddress(null)).not.toThrow();
-    expect(() => assertLocalServerAddress("127.0.0.1")).not.toThrow();
-    expect(() => assertLocalServerAddress("::1")).not.toThrow();
-    expect(() => assertLocalServerAddress("10.0.0.5")).toThrow(/10\.0\.0\.5/);
   });
 
   it.each([

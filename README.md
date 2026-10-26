@@ -82,7 +82,7 @@ ratings and one review item of each Phase 3 kind. Sign in with your own Google a
 or (as ADMIN) turn the panel on for yourself on `/admin/users` and work through `/admin/review`.
 `pnpm dev:demo -- --undo` removes all of it, also restaurants or dishes created from demo suggestions, and
 puts the candidates back to NEW. It refuses `NODE_ENV=production`, Vercel, and any database not on this machine
-(URLs and the live connection are checked). If a demo restaurant was merged with a real one, undo removes nothing
+(it checks the URLs the database client uses; the client never falls back to another server). If a demo restaurant was merged with a real one, undo removes nothing
 and names the merge: the two are mixed, so remove that demo data by hand.
 
 CI (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`: Node from `.nvmrc`, `pnpm install`,

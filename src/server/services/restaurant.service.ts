@@ -266,38 +266,47 @@ export async function updateRestaurant(
   input: AdminRestaurantUpdateInput,
 ) {
   const admin = assertRole(actor, "ADMIN");
-  const restaurant = await loadEditable(id);
   const area = await findAreaById(input.areaId);
-  if (!area || area.cityId !== restaurant.cityId) {
-    throw new AppError(
-      "AREA_NOT_IN_CITY",
-      "The area does not belong to this restaurant's city",
-      400,
+  // Under the restaurant's lock (docs/02 Concurrency): a merge that committed meanwhile is seen and
+  // refused, one that starts now waits for this edit.
+  const updated = await inTransaction(async (tx) => {
+    await lockRestaurants([id], tx);
+    const restaurant = await loadEditable(id, tx);
+    if (!area || area.cityId !== restaurant.cityId) {
+      throw new AppError(
+        "AREA_NOT_IN_CITY",
+        "The area does not belong to this restaurant's city",
+        400,
+      );
+    }
+    const data: Prisma.RestaurantUncheckedUpdateInput = {};
+    if (input.lat !== undefined || input.lng !== undefined) {
+      const lat = input.lat ?? null;
+      const lng = input.lng ?? null;
+      if ((lat === null) !== (lng === null)) {
+        throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
+      }
+      // Unchanged coordinates keep their source; typed ones are the admin's; none means unknown.
+      if (lat !== restaurant.lat || lng !== restaurant.lng) {
+        Object.assign(data, { lat, lng, locationSource: lat === null ? null : "ADMIN" });
+      }
+    }
+    const aliases = normalizeAliases(input.aliases, input.name);
+    return updateRestaurantById(
+      id,
+      {
+        ...data,
+        name: input.name,
+        areaId: input.areaId,
+        address: input.address,
+        phone: input.phone,
+        website: input.website,
+        priceBand: input.priceBand,
+        aliases,
+        searchText: buildSearchText(input.name, aliases),
+      },
+      tx,
     );
-  }
-  const data: Prisma.RestaurantUncheckedUpdateInput = {};
-  if (input.lat !== undefined || input.lng !== undefined) {
-    const lat = input.lat ?? null;
-    const lng = input.lng ?? null;
-    if ((lat === null) !== (lng === null)) {
-      throw new AppError("VALIDATION_FAILED", "lat and lng go together", 400);
-    }
-    // Unchanged coordinates keep their source; typed ones are the admin's; none means unknown.
-    if (lat !== restaurant.lat || lng !== restaurant.lng) {
-      Object.assign(data, { lat, lng, locationSource: lat === null ? null : "ADMIN" });
-    }
-  }
-  const aliases = normalizeAliases(input.aliases, input.name);
-  const updated = await updateRestaurantById(id, {
-    ...data,
-    name: input.name,
-    areaId: input.areaId,
-    address: input.address,
-    phone: input.phone,
-    website: input.website,
-    priceBand: input.priceBand,
-    aliases,
-    searchText: buildSearchText(input.name, aliases),
   });
   logEvent("restaurant.update", { userId: admin.id, entityId: id });
   return { id, slug: updated.slug, citySlug: updated.city.slug };
@@ -309,9 +318,14 @@ export async function setRestaurantStatus(
   status: Exclude<RestaurantStatus, "DUPLICATE">,
 ) {
   const admin = assertRole(actor, "ADMIN");
-  const restaurant = await loadEditable(id);
+  // Under the restaurant's lock: never overwrites a merge's DUPLICATE that committed meanwhile.
+  const restaurant = await inTransaction(async (tx) => {
+    await lockRestaurants([id], tx);
+    const live = await loadEditable(id, tx);
+    if (live.status !== status) await updateRestaurantById(id, { status }, tx);
+    return live;
+  });
   if (restaurant.status !== status) {
-    await updateRestaurantById(id, { status });
     // Only ACTIVE restaurants rank (docs/04): its dish rows gain or lose their rank numbers now.
     await rerankRestaurant(id);
     logEvent("restaurant.status", {
@@ -676,6 +690,8 @@ export async function mergeRestaurants(
       out.movedDishes.push(rd.id);
     }
 
+    // Counter changes of users who rated both rows, applied last (user rows come last, docs/02).
+    const counterDeltas = new Map<string, { ratings: number; photos: number }>();
     for (const pair of plan.pairs) {
       const ratings = await listRatingsOfRestaurantDishes([pair.keep.id, pair.drop.id], tx);
       const ratingPlan = planRatingMerge(
@@ -696,11 +712,10 @@ export async function mergeRestaurants(
         await moveRatingHistory(older.id, kept.id, tx);
         await deleteRating(older.id, tx);
         // The user keeps one rating where they had two.
-        await adjustRatingCounters(
-          older.userId,
-          { ratings: -1, photos: photoOf.get(older.id) ? -1 : 0 },
-          tx,
-        );
+        const delta = counterDeltas.get(older.userId) ?? { ratings: 0, photos: 0 };
+        delta.ratings -= 1;
+        if (photoOf.get(older.id)) delta.photos -= 1;
+        counterDeltas.set(older.userId, delta);
         out.mergedRatings.push({ keptId: kept.id, droppedId: older.id });
       }
       await moveRatings(
@@ -752,6 +767,12 @@ export async function mergeRestaurants(
     out.movedReviewItems = (await moveOpenReviewItems(sourceId, targetId, tx)).count;
     out.movedCandidates = (await moveCandidatesToRestaurant(sourceId, targetId, tx)).count;
     out.movedLocationObservations = (await moveLocationObservations(sourceId, targetId, tx)).count;
+
+    for (const [userId, delta] of [...counterDeltas].sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    )) {
+      await adjustRatingCounters(userId, delta, tx);
+    }
 
     // Steps 5-6: Overture id and location (the target keeps its own; it takes the source's only
     // when it has none; the unique overtureId is cleared on the source first), owner, status.

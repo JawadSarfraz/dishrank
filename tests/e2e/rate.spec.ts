@@ -37,8 +37,12 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
 
   await tap(result);
   await expect(page.getByRole("heading", { name: "What did you eat?" })).toBeVisible();
+  // Measured once the restaurant's own dishes are on screen (nothing moves after that).
+  await expect(page.getByRole("heading", { name: "On the menu here" })).toBeVisible();
+  const chip = page.getByRole("button", { name: new RegExp(`^${dish.name}`) }).first();
+  expect((await chip.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await expectNoSideScroll(page);
-  await tap(page.getByRole("button", { name: new RegExp(`^${dish.name}`) }).first());
+  await tap(chip);
 
   const eight = page.getByRole("button", { name: "8 out of 10" });
   await expect(eight).toBeVisible();

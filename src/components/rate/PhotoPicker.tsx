@@ -22,11 +22,14 @@ export function PhotoPicker({
   const [preview, setPreview] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(current ? "A photo is attached." : null);
   const [error, setError] = useState<string | null>(null);
+  // One upload at a time: the input is disabled until it ends, so Submit never waits on a second.
+  const [busy, setBusy] = useState(false);
 
   async function choose(file: File | undefined) {
-    if (!file) return;
+    if (!file || busy) return;
     setError(null);
     setStatus("Preparing the photo…");
+    setBusy(true);
     onBusy(true);
     try {
       const blob = await preparePhoto(file);
@@ -50,6 +53,7 @@ export function PhotoPicker({
       setStatus(null);
       setError(e instanceof Error ? e.message : "The photo could not be uploaded.");
     } finally {
+      setBusy(false);
       onBusy(false);
     }
   }
@@ -64,6 +68,7 @@ export function PhotoPicker({
         type="file"
         accept="image/*"
         ref={input}
+        disabled={busy}
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = "";

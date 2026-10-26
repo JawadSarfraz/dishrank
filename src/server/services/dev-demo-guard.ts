@@ -47,10 +47,3 @@ export function assertLocalDatabase(env: Readonly<Record<string, string | undefi
   }
   return target!;
 }
-
-/** The server address of a live connection: NULL for a Unix socket, else it must be loopback. */
-export function assertLocalServerAddress(address: string | null) {
-  if (address !== null && address !== "127.0.0.1" && address !== "::1") {
-    refuse(`the database connection reaches ${address}, not this machine`);
-  }
-}

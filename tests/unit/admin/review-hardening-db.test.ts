@@ -4,6 +4,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import type { SessionUser } from "@/server/roles";
 import { setPanel } from "@/server/services/admin-users.service";
+import { recordLocationObservation } from "@/server/services/location.service";
 import { addRestaurantDish, createOrReplace } from "@/server/services/rating.service";
 import { mergeRestaurants } from "@/server/services/restaurant.service";
 import { getReviewQueue, resolveReviewItem } from "@/server/services/review.service";
@@ -167,6 +168,92 @@ describe("review follow-ups (test DB)", () => {
     const failed = results.find((x) => x.status === "rejected") as PromiseRejectedResult;
     expect(failed.reason).toMatchObject({ code: "PHOTO_IN_USE", status: 409 });
     expect(await db.rating.count({ where: { photoPath } })).toBe(1);
+  });
+
+  it("a comment edit that keeps the same flag still changes the fingerprint (updatedAt)", async () => {
+    const r = await makeRestaurant("Fixture Same Flag");
+    const user = await oldUser();
+    await rate(user, r.id, "chai", { comment: "Visit www.chai.pk" });
+    const seen = (await getReviewQueue(admin, { status: "OPEN", limit: 50 }, NOW)).items[0];
+    await rate(user, r.id, "chai", { comment: "Visit www.tea.pk" }, new Date(NOW.getTime() + 1000));
+    const item = await db.reviewItem.findUniqueOrThrow({ where: { id: seen.id } });
+    expect(item.payload).toEqual(seen.payload); // same flag: only the rating changed
+    await expect(
+      resolveReviewItem(admin, seen.id, { action: "release" }, NOW, seen.fingerprint),
+    ).rejects.toMatchObject({ code: "ITEM_CHANGED" });
+  });
+
+  it("a location card's fingerprint covers the restaurant's current location", async () => {
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const r = await makeRestaurant("Fixture Location Seen");
+    await recordLocationObservation(
+      actorOf(panel),
+      { restaurantId: r.id, lat: 33.7, lng: 73.05, accuracyM: 9 },
+      NOW,
+    );
+    const seen = (await getReviewQueue(admin, { status: "OPEN", limit: 50 }, NOW)).items[0];
+    // Another admin types the restaurant's location meanwhile.
+    await db.restaurant.update({
+      where: { id: r.id },
+      data: { lat: 33.71, lng: 73.06, locationSource: "ADMIN" },
+    });
+    await expect(
+      resolveReviewItem(admin, seen.id, { action: "approve" }, NOW, seen.fingerprint),
+    ).rejects.toMatchObject({ code: "ITEM_CHANGED" });
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
+      locationSource: "ADMIN",
+    });
+  });
+
+  it("a burst release clears its ratings for the burst rule, also ones still held for a comment", async () => {
+    const r = await makeRestaurant("Fixture Burst Clear");
+    const young = (i: number) => makeUser(`Young ${i}`, { createdAt: daysAgo(1, NOW) });
+    for (let i = 0; i < 5; i++) {
+      await rate(await young(i), r.id, "pizza", { comment: `www.p${i}.pk` });
+    }
+    const burst = (await openItems()).find((i) => reasonOf(i) === "BURST")!;
+    expect(idsOf(burst)).toHaveLength(5);
+    const out = await resolveReviewItem(admin, burst.id, { action: "release" }, NOW);
+    expect(out.resolution).toBe("released 0"); // all five wait for their comment item
+    // A sixth young account: the five are cleared of the burst, so no burst item opens again.
+    await rate(await young(5), r.id, "pizza");
+    expect((await openItems()).filter((i) => reasonOf(i) === "BURST")).toHaveLength(0);
+    expect(await db.rating.count({ where: { status: "HELD" } })).toBe(5);
+  });
+
+  it("a ban hides every rating of the user and names every page whose scores changed", async () => {
+    const user = await oldUser("Banned");
+    const a = await makeRestaurant("Fixture Ban A");
+    const b = await makeRestaurant("Fixture Ban B");
+    await rate(user, a.id, "chai");
+    await rate(user, b.id, "pizza", { comment: "www.spam.pk" });
+    const out = await resolveReviewItem(
+      admin,
+      (await openItems())[0].id,
+      { action: "ban_users" },
+      NOW,
+    );
+    expect(await db.rating.count({ where: { userId: user.id, status: { not: "HIDDEN" } } })).toBe(
+      0,
+    );
+    expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).bannedAt).not.toBeNull();
+    expect(out.dishPages.map((p) => p.restaurantSlug).sort()).toEqual([a.slug, b.slug].sort());
+  });
+
+  it("a hide names the pages of the rows the user's new trust recomputed", async () => {
+    const user = await oldUser("Hidden Twice");
+    const p = await makeRestaurant("Fixture Trust P");
+    const r1 = await makeRestaurant("Fixture Trust R1");
+    const r2 = await makeRestaurant("Fixture Trust R2");
+    await rate(user, p.id, "chai");
+    await rate(user, r1.id, "chai", { comment: "www.a.pk" });
+    await resolveReviewItem(admin, (await openItems())[0].id, { action: "hide" }, NOW);
+    await rate(user, r2.id, "chai", { comment: "www.b.pk" });
+    const out = await resolveReviewItem(admin, (await openItems())[0].id, { action: "hide" }, NOW);
+    expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).trustScore).toBe(0.3);
+    expect(out.dishPages.map((x) => x.restaurantSlug)).toEqual(
+      expect.arrayContaining([p.slug, r2.slug]),
+    );
   });
 
   it("the panel toggle names the public pages whose scores changed", async () => {

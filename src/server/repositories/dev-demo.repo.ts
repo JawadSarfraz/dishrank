@@ -81,13 +81,6 @@ export async function countRatingsOfUsers(userIds: readonly string[]) {
   return { total, held };
 }
 
-/** The database and server address of the live connection (NULL address: a Unix socket). */
-export async function findConnectionTarget() {
-  const [row] = await db.$queryRaw<{ database: string; address: string | null }[]>`
-    SELECT current_database() AS database, host(inet_server_addr()) AS address`;
-  return row!;
-}
-
 /**
  * Restaurants that came from demo data: recorded by a run, created from a suggestion a demo user
  * filed, or (when a run died before recording) created from a candidate the demo admin reviewed

@@ -5,10 +5,12 @@
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { listDishPagesOfRows } from "@/server/repositories/restaurant-dish.repo";
+import { inTransaction } from "@/server/repositories/transaction";
 import {
   findTrustStats,
   listRatedRowsOfUser,
   listUsersPage,
+  lockUser,
   updateUserById,
 } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
@@ -34,23 +36,35 @@ export async function listUsersForAdmin(actor: SessionUser | null, query: AdminU
   };
 }
 
-/** Recomputes a user's trust from the docs/04 table and every row their ratings count in. */
+/**
+ * Recomputes a user's trust from the docs/04 table, then every row their ratings count in, and
+ * returns those rows (their pages show new scores). Read and written under the user's row lock, so
+ * a panel toggle at the same moment is either seen here or waits.
+ */
 export async function refreshUserTrust(userId: string) {
-  const stats = await findTrustStats(userId);
-  if (!stats) return null;
-  const trustScore = trustFor(stats);
-  const updated = await updateUserById(userId, { trustScore });
-  for (const rowId of await listRatedRowsOfUser(userId)) await recomputeOne(rowId);
-  return updated;
+  const updated = await inTransaction(async (tx) => {
+    await lockUser(userId, tx);
+    const stats = await findTrustStats(userId, tx);
+    return stats ? updateUserById(userId, { trustScore: trustFor(stats) }, tx) : null;
+  });
+  if (!updated) return null;
+  const rows = await listRatedRowsOfUser(userId);
+  for (const rowId of rows) await recomputeOne(rowId);
+  return { user: updated, rows };
 }
 
 export async function setPanel(actor: SessionUser | null, userId: string, isPanel: boolean) {
   const admin = assertRole(actor, "ADMIN");
-  const stats = await findTrustStats(userId);
-  if (!stats) throw new AppError("NOT_FOUND", "User not found", 404);
-  // Panel trust is fixed at 1.3 (Decided 2026-10-22); off → the trust table (docs/04).
-  const trustScore = isPanel ? TRUST.panel : trustFor({ ...stats, isPanel: false });
-  const updated = await updateUserById(userId, { isPanel, trustScore });
+  // Under the user's row lock, like refreshUserTrust: the two never overwrite each other.
+  const updated = await inTransaction(async (tx) => {
+    await lockUser(userId, tx);
+    const stats = await findTrustStats(userId, tx);
+    if (!stats) throw new AppError("NOT_FOUND", "User not found", 404);
+    // Panel trust is fixed at 1.3 (Decided 2026-10-22); off → the trust table (docs/04).
+    const trustScore = isPanel ? TRUST.panel : trustFor({ ...stats, isPanel: false });
+    return updateUserById(userId, { isPanel, trustScore }, tx);
+  });
+  const trustScore = updated.trustScore;
   const rows = await listRatedRowsOfUser(userId);
   for (const rowId of rows) await recomputeOne(rowId);
   logEvent("admin.user.panel", {

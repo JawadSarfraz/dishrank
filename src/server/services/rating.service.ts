@@ -14,7 +14,7 @@ import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
   createReviewItem,
   findOpenItemForDishRow,
-  listReleasedRatingIds,
+  listBurstClearedRatingIds,
   lockReviewItem,
   updateReviewItemPayload,
 } from "@/server/repositories/moderation.repo";
@@ -23,6 +23,7 @@ import {
   addRatingHistory,
   findRatingByPhotoPath,
   findRatingOfUser,
+  findRatingRow,
   findRatingWithPlace,
   insertRating,
   listBurstRatings,
@@ -36,6 +37,7 @@ import {
 import {
   ensureRestaurantDish,
   findRestaurantDish,
+  listDishPagesOfRows,
   reviveRestaurantDish,
 } from "@/server/repositories/restaurant-dish.repo";
 import { findRestaurantById, lockRestaurantForRating } from "@/server/repositories/restaurant.repo";
@@ -181,9 +183,9 @@ async function applyBurstRule(
   now: Date,
   tx: Tx,
 ): Promise<string[]> {
-  // Ratings an admin already released for this row were judged genuine: they neither count nor
-  // get held again.
-  const released = await listReleasedRatingIds(rd.id, tx);
+  // Ratings an admin cleared of a burst on this row were judged genuine: they neither count nor
+  // get held again (also one still HELD for its comment).
+  const released = await listBurstClearedRatingIds(rd.id, tx);
   const ratings = (
     await listBurstRatings(
       rd.id,
@@ -429,10 +431,19 @@ export async function deleteOwn(
     );
   }
   await assertRateLimit(`user:${user.id}:rating-delete`, RATE_LIMITS.ratingDelete, now);
-  await inTransaction(async (tx) => {
+  const rowId = await inTransaction(async (tx) => {
+    // The shared lock order (restaurant → dish row → rating): a merge that moved this rating
+    // meanwhile is seen, and the row recomputed below is the one it is on now.
+    const row = await findRatingRow(rating.id, tx);
+    if (!row) throw new AppError("NOT_FOUND", "Rating not found", 404);
+    await lockRestaurantForRating(row.restaurantId, tx);
+    await lockRestaurantDish(row.restaurantDishId, tx);
     // Checked again under the row lock: a hold or hide that committed meanwhile wins.
     const live = await lockRatingById(rating.id, tx);
     if (!live) throw new AppError("NOT_FOUND", "Rating not found", 404);
+    if (live.restaurantDishId !== row.restaurantDishId) {
+      throw new AppError("CONFLICT", "This changed at the same time elsewhere. Try again.", 409);
+    }
     if (live.status !== "ACTIVE") {
       throw new AppError(
         "RATING_UNDER_REVIEW",
@@ -442,15 +453,17 @@ export async function deleteOwn(
     }
     await deleteRating(live.id, tx); // its history goes with it (cascade)
     await adjustRatingCounters(user.id, { ratings: -1, photos: live.photoPath ? -1 : 0 }, tx);
+    return row.restaurantDishId;
   });
-  await recomputeOne(rating.restaurantDishId, now);
+  await recomputeOne(rowId, now);
   logEvent("rating.delete", { userId: user.id, entityId: rating.id });
+  const [page] = await listDishPagesOfRows([rowId]);
   return {
     id: rating.id,
-    restaurantDishId: rating.restaurantDishId,
-    citySlug: rating.restaurantDish.restaurant.city.slug,
-    restaurantSlug: rating.restaurantDish.restaurant.slug,
-    dishSlug: rating.restaurantDish.dish.slug,
+    restaurantDishId: rowId,
+    citySlug: page?.citySlug ?? rating.restaurantDish.restaurant.city.slug,
+    restaurantSlug: page?.restaurantSlug ?? rating.restaurantDish.restaurant.slug,
+    dishSlug: page?.dishSlug ?? rating.restaurantDish.dish.slug,
   };
 }
 

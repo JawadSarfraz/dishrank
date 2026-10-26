@@ -91,9 +91,10 @@ export function RateFlow({ data }: { data: RatePageData }) {
   const [dish, setDish] = useState<DishRef | null>(data.dish);
   const [existing, setExisting] = useState<Existing | null>(data.existing);
   const [result, setResult] = useState<RatingResult | null>(null);
-  // While a picked restaurant's own dishes load, the dish step shows neither list, so no chip moves
-  // under the diner's finger when "On the menu here" arrives.
-  const [loadingDishes, setLoadingDishes] = useState(false);
+  // While a picked restaurant's own dishes load, its dish step shows neither list, so no chip moves
+  // under the diner's finger when "On the menu here" arrives. Keyed by slug: a slower answer for
+  // a restaurant picked before never clears the placeholder of the one on screen.
+  const [loadingSlug, setLoadingSlug] = useState<string | null>(null);
   const [seen] = useState(() => initialSeen(data));
   const city = data.cities.find((c) => c.slug === citySlug) ?? data.cities[0];
   const step = result ? "done" : !restaurant ? "restaurant" : !dish ? "dish" : "score";
@@ -121,7 +122,8 @@ export function RateFlow({ data }: { data: RatePageData }) {
       const d = params.get("d");
       setResult(null);
       setExisting(null); // the effect below loads the one for this entry
-      if (c && data.cities.some((x) => x.slug === c)) setCitySlug(c);
+      // The first entry (/rate from the home page or /me) names no city: the server's default.
+      setCitySlug(c && data.cities.some((x) => x.slug === c) ? c : data.citySlug);
       if (!r) {
         setRestaurant(null);
         setDish(null);
@@ -131,16 +133,18 @@ export function RateFlow({ data }: { data: RatePageData }) {
       setRestaurant(known);
       setDish(d ? (seen.dishes.get(d) ?? null) : null);
       if (known) return;
-      void fetchRestaurant(r).then((found) => {
-        if (!found) return;
-        remember(seen, found, null);
-        // Only if the diner is still on that entry.
-        const now = new URLSearchParams(window.location.search);
-        if (now.get("r") !== r) return;
-        setRestaurant(found);
-        const nd = now.get("d");
-        setDish(nd ? (seen.dishes.get(nd) ?? null) : null);
-      });
+      void fetchRestaurant(r)
+        .then((found) => {
+          if (!found) return;
+          remember(seen, found, null);
+          // Only if the diner is still on that entry.
+          const now = new URLSearchParams(window.location.search);
+          if (now.get("r") !== r) return;
+          setRestaurant(found);
+          const nd = now.get("d");
+          setDish(nd ? (seen.dishes.get(nd) ?? null) : null);
+        })
+        .catch(() => {}); // offline: the diner stays on the search step and can search again
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -170,7 +174,7 @@ export function RateFlow({ data }: { data: RatePageData }) {
             // Show the dish step at once; the restaurant's own dishes arrive a moment later.
             const pending: RateRestaurant = { ...hit, citySlug: city?.slug ?? "", dishes: [] };
             move({ restaurant: pending, dish: null });
-            setLoadingDishes(true);
+            setLoadingSlug(hit.slug);
             void fetchRestaurant(hit.slug)
               .then((found) => {
                 if (!found) return;
@@ -178,14 +182,14 @@ export function RateFlow({ data }: { data: RatePageData }) {
                 setRestaurant((cur) => (cur?.id === found.id ? found : cur));
               })
               .catch(() => {}) // offline: the launch dishes and the search still work
-              .finally(() => setLoadingDishes(false));
+              .finally(() => setLoadingSlug((cur) => (cur === hit.slug ? null : cur)));
           }}
         />
       )}
       {step === "dish" && restaurant && (
         <DishStep
           restaurant={restaurant}
-          loading={loadingDishes}
+          loading={loadingSlug === restaurant.slug}
           launchDishes={data.launchDishes}
           signedIn={data.signedIn}
           backUrl={rateUrl(citySlug, restaurant, null)}
@@ -206,6 +210,10 @@ export function RateFlow({ data }: { data: RatePageData }) {
           onChangeRestaurant={() => move({ restaurant: null, dish: null })}
           onChangeDish={() => move({ restaurant, dish: null })}
           onDone={(res) => {
+            // Saved either way; the thank-you step only if the diner is still on this rating's
+            // entry (a slow save must not replace a step they went back or forward to).
+            const now = new URLSearchParams(window.location.search);
+            if (now.get("r") !== res.restaurant.slug || now.get("d") !== res.dish.slug) return;
             setResult(res);
             window.scrollTo({ top: 0 });
           }}

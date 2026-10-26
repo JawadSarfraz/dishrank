@@ -84,12 +84,15 @@ type RestaurantProposalPayload = {
 export function reviewFingerprint(
   item: { payload: unknown; restaurantId: string | null },
   ratings: readonly { id: string; status: string; updatedAt: Date }[],
+  /** A location card also shows the restaurant's current location, which approving replaces. */
+  location: { lat: number | null; lng: number | null; locationSource: string | null } | null = null,
 ): string {
   const state = [...ratings]
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .map((r) => [r.id, r.status, r.updatedAt.toISOString()]);
+  const place = location ? [location.lat, location.lng, location.locationSource] : null;
   return createHash("sha256")
-    .update(JSON.stringify([item.payload, item.restaurantId, state]))
+    .update(JSON.stringify([item.payload, item.restaurantId, state, place]))
     .digest("hex")
     .slice(0, 32);
 }
@@ -148,6 +151,7 @@ export async function getReviewQueue(
       fingerprint: reviewFingerprint(
         item,
         item.type === "SUSPICIOUS_RATINGS" ? listedRatings(item.payload, ratings) : [],
+        item.type === "LOCATION_SUGGESTION" ? item.restaurant : null,
       ),
       createdAt: item.createdAt,
       resolution: item.resolution,
@@ -252,15 +256,17 @@ async function decideHeldRatings(
     };
   }
   if (input.action === "ban_users") {
-    for (const userId of users) {
-      await updateUserById(userId, { bannedAt: now }, tx);
-    }
+    // The ratings first, then the user rows in id order: the order every other writer uses
+    // (docs/02 Concurrency), so a ban never deadlocks with an edit, a delete or a merge.
     const all = await listRatingsOfUsers(users, tx);
     await setRatingStatus(
       all.filter((r) => r.status !== "HIDDEN").map((r) => r.id),
       "HIDDEN",
       tx,
     );
+    for (const userId of [...users].sort()) {
+      await updateUserById(userId, { bannedAt: now }, tx);
+    }
     return {
       status: "RESOLVED",
       resolution: `banned ${users.length}`,
@@ -408,12 +414,18 @@ const itemChanged = () =>
  */
 async function lockItemParents(
   item: { type: ReviewItemType; payload: unknown; restaurantId: string | null },
+  action: ReviewResolveInput["action"],
   tx: Tx,
 ) {
   if (item.type === "SUSPICIOUS_RATINGS") {
     const payload = item.payload as HeldPayload;
     const ratings = await listRatingsForReview(payload.ratingIds ?? [], tx);
     const rows = [payload.restaurantDishId, ...ratings.map((r) => r.restaurantDishId)];
+    // A ban hides every rating of its users: the dish rows of all of them are locked too.
+    if (action === "ban_users") {
+      const users = [...new Set(ratings.map((r) => r.userId))];
+      for (const r of await listRatingsOfUsers(users, tx)) rows.push(r.restaurantDishId);
+    }
     await lockRestaurantDishes(rows, tx);
     return { rows: new Set(rows), restaurantId: null };
   }
@@ -437,7 +449,7 @@ export async function resolveReviewItem(
   const decision = await inTransaction(async (tx) => {
     const peek = await peekReviewItem(itemId, tx);
     if (!peek) throw new AppError("NOT_FOUND", "Review item not found", 404);
-    const locked = peek.status === "OPEN" ? await lockItemParents(peek, tx) : null;
+    const locked = peek.status === "OPEN" ? await lockItemParents(peek, input.action, tx) : null;
     const item = await lockReviewItem(itemId, tx);
     if (!item) throw new AppError("NOT_FOUND", "Review item not found", 404);
     if (item.status !== "OPEN" || !locked) {
@@ -465,7 +477,11 @@ export async function resolveReviewItem(
     ) {
       throw itemChanged();
     }
-    if (fingerprint !== undefined && fingerprint !== reviewFingerprint(item, ratings)) {
+    const location =
+      item.type === "LOCATION_SUGGESTION" && item.restaurantId
+        ? await findRestaurantById(item.restaurantId, tx)
+        : null;
+    if (fingerprint !== undefined && fingerprint !== reviewFingerprint(item, ratings, location)) {
       throw itemChanged();
     }
     const d =
@@ -492,9 +508,13 @@ export async function resolveReviewItem(
     return { ...d, type: item.type };
   });
 
-  // After commit: trust first (it changes weights), then every touched dish row.
+  // After commit: trust first (it changes weights; it recomputes the user's rows itself), then
+  // every dish row the decision touched. Pages of both kinds of rows are revalidated.
   const rows = new Set(decision.recompute);
-  for (const userId of decision.trustUsers) await refreshUserTrust(userId);
+  const pages = new Set(decision.recompute);
+  for (const userId of decision.trustUsers) {
+    for (const row of (await refreshUserTrust(userId))?.rows ?? []) pages.add(row);
+  }
   for (const row of rows) await recomputeOne(row, now);
   if (decision.invalidateAliases) invalidateAliasIndex();
   logEvent("admin.review.resolve", {
@@ -511,6 +531,6 @@ export async function resolveReviewItem(
     resolution: decision.resolution,
     restaurantSlugs: decision.restaurantSlugs,
     /** Ranking and restaurant pages whose scores or ranks may have changed. */
-    dishPages: await listDishPagesOfRows([...rows]),
+    dishPages: await listDishPagesOfRows([...pages]),
   };
 }

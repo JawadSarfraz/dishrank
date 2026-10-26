@@ -65,9 +65,24 @@ export async function lockRatingOfUser(restaurantDishId: string, userId: string,
 
 /** One rating, locked for this transaction (a delete re-checks its status under the lock). */
 export async function lockRatingById(id: string, tx: Tx) {
-  const rows = await tx.$queryRaw<{ id: string; status: RatingStatus; photoPath: string | null }[]>`
-    SELECT id, status, "photoPath" FROM "Rating" WHERE id = ${id} FOR UPDATE`;
+  const rows = await tx.$queryRaw<
+    { id: string; status: RatingStatus; photoPath: string | null; restaurantDishId: string }[]
+  >`SELECT id, status, "photoPath", "restaurantDishId" FROM "Rating" WHERE id = ${id} FOR UPDATE`;
   return rows[0] ?? null;
+}
+
+/** The dish row and restaurant a rating is on now (to take their locks before the rating's). */
+export async function findRatingRow(id: string, tx: Tx) {
+  const rating = await tx.rating.findUnique({
+    where: { id },
+    select: { restaurantDishId: true, restaurantDish: { select: { restaurantId: true } } },
+  });
+  return rating
+    ? {
+        restaurantDishId: rating.restaurantDishId,
+        restaurantId: rating.restaurantDish.restaurantId,
+      }
+    : null;
 }
 
 export async function findRatingOfUser(
