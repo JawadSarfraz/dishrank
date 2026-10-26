@@ -3,14 +3,15 @@ import { ReviewItemCard } from "@/components/admin/ReviewItemCard";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { requirePageRole } from "@/server/auth";
 import { getRestaurantFormOptions } from "@/server/services/import.service";
-import { getReviewQueue, PHASE3_REVIEW_TYPES } from "@/server/services/review.service";
+import { getReviewQueue, REVIEW_PAGE_TYPES } from "@/server/services/review.service";
 import { reviewQueueQuery } from "@/server/validation";
 
-const LABELS: Record<(typeof PHASE3_REVIEW_TYPES)[number], string> = {
+const LABELS: Record<(typeof REVIEW_PAGE_TYPES)[number], string> = {
   SUSPICIOUS_RATINGS: "Held ratings",
   DISH_PROPOSAL: "Dish suggestions",
   RESTAURANT_PROPOSAL: "Restaurant suggestions",
   LOCATION_SUGGESTION: "Locations",
+  FLAG: "Reports and disputes",
 };
 
 export default async function AdminReviewPage({ searchParams }: PageProps<"/admin/review">) {
@@ -36,13 +37,14 @@ export default async function AdminReviewPage({ searchParams }: PageProps<"/admi
       <h1 className="text-2xl font-bold">Review queue</h1>
       <p className="text-sm">
         Held ratings do not count until approved. Suggestions are never public until you create
-        them. Menu items, flags and claims arrive in Phases 5 and 6.
+        them. Reports and disputes change nothing by themselves: act on /admin/restaurants, then
+        mark them done. Menu items and claims arrive in Phases 5 and 6.
       </p>
       <nav aria-label="Item types" className="flex flex-wrap gap-3 text-sm">
         <Link href={tab()} className={query.type ? "underline" : "font-semibold"}>
           All open ({Object.values(queue.counts).reduce((a, b) => a + (b ?? 0), 0)})
         </Link>
-        {PHASE3_REVIEW_TYPES.map((type) => (
+        {REVIEW_PAGE_TYPES.map((type) => (
           <Link
             key={type}
             href={tab(type)}

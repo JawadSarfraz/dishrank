@@ -24,6 +24,12 @@ const date = new Intl.DateTimeFormat("en-PK", {
   timeZone: "Asia/Karachi",
 });
 const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
+const REPORT_LABELS: Record<string, string> = {
+  CLOSED: "closed",
+  WRONG_LOCATION: "wrong location",
+  WRONG_DISH: "wrong dish",
+  OTHER: "other",
+};
 const osm = (lat: number, lng: number) =>
   `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=18/${lat}/${lng}`;
 
@@ -143,6 +149,24 @@ export function ReviewItemCard({
         <LocationDetails payload={p} restaurant={item.restaurant} />
       )}
 
+      {item.type === "FLAG" && p.kind === "report" && (
+        <p>
+          Problem:{" "}
+          <span className="font-medium">{REPORT_LABELS[String(p.reason)] ?? String(p.reason)}</span>
+          {item.dish ? ` · ${item.dish.name}` : ""}
+          {p.note ? <span className="text-muted-foreground"> · “{String(p.note)}”</span> : null}
+        </p>
+      )}
+      {item.type === "FLAG" && p.kind === "dispute" && (
+        <div className="flex flex-col gap-1">
+          <p className="whitespace-pre-wrap">“{String(p.message)}”</p>
+          <p className="text-muted-foreground">
+            {p.contact ? `Contact: ${String(p.contact)}` : "No contact given"}
+            {p.page ? ` · About: ${String(p.page)}` : ""}
+          </p>
+        </div>
+      )}
+
       {item.status !== "OPEN" && (
         <p className="text-muted-foreground">
           {item.status.toLowerCase()}: {item.resolution}{" "}
@@ -210,7 +234,22 @@ export function ReviewItemCard({
               Approve location
             </Button>
           )}
-          {item.type !== "SUSPICIOUS_RATINGS" && (
+          {item.type === "FLAG" && (
+            <>
+              <Button size="sm" disabled={pending} onClick={() => resolve({ action: "uphold" })}>
+                Done (acted on it)
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => resolve({ action: "dismiss" })}
+              >
+                Dismiss
+              </Button>
+            </>
+          )}
+          {item.type !== "SUSPICIOUS_RATINGS" && item.type !== "FLAG" && (
             <Button
               size="sm"
               variant="ghost"

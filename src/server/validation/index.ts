@@ -87,6 +87,27 @@ export const locationObservationInput = z.strictObject({
 });
 export type LocationObservationInput = z.infer<typeof locationObservationInput>;
 
+/** POST /api/v1/reports: "Report a problem" on a restaurant page (a FLAG review item). */
+export const REPORT_REASONS = ["CLOSED", "WRONG_LOCATION", "WRONG_DISH", "OTHER"] as const;
+export const reportInput = z.strictObject({
+  restaurantId: id,
+  reason: z.enum(REPORT_REASONS),
+  /** The dish a WRONG_DISH report is about. */
+  dishId: id.optional(),
+  note: optionalText(280),
+});
+export type ReportInput = z.infer<typeof reportInput>;
+
+/** POST /api/v1/disputes: the /dispute form; anyone may send one. */
+export const disputeInput = z.strictObject({
+  message: text(1000, 10),
+  /** How to reach the sender with the answer (optional). */
+  contact: optionalText(200),
+  /** The page the dispute is about. */
+  page: optionalText(300),
+});
+export type DisputeInput = z.infer<typeof disputeInput>;
+
 /** POST /api/v1/owner/claims. */
 export const claimInput = z.strictObject({
   restaurantId: id,
@@ -175,6 +196,10 @@ export type AdminUserListQuery = z.infer<typeof adminUserListQuery>;
  */
 export const adminUserUpdateInput = z.strictObject({ isPanel: z.boolean() });
 export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateInput>;
+
+/** /admin/rankings "Launch city": sets City.launchedAt once (docs/06 admin cities launch). */
+export const cityLaunchInput = z.strictObject({ city: slug });
+export type CityLaunchInput = z.infer<typeof cityLaunchInput>;
 
 /** GET /api/v1/admin/review-queue query. */
 export const reviewQueueQuery = z.object({

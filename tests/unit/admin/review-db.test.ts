@@ -308,11 +308,20 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
     ).rejects.toMatchObject({
       code: "ACTION_NOT_ALLOWED",
     });
-    const flag = await db.reviewItem.create({ data: { type: "FLAG", payload: {} } });
+    const claim = await db.reviewItem.create({ data: { type: "OWNER_CLAIM", payload: {} } });
     await expect(
-      resolveReviewItem(admin, flag.id, { action: "dismiss" }, NOW),
+      resolveReviewItem(admin, claim.id, { action: "reject" }, NOW),
     ).rejects.toMatchObject({
       code: "NOT_AVAILABLE",
+    });
+    // Phase 4: reports and disputes (FLAG) are decided by hand: done or dismissed, nothing else.
+    const report = await db.reviewItem.create({
+      data: { type: "FLAG", payload: { kind: "report", reason: "CLOSED" } },
+    });
+    await resolveReviewItem(admin, report.id, { action: "uphold" }, NOW);
+    expect(await db.reviewItem.findUniqueOrThrow({ where: { id: report.id } })).toMatchObject({
+      status: "RESOLVED",
+      resolution: "done",
     });
   });
 });

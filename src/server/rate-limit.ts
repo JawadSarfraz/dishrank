@@ -22,6 +22,11 @@ export const RATE_LIMITS = {
   proposal: { limit: 5, windowSeconds: 86_400 },
   /** `user:{id}:upload`: signed photo uploads. */
   upload: { limit: 20, windowSeconds: 86_400 },
+  /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
+  flag: { limit: 10, windowSeconds: 86_400 },
+  /** `ip:{hash}:dispute`: the /dispute form, open to anyone. */
+  // DECISION-PENDING: docs/06 has no key for disputes; 5 a day per IP.
+  dispute: { limit: 5, windowSeconds: 86_400 },
   /** `user:{id}:rating-delete`. */
   // DECISION-PENDING: docs/06 has no key for deleting ratings; 30 a day.
   ratingDelete: { limit: 30, windowSeconds: 86_400 },

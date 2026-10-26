@@ -56,12 +56,13 @@ import { recomputeEach } from "./ranking.service";
 import { addAdminDishesTx, insertRestaurantTx, resolveDishSlugs } from "./restaurant.service";
 import type { SuggestionPayload } from "./location.service";
 
-/** The item types /admin/review handles in Phase 3. */
-export const PHASE3_REVIEW_TYPES = [
+/** The item types /admin/review handles (menu items, claims and duplicates arrive later). */
+export const REVIEW_PAGE_TYPES = [
   "SUSPICIOUS_RATINGS",
   "DISH_PROPOSAL",
   "RESTAURANT_PROPOSAL",
   "LOCATION_SUGGESTION",
+  "FLAG",
 ] as const satisfies readonly ReviewItemType[];
 
 type HeldPayload = {
@@ -111,7 +112,7 @@ export async function getReviewQueue(
   now: Date = new Date(),
 ) {
   assertRole(actor, "ADMIN");
-  const types = PHASE3_REVIEW_TYPES as readonly ReviewItemType[];
+  const types = REVIEW_PAGE_TYPES as readonly ReviewItemType[];
   if (query.type && !types.includes(query.type)) {
     throw new AppError("NOT_AVAILABLE", "This review type arrives in a later phase", 400);
   }
@@ -378,6 +379,18 @@ async function decideRestaurantProposal(input: ReviewResolveInput, tx: Tx): Prom
   return reject(input);
 }
 
+/**
+ * Problem reports and disputes (FLAG items with payload.kind "report" or "dispute"): the admin acts
+ * by hand (close the restaurant, fix its location or dishes on /admin/restaurants) and marks the
+ * item done, or dismisses it. Dish flags with automatic effects arrive in Phase 5.
+ */
+function decideFlag(input: ReviewResolveInput): Decision {
+  const closed = { recompute: [], trustUsers: [], restaurantSlugs: [] };
+  return input.action === "uphold"
+    ? { status: "RESOLVED", resolution: "done", ...closed }
+    : { status: "REJECTED", resolution: "dismissed", ...closed };
+}
+
 async function decideLocation(
   item: { restaurantId: string | null; payload: unknown },
   input: ReviewResolveInput,
@@ -464,7 +477,7 @@ export async function resolveReviewItem(
     if (item.status !== "OPEN" || !locked) {
       throw new AppError("ITEM_CLOSED", "This item was already decided", 409);
     }
-    if (!(PHASE3_REVIEW_TYPES as readonly ReviewItemType[]).includes(item.type)) {
+    if (!(REVIEW_PAGE_TYPES as readonly ReviewItemType[]).includes(item.type)) {
       throw new AppError("NOT_AVAILABLE", "This review type arrives in a later phase", 400);
     }
     if (!isReviewActionAllowed(item.type, input.action)) {
@@ -500,7 +513,9 @@ export async function resolveReviewItem(
           ? await decideDishProposal(input, tx)
           : item.type === "RESTAURANT_PROPOSAL"
             ? await decideRestaurantProposal(input, tx)
-            : await decideLocation(item, input, tx);
+            : item.type === "FLAG"
+              ? decideFlag(input)
+              : await decideLocation(item, input, tx);
     await closeReviewItem(
       item.id,
       {
