@@ -13,10 +13,14 @@ export const E2E = {
   fixtureFile: "playwright/.auth/e2e-fixture.json",
   restaurant: "E2E Karahi House",
   dish: "Chicken Karahi",
+  /** The ranking-page journey: Pizza in Islamabad, one ranked restaurant and one without votes. */
+  ranked: "E2E Pizza Point",
+  unranked: "E2E Pizza Corner",
 } as const;
 
 export type E2EFixture = {
   cookie: { name: string; value: string };
   restaurant: { name: string; slug: string };
   dish: { name: string };
+  pizza: { ranked: { name: string; slug: string }; unranked: { name: string; slug: string } };
 };
