@@ -1,4 +1,6 @@
 // The ranking page's share image (WhatsApp, Facebook): dish, city and the top three, 1200 × 630.
+// Rendered on each request (crawlers fetch it rarely). Satori (next/og) needs an explicit flex
+// display on every element with text.
 import { ImageResponse } from "next/og";
 import { formatScore, formatVotes } from "@/lib/format";
 import { getRanking } from "@/server/services/ranking.service";
@@ -6,7 +8,6 @@ import { getRanking } from "@/server/services/ranking.service";
 export const alt = "DishRank: restaurants ranked for one dish";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const revalidate = 3600;
 
 export default async function Image({
   params,
@@ -33,21 +34,28 @@ export default async function Image({
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ fontSize: 30, color: "#555555" }}>
+        <div style={{ display: "flex", fontSize: 30, color: "#555555" }}>
           {ranking?.mode === "bootstrap" ? "DishRank · Early rankings" : "DishRank"}
         </div>
-        <div style={{ fontSize: 68, fontWeight: 700, lineHeight: 1.1 }}>{title}</div>
+        <div style={{ display: "flex", fontSize: 68, fontWeight: 700, lineHeight: 1.1 }}>
+          {title}
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {top.length === 0 ? (
-          <div style={{ fontSize: 36 }}>Not enough votes yet. Rate it on DishRank.</div>
+          <div style={{ display: "flex", fontSize: 36 }}>
+            Not enough votes yet. Rate it on DishRank.
+          </div>
         ) : (
           top.map((row) => (
             <div key={row.rank} style={{ display: "flex", alignItems: "center", gap: 24 }}>
-              <div style={{ fontSize: 44, fontWeight: 700, width: 60 }}>{row.rank}</div>
-              <div style={{ fontSize: 42, flex: 1 }}>{row.restaurant.name}</div>
+              <div style={{ display: "flex", fontSize: 44, fontWeight: 700, width: 60 }}>
+                {row.rank}
+              </div>
+              <div style={{ display: "flex", fontSize: 42, flex: 1 }}>{row.restaurant.name}</div>
               <div
                 style={{
+                  display: "flex",
                   fontSize: 40,
                   fontWeight: 700,
                   background: "#111111",
@@ -58,7 +66,7 @@ export default async function Image({
               >
                 {formatScore(row.score)}
               </div>
-              <div style={{ fontSize: 28, color: "#555555", width: 160 }}>
+              <div style={{ display: "flex", fontSize: 28, color: "#555555", width: 160 }}>
                 {formatVotes(row.votes)}
               </div>
             </div>

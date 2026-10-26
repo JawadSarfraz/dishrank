@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 /**
  * The ISR pages that show one dish row's score: its ranking page, its restaurant page, the city's
  * dish grid and the home page (which shows the first city's grid). The ranking page's Open Graph
- * image keeps its own hourly refresh.
+ * image is rendered on each request.
  */
 export function revalidateDishPages(p: {
   citySlug: string;
