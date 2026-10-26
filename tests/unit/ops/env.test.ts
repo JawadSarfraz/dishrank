@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describeEnvProblems, parseEnv, validVariables } from "@/env";
+import { SUPABASE_ROOT_CA_2021, sslOptionFor } from "@/server/db-ssl";
 
 const valid = {
   NODE_ENV: "production",
@@ -41,5 +42,25 @@ describe("env schema", () => {
     expect(kept.SUPABASE_DISH_PHOTOS_BUCKET).toBe("dish-photos");
     expect(kept).not.toHaveProperty("SUPABASE_S3_ENDPOINT");
     expect(kept).not.toHaveProperty("CRON_SECRET");
+  });
+
+  it("Supabase: verified TLS from the app, so DATABASE_URL may not carry its own sslmode", () => {
+    const pooled =
+      "postgresql://postgres.ref:pw@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true";
+    expect(parseEnv({ ...valid, DATABASE_URL: pooled }).success).toBe(true);
+    const withMode = parseEnv({ ...valid, DATABASE_URL: `${pooled}&sslmode=require` });
+    expect(withMode.success).toBe(false);
+    expect(describeEnvProblems(withMode.error!)).toContain("DATABASE_URL");
+    // DIRECT_URL is read only by the Prisma CLI, whose own TLS handles sslmode=require.
+    const session = pooled.replace(":6543/", ":5432/").replace("pgbouncer=true", "sslmode=require");
+    expect(parseEnv({ ...valid, DIRECT_URL: session }).success).toBe(true);
+    expect(sslOptionFor(pooled)).toEqual({ ca: SUPABASE_ROOT_CA_2021 });
+    expect(sslOptionFor("postgresql://postgres:pw@db.abcdefref.supabase.co:5432/postgres")).toEqual(
+      {
+        ca: SUPABASE_ROOT_CA_2021,
+      },
+    );
+    expect(sslOptionFor("postgresql://u@localhost:5433/dishrank")).toBeUndefined();
+    expect(sslOptionFor("postgresql://u:p@evilsupabase.com:5432/db")).toBeUndefined();
   });
 });

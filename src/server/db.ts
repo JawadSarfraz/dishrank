@@ -1,14 +1,17 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { env } from "@/env";
+import { sslOptionFor } from "./db-ssl";
 
 // Runtime connection = DATABASE_URL (Supabase: Supavisor transaction pooler, docs/10).
 // With a driver adapter, node-postgres owns the pool; keep it small for serverless functions.
+// Supabase hosts get verified TLS (src/server/db-ssl.ts).
 function createClient(url: string): PrismaClient {
   const adapter = new PrismaPg({
     connectionString: url,
     max: 3,
     connectionTimeoutMillis: 5_000,
+    ssl: sslOptionFor(url),
   });
   return new PrismaClient({ adapter });
 }
