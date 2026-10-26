@@ -60,3 +60,20 @@ export async function listAreasWithCity(client: Client = db) {
   });
   return rows.map(({ city, ...area }) => ({ ...area, citySlug: city.slug }));
 }
+
+/** Cities with their launch dates (/admin/rankings, the nightly re-rank). */
+export async function listCityLaunches(client: Client = db) {
+  return client.city.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, slug: true, name: true, launchedAt: true },
+  });
+}
+
+/** Sets City.launchedAt once: false when the city was launched already. */
+export async function setCityLaunchedAtOnce(id: string, launchedAt: Date, client: Client = db) {
+  const { count } = await client.city.updateMany({
+    where: { id, launchedAt: null },
+    data: { launchedAt },
+  });
+  return count === 1;
+}

@@ -15,6 +15,16 @@ export async function listJobRuns(name: string) {
   });
 }
 
+/** The latest runs of one job, newest first (/admin/rankings). */
+export async function listRecentJobRuns(name: string, take: number) {
+  return db.jobRun.findMany({
+    where: { name },
+    orderBy: { startedAt: "desc" },
+    take,
+    select: { id: true, startedAt: true, finishedAt: true, ok: true, summary: true },
+  });
+}
+
 /** Successful runs of one job, oldest first. */
 export async function listSuccessfulJobRuns(name: string) {
   return db.jobRun.findMany({
@@ -48,4 +58,10 @@ export async function incrementRateLimit(key: string, windowStart: Date, since: 
       WHERE "key" = ${key} AND "windowStart" > ${since} AND "windowStart" <> ${windowStart}
     ), 0))::int AS total`;
   return row?.total ?? 1;
+}
+
+/** Rate-limit buckets older than every window (nightly cleanup). Returns how many were deleted. */
+export async function deleteRateLimitBucketsBefore(before: Date) {
+  const { count } = await db.rateLimitBucket.deleteMany({ where: { windowStart: { lt: before } } });
+  return count;
 }
