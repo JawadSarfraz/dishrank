@@ -10,6 +10,7 @@
     "dev": "next dev",
     "dev:demo": "tsx scripts/dev-demo.ts",
     "build": "next build",
+    "vercel-build": "tsx scripts/vercel-build.ts",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
@@ -23,6 +24,7 @@
     "menu:parse": "tsx scripts/parse-menu.ts",
     "rankings:recompute": "tsx scripts/recompute-rankings.ts",
     "overture:sync": "tsx scripts/overture-sync.ts",
+    "prod:bootstrap": "tsx scripts/prod-bootstrap.ts",
     "research:overture": "tsx scripts/research/overture-coverage.ts"
   },
   "dependencies": {

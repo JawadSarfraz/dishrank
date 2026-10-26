@@ -1,3 +1,8 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm vercel-build",
+  "regions": ["bom1"],
+  "fluid": true,
+  "git": { "deploymentEnabled": { "**": false, "main": true } },
   "crons": [{ "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }]
 }
