@@ -105,7 +105,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
   - an upload whose items all matched is `REVIEWED` at once;
   - FAILED uploads are parsed again only by hand (Parse now or the CLI), never by the nightly job.
 - [ ] Q (Phase 5): What a menu photo changes on a dish row. | Default taken: MENU_VERIFIED, menuName = the first item of that dish on the photo, price = the lowest of its items (Half below Full), tags = the items' tags (an empty list or a missing price keeps the row's own), confidence = the higher one, lastVerifiedAt now. A new row has source MENU_PHOTO; an existing row keeps its source. An OWNER_VERIFIED row keeps the owner's name, price and tags (only lastVerifiedAt moves); a REMOVED row stays removed even when an admin assigns a menu item to it (DECISION-PENDING in menu.service.ts).
-- [ ] Q (Phase 5): The nightly parse. | Default taken: its own cron, `/api/cron/parse-menus` at 01:00 PKT (an hour before the recompute, Hobby allows only daily crons), up to 20 PENDING uploads oldest first, no new parse after 200 s of the route's 300 s; the rest wait for the next night.
+- [ ] Q (Phase 5): The nightly parse. | Default taken: its own cron, `/api/cron/parse-menus` at 01:00 PKT (an hour before the recompute, Hobby allows only daily crons), up to 20 PENDING uploads oldest first, no new parse after 120 s of the route's 300 s (a vision request times out after 90 s, retried once); the rest wait for the next night.
 - [ ] Q (Phase 5): Flag rows (docs/08 Phase 5 task). | Default taken: not built in this phase (the owner's Phase 5 prompt covered menus only); "Report a problem" still files FLAG review items without Flag rows.
 
 ## Decided

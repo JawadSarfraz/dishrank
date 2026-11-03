@@ -130,7 +130,7 @@ Panel members only (`403 PANEL_ONLY`, read from the database): `{ restaurantId, 
 
 ## Cron (Bearer CRON_SECRET)
 
-- `GET /api/cron/parse-menus` — daily 01:00 PKT (`0 20 * * *` UTC): up to 20 PENDING menu photos, oldest first, one at a time, none started after 200 s, stopping at the daily cap (docs/07 §3), then the pages of the dish rows they verified are revalidated. Without `ANTHROPIC_API_KEY` and `ANTHROPIC_VISION_MODEL` it parses nothing and answers ok. JobRun `parse-menus`. → `{ ok, summary: { enabled, considered, parsed, failed, skipped, deferred, capReached, inputTokens, outputTokens, matchCalls, durationMs } }`.
+- `GET /api/cron/parse-menus` — daily 01:00 PKT (`0 20 * * *` UTC): up to 20 PENDING menu photos, oldest first, one at a time, none started after 120 s, stopping at the daily cap (docs/07 §3), then the pages of the dish rows they verified are revalidated. Without `ANTHROPIC_API_KEY` and `ANTHROPIC_VISION_MODEL` it parses nothing and answers ok. JobRun `parse-menus`. → `{ ok, summary: { enabled, considered, parsed, failed, skipped, deferred, capReached, inputTokens, outputTokens, matchCalls, durationMs } }`.
 - `GET /api/cron/recompute-rankings` — daily 02:00 PKT (`0 21 * * *` UTC); `recomputeAll()` (docs/04 steps 1–8, including stale marking), then every page is revalidated. → `{ ok, summary }`.
 - `GET /api/cron/mark-stale` — not scheduled; for manual runs only (recompute already does it): stale marking and re-rank of every list, with its own JobRun (`mark-stale`). → `{ ok, summary: { stale, lists, durationMs } }`.
 

@@ -77,8 +77,8 @@ export const MENU_PARSE = {
   dailyCap: 50,
   /** The nightly job parses at most this many PENDING uploads (docs/07 §3)… */
   nightlyLimit: 20,
-  /** …and starts no new parse after this long, within the route's 300 s. */
-  nightlyBudgetMs: 200_000,
+  /** …and starts no new parse after this long: a parse takes seconds, at worst ~2 × 90 s. */
+  nightlyBudgetMs: 120_000,
   /** An unfinished attempt older than this is taken as dead (the function timed out). */
   runningMs: 10 * 60_000,
   /** LLM matcher calls (docs/05 step 5) per parse; items past it go to review with suggestions. */
@@ -210,28 +210,45 @@ export function menuVerification(
   };
 }
 
-/** Creates (source MENU_PHOTO) or upgrades one dish row from these items; returns its id. */
-async function verifyDishFromMenu(
-  input: { restaurantId: string; cityId: string; dishId: string; confidence: number },
-  items: readonly MenuEvidence[],
+/**
+ * Creates (source MENU_PHOTO) or upgrades dish rows from a menu: every row is created first (an
+ * insert locks only its own new row), then all are locked in id order, the order every writer of
+ * several rows uses (docs/02 Concurrency), then each is updated. Returns the rows that changed.
+ */
+async function verifyDishesFromMenu(
+  restaurant: { id: string; cityId: string },
+  groups: readonly { dishId: string; confidence: number; items: readonly MenuEvidence[] }[],
   now: Date,
   tx: Tx,
 ) {
-  const ensured = await ensureRestaurantDish(
-    {
-      restaurantId: input.restaurantId,
-      dishId: input.dishId,
-      cityId: input.cityId,
-      source: "MENU_PHOTO",
-      confidence: input.confidence,
-    },
+  const rows: { id: string; confidence: number; items: readonly MenuEvidence[] }[] = [];
+  // Dish order, so two parses of one restaurant insert new rows in the same order.
+  for (const group of [...groups].sort((a, b) => (a.dishId < b.dishId ? -1 : 1))) {
+    const ensured = await ensureRestaurantDish(
+      {
+        restaurantId: restaurant.id,
+        dishId: group.dishId,
+        cityId: restaurant.cityId,
+        source: "MENU_PHOTO",
+        confidence: group.confidence,
+      },
+      tx,
+    );
+    rows.push({ id: ensured.id, confidence: group.confidence, items: group.items });
+  }
+  await lockRestaurantDishes(
+    rows.map((r) => r.id),
     tx,
   );
-  await lockRestaurantDishes([ensured.id], tx);
-  const row = await findDishRowForMenu(ensured.id, tx);
-  const data = menuVerification(row, items, input.confidence, now);
-  if (data) await updateDishRowFromMenu(row.id, data, tx);
-  return { id: row.id, changed: data !== null, created: ensured.created };
+  const changed: string[] = [];
+  for (const r of rows) {
+    const row = await findDishRowForMenu(r.id, tx);
+    const data = menuVerification(row, r.items, r.confidence, now);
+    if (!data) continue;
+    await updateDishRowFromMenu(row.id, data, tx);
+    changed.push(row.id);
+  }
+  return changed;
 }
 
 // ---------- parse ----------
@@ -407,23 +424,12 @@ export async function parseMenuUpload(
         group.confidence = Math.max(group.confidence, m.confidence);
         byDish.set(m.dishId, group);
       });
-      // Dish order, so two parses of one restaurant create and lock rows in the same order.
-      const rows: string[] = [];
-      for (const dishId of [...byDish.keys()].sort()) {
-        const group = byDish.get(dishId)!;
-        const row = await verifyDishFromMenu(
-          {
-            restaurantId: upload.restaurantId,
-            cityId: upload.restaurant.cityId,
-            dishId,
-            confidence: group.confidence,
-          },
-          group.evidence,
-          now,
-          tx,
-        );
-        if (row.changed) rows.push(row.id);
-      }
+      const rows = await verifyDishesFromMenu(
+        { id: upload.restaurantId, cityId: upload.restaurant.cityId },
+        [...byDish].map(([dishId, g]) => ({ dishId, confidence: g.confidence, items: g.evidence })),
+        now,
+        tx,
+      );
       let needsReview = 0;
       for (const [i, item] of items.entries()) {
         const m = matches[i]!;
@@ -793,18 +799,19 @@ export async function decideMenuItemTx(
     );
     const restaurant = await findRestaurantById(input.restaurantId, tx);
     if (!restaurant) throw new AppError("NOT_FOUND", "Restaurant not found", 404);
-    const row = await verifyDishFromMenu(
-      {
-        restaurantId: input.restaurantId,
-        cityId: restaurant.cityId,
-        dishId: input.dish.id,
-        confidence: 1,
-      },
-      await listMatchedItemsOfDish(item.menuUploadId, input.dish.id, tx),
+    const [changed] = await verifyDishesFromMenu(
+      restaurant,
+      [
+        {
+          dishId: input.dish.id,
+          confidence: 1,
+          items: await listMatchedItemsOfDish(item.menuUploadId, input.dish.id, tx),
+        },
+      ],
       now,
       tx,
     );
-    if (row.changed) rowId = row.id;
+    rowId = changed ?? null;
   } else {
     await updateMenuItem(item.id, { status: "IGNORED" }, tx);
   }

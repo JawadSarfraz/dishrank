@@ -45,8 +45,8 @@ export const MENU_SCHEMA = {
 export const MENU_VISION = {
   /** A long menu is a few thousand output tokens; well under the SDK's non-streaming limit. */
   maxTokens: 16_000,
-  /** Per request; the cron and admin routes allow 300 s in all. */
-  timeoutMs: 180_000,
+  /** Per request: with one retry a read ends within 180 s of the routes' 300 s. */
+  timeoutMs: 90_000,
   /** One retry on a connection error, 429 or 5xx; every attempt is an API call. */
   maxRetries: 1,
 } as const;
