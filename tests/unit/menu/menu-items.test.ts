@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createMenuVision, MENU_SYSTEM_PROMPT, parsePrice, toMenuItems } from "@/server/vision";
+import {
+  createMenuVision,
+  MENU_SYSTEM_PROMPT,
+  matchingName,
+  parsePrice,
+  toMenuItems,
+} from "@/server/vision";
 import { fakeAnthropic } from "./fake-anthropic";
 
 describe("menu photo → items (docs/07 §3)", () => {
@@ -35,9 +41,9 @@ describe("menu photo → items (docs/07 §3)", () => {
     });
     expect(dropped).toBe(0);
     expect(items).toEqual([
-      { rawName: "Chicken Karahi Half", rawPrice: 1100, rawSection: "Karahi" },
-      { rawName: "Chicken Karahi Full", rawPrice: 2000, rawSection: "Karahi" },
-      { rawName: "Doodh Pati", rawPrice: null, rawSection: null },
+      { rawName: "Chicken Karahi Half", romanName: null, rawPrice: 1100, rawSection: "Karahi" },
+      { rawName: "Chicken Karahi Full", romanName: null, rawPrice: 2000, rawSection: "Karahi" },
+      { rawName: "Doodh Pati", romanName: null, rawPrice: null, rawSection: null },
     ]);
     expect(toMenuItems("nonsense")).toEqual({ items: [], dropped: 0 });
   });
@@ -94,5 +100,34 @@ describe("menu photo → items (docs/07 §3)", () => {
     ).rejects.toMatchObject({ code: "REFUSAL" });
     expect(createMenuVision({ apiKey: "k" })).toBeNull();
     expect(createMenuVision({ model: "m" })).toBeNull();
+  });
+
+  it("Urdu-script items keep the printed name and match on the Roman spelling", () => {
+    const { items } = toMenuItems({
+      sections: [
+        {
+          name: "کڑاہی",
+          items: [
+            { name: "چکن کڑاہی", price: 1800, note: null, roman: "Chicken Karahi" },
+            { name: "Chicken Karahi", price: 1900, note: null, roman: "chikan karahi" },
+            { name: "Chicken کڑاہی", price: 1950, note: null, roman: "chicken karahi" },
+            { name: "دودھ پتی", price: 120, note: null, roman: null },
+          ],
+        },
+      ],
+    });
+    expect(items[0]).toEqual({
+      rawName: "چکن کڑاہی",
+      romanName: "chicken karahi",
+      rawPrice: 1800,
+      rawSection: "کڑاہی",
+    });
+    expect(items.map(matchingName)).toEqual([
+      "chicken karahi", // Urdu: the Roman spelling
+      "Chicken Karahi", // Latin: the printed name, whatever the model added
+      "chicken karahi", // mixed scripts: the Roman spelling
+      "دودھ پتی", // no Roman spelling given: the printed name (goes to review)
+    ]);
+    expect(MENU_SYSTEM_PROMPT).toContain('"roman"');
   });
 });

@@ -153,6 +153,51 @@ describe("menu photos → dishes (docs/07 §3)", () => {
     });
   });
 
+  it("reads an Urdu-script menu through the model's Roman spelling (fake model answer)", async () => {
+    const { restaurant, upload, storage } = await pendingUpload();
+    const urdu = {
+      sections: [
+        {
+          name: "کڑاہی",
+          items: [
+            { name: "چکن کڑاہی ہاف", price: 1100, note: null, roman: "chicken karahi half" },
+            { name: "دودھ پتی", price: 120, note: null, roman: "doodh pati" },
+            { name: "رائتہ", price: 80, note: null, roman: "raita" },
+          ],
+        },
+      ],
+    };
+    const result = await parseMenuUpload(
+      upload.id,
+      { trigger: "cli", now: NOW },
+      deps(storage, urdu).d,
+    );
+    expect(result).toMatchObject({ status: "PARSED", matched: 2, needsReview: 1 });
+    const items = await db.menuItem.findMany({
+      where: { menuUploadId: upload.id },
+      orderBy: { position: "asc" },
+      include: { matchedDish: { select: { slug: true } } },
+    });
+    expect(
+      items.map((i) => [i.rawName, i.romanName, i.status, i.matchedDish?.slug ?? null]),
+    ).toEqual([
+      ["چکن کڑاہی ہاف", "chicken karahi half", "MATCHED", "chicken-karahi"],
+      ["دودھ پتی", "doodh pati", "MATCHED", "chai"],
+      ["رائتہ", "raita", "NEEDS_REVIEW", null],
+    ]);
+    // The dish row keeps the name as printed.
+    expect(
+      await db.restaurantDish.findUniqueOrThrow({
+        where: {
+          restaurantId_dishId: {
+            restaurantId: restaurant.id,
+            dishId: await dishId("chicken-karahi"),
+          },
+        },
+      }),
+    ).toMatchObject({ status: "MENU_VERIFIED", menuName: "چکن کڑاہی ہاف", price: 1100 });
+  });
+
   it("assign and ignore resolve the items; the last one marks the upload REVIEWED", async () => {
     const { restaurant, upload, storage } = await pendingUpload();
     await parseMenuUpload(upload.id, { trigger: "cli", now: NOW }, deps(storage).d);

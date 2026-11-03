@@ -54,6 +54,7 @@ import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { MenuUploadInput, MenuUploadsQuery } from "@/server/validation";
 import {
   createMenuVision,
+  matchingName,
   MenuVisionError,
   toMenuItems,
   type MenuImage,
@@ -396,7 +397,7 @@ export async function parseMenuUpload(
     for (const item of items) {
       matches.push(
         await matchDish(
-          item.rawName,
+          matchingName(item),
           { section: item.rawSection ?? undefined, allowLlm: true },
           { llm, aliasIndex: deps.aliasIndex, trigram: deps.trigram },
         ),
@@ -457,6 +458,7 @@ export async function parseMenuUpload(
               menuItemId: created.id,
               menuUploadId: uploadId,
               rawName: item.rawName,
+              romanName: item.romanName,
               rawPrice: item.rawPrice,
               rawSection: item.rawSection,
               suggestions: m.candidates.map((c) => ({ dishSlug: c.dishSlug, conf: c.confidence })),
@@ -793,7 +795,7 @@ export async function decideMenuItemTx(
         matchMethod: "HUMAN",
         status: "MATCHED",
         // A dish created in this decision is not in the alias index yet: no tags then.
-        variantTags: dishInfo ? tagsInText(tokenize(normalize(item.rawName)), dishInfo) : [],
+        variantTags: dishInfo ? tagsInText(tokenize(normalize(matchingName(item))), dishInfo) : [],
       },
       tx,
     );

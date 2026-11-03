@@ -607,7 +607,8 @@ model MenuItem {
   id              String         @id @default(cuid())
   menuUploadId    String
   position        Int            @default(0) // order on the menu photo, from 0
-  rawName         String
+  rawName         String // as printed, in any script
+  romanName       String? // the vision model's Roman-Urdu spelling when rawName is not in Latin letters
   rawPrice        Int?
   rawSection      String?
   matchedDishId   String?

@@ -5,11 +5,14 @@
 // uploader or other data. The API key is never logged.
 import Anthropic from "@anthropic-ai/sdk";
 
-/** docs/07 §3, verbatim. */
+/** docs/07 §3, verbatim (the last-but-one sentence covers Urdu-script menus, owner 2026-11-04). */
 export const MENU_SYSTEM_PROMPT =
-  'You read a photo of a restaurant menu from Pakistan. Return every food/drink item exactly as printed, with its PKR price as an integer if visible. Keep section headings. Do not translate, do not guess items that are not visible, do not merge sizes (if Half and Full have prices, output two items "X Half" and "X Full"). Prices like 1,850/- are 1850. Return nothing else.';
+  'You read a photo of a restaurant menu from Pakistan. Return every food/drink item exactly as printed, with its PKR price as an integer if visible. Keep section headings. Do not translate, do not guess items that are not visible, do not merge sizes (if Half and Full have prices, output two items "X Half" and "X Full"). Prices like 1,850/- are 1850. If an item name is not written in Latin letters (for example Urdu), keep it as printed in "name" and also give its Roman-Urdu spelling in lowercase in "roman" (for example "chicken karahi" for چکن کڑاہی); otherwise "roman" is null. Return nothing else.';
 
-/** docs/07 §3: `{ sections: [{ name, items: [{ name, price: integer|null, note: string|null }] }] }`. */
+/**
+ * docs/07 §3: `{ sections: [{ name, items: [{ name, price: integer|null, note: string|null,
+ * roman: string|null }] }] }`.
+ */
 export const MENU_SCHEMA = {
   type: "object",
   properties: {
@@ -27,8 +30,9 @@ export const MENU_SCHEMA = {
                 name: { type: "string" },
                 price: { type: ["integer", "null"] },
                 note: { type: ["string", "null"] },
+                roman: { type: ["string", "null"] },
               },
-              required: ["name", "price", "note"],
+              required: ["name", "price", "note", "roman"],
               additionalProperties: false,
             },
           },

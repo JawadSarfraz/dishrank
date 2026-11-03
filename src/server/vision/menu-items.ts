@@ -11,7 +11,10 @@ export const MENU_ITEMS = {
 } as const;
 
 export type ParsedMenuItem = {
+  /** As printed, in any script. */
   rawName: string;
+  /** The model's Roman-Urdu spelling of a name that is not in Latin letters, else null. */
+  romanName: string | null;
   rawPrice: number | null;
   rawSection: string | null;
 };
@@ -52,6 +55,18 @@ const clean = (text: unknown, max: number): string =>
 
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+/** A letter of any script other than Latin (Urdu, Arabic, Devanagari…). */
+const NON_LATIN_LETTER = /(?![A-Za-z\u00C0-\u024F])\p{L}/u;
+
+/**
+ * The text to match (docs/05): the printed name, or its Roman-Urdu spelling when the printed name
+ * has letters outside the Latin script (Urdu "چکن کڑاہی" → "chicken karahi"). The matcher's
+ * normalize() keeps Latin letters and digits only, so an Urdu name would otherwise match nothing.
+ */
+export function matchingName(item: { rawName: string; romanName: string | null }): string {
+  return item.romanName && NON_LATIN_LETTER.test(item.rawName) ? item.romanName : item.rawName;
+}
+
 const field = (value: unknown, key: string): unknown =>
   value !== null && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
 
@@ -72,7 +87,12 @@ export function toMenuItems(raw: unknown): { items: ParsedMenuItem[]; dropped: n
         dropped++;
         continue;
       }
-      items.push({ rawName, rawPrice: parsePrice(field(item, "price")), rawSection: sectionName });
+      items.push({
+        rawName,
+        romanName: clean(field(item, "roman"), MENU_ITEMS.maxNameLength).toLowerCase() || null,
+        rawPrice: parsePrice(field(item, "price")),
+        rawSection: sectionName,
+      });
     }
   }
   return { items, dropped };

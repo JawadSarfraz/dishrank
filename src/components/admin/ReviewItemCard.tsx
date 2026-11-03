@@ -131,6 +131,7 @@ export function ReviewItemCard({
         <p>
           Menu item: <span className="font-medium">“{String(p.rawName)}”</span>
           <span className="text-muted-foreground">
+            {p.romanName ? ` (${String(p.romanName)})` : ""}
             {typeof p.rawPrice === "number" ? ` · ${formatPrice(p.rawPrice)}` : ""}
             {p.rawSection ? ` · ${String(p.rawSection)}` : ""}
           </span>{" "}

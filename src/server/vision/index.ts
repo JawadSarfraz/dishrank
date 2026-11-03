@@ -8,4 +8,4 @@ export {
   type MessagesClient,
   type TokenUsage,
 } from "./parseMenu";
-export { parsePrice, toMenuItems, type ParsedMenuItem } from "./menu-items";
+export { matchingName, parsePrice, toMenuItems, type ParsedMenuItem } from "./menu-items";

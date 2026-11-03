@@ -113,6 +113,7 @@ export async function findMenuUploadForAdmin(id: string) {
         select: {
           id: true,
           rawName: true,
+          romanName: true,
           rawPrice: true,
           rawSection: true,
           status: true,
@@ -215,6 +216,7 @@ export async function findMenuItemForDecision(id: string, client: Client = db) {
     select: {
       id: true,
       rawName: true,
+      romanName: true,
       rawPrice: true,
       status: true,
       menuUploadId: true,

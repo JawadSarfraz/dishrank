@@ -25,6 +25,7 @@ function ItemLine({ item }: { item: Item }) {
     <span>
       <span className="font-medium">{item.rawName}</span>
       <span className="text-muted-foreground">
+        {item.romanName ? ` (${item.romanName})` : ""}
         {item.rawPrice !== null ? ` · ${formatPrice(item.rawPrice)}` : ""}
         {item.rawSection ? ` · ${item.rawSection}` : ""}
       </span>
