@@ -4,6 +4,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SITE_URL, isBeta } from "@/server/site";
 import "./globals.css";
 
+// next/font downloads the font files at build time and serves them from this site (/_next/static):
+// a page never calls Google. globals.css maps --font-sans to --font-geist-sans.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
