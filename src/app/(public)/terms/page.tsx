@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "Terms of use – DishRank",
   description: "The rules for using DishRank and rating dishes.",
   alternates: { canonical: "/terms" },
-  // DECISION-PENDING: kept out of search results until a lawyer has reviewed the draft.
+  // Decided 2026-11-04: kept out of search results until a lawyer has reviewed the draft.
   robots: { index: false, follow: true },
 };
 

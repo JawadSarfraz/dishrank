@@ -23,21 +23,21 @@ export const RATE_LIMITS = {
   /** `user:{id}:upload`: signed photo uploads. */
   upload: { limit: 20, windowSeconds: 86_400 },
   /** `user:{id}:menu-upload`: menu photos sent for parsing (docs/07 §3). */
-  // DECISION-PENDING: docs/06 has no menu key; the owner's Phase 5 default, 10 a day.
+  // Decided 2026-11-04: docs/06 has no menu key; the owner's Phase 5 default, 10 a day.
   menuUpload: { limit: 10, windowSeconds: 86_400 },
   /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
   flag: { limit: 10, windowSeconds: 86_400 },
   /** `ip:{hash}:dispute`: the /dispute form, open to anyone. */
-  // DECISION-PENDING: docs/06 has no key for disputes; 5 a day per IP.
+  // Decided 2026-11-04: docs/06 has no key for disputes; 5 a day per IP.
   dispute: { limit: 5, windowSeconds: 86_400 },
   /** `user:{id}:rating-delete`. */
-  // DECISION-PENDING: docs/06 has no key for deleting ratings; 30 a day.
+  // Decided 2026-11-04: docs/06 has no key for deleting ratings; 30 a day.
   ratingDelete: { limit: 30, windowSeconds: 86_400 },
   /** `user:{id}:location`: panel members' on-site locations. */
-  // DECISION-PENDING: docs/06 has no key for location observations; 30 a day.
+  // Decided 2026-11-04: docs/06 has no key for location observations; 30 a day.
   location: { limit: 30, windowSeconds: 86_400 },
   /** `user:{id}:admin-write` (every admin write: import, edit, status, merge, review, users). */
-  // DECISION-PENDING: docs/06 has no admin key; 600 per hour leaves room for a long import session.
+  // Decided 2026-11-04: docs/06 has no admin key; 600 per hour leaves room for a long import session.
   adminWrite: { limit: 600, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitRule>;
 

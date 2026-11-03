@@ -68,7 +68,7 @@ export async function findTrustStats(userId: string, client: Client = db) {
     activeRatings: count("ACTIVE"),
     activePhotoRatings,
     hiddenRatings: count("HIDDEN"),
-    // DECISION-PENDING: a Flag points at a dish row, not a rating, so "upheld flags against their
+    // Decided 2026-11-04: a Flag points at a dish row, not a rating, so "upheld flags against their
     // ratings" cannot be counted yet; 0 until flags carry the rating they target.
     upheldFlags: 0,
     recentRatings: last.map((r) => ({

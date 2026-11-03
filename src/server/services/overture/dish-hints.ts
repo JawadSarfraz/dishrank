@@ -18,7 +18,7 @@ const NOT_A_DISH: Record<string, { before: readonly string[]; after: readonly st
 };
 
 /** A signboard "karahi" without the meat word: karahi houses serve both. */
-// DECISION-PENDING: bare "karahi" pre-ticks both Chicken Karahi and Mutton Karahi.
+// Decided 2026-11-04: bare "karahi" pre-ticks both Chicken Karahi and Mutton Karahi.
 const KARAHI_WORDS = ["karahi", "karhai", "kadai", "kadhai", "karai", "kerahi"];
 const KARAHI_DISHES = ["chicken-karahi", "mutton-karahi"];
 const KARAHI_FAMILY = new Set([...KARAHI_DISHES, "namkeen-gosht"]);

@@ -73,7 +73,7 @@ import { isAcceptedPhoto, MENU_PREFIX, UPLOAD } from "./upload.service";
 
 export const MENU_PARSE = {
   /** Owner's Phase 5 rule: at most 50 parses start in any 24 hours, whatever triggers them. */
-  // DECISION-PENDING: "per day" is a rolling 24 hours, not the Pakistan calendar day.
+  // Decided 2026-11-04: "per day" is a rolling 24 hours, not the Pakistan calendar day.
   dailyCap: 50,
   /** The nightly job parses at most this many PENDING uploads (docs/07 §3)… */
   nightlyLimit: 20,
@@ -82,7 +82,7 @@ export const MENU_PARSE = {
   /** An unfinished attempt older than this is taken as dead (the function timed out). */
   runningMs: 10 * 60_000,
   /** LLM matcher calls (docs/05 step 5) per parse; items past it go to review with suggestions. */
-  // DECISION-PENDING: 25 calls a parse bounds the matcher's cost on a long menu.
+  // Decided 2026-11-04: 25 calls a parse bounds the matcher's cost on a long menu.
   maxMatchCalls: 25,
 } as const;
 
@@ -189,7 +189,7 @@ type MenuEvidence = { rawName: string; rawPrice: number | null; variantTags: str
  * owner's data and only counts as seen again; a removed row stays removed (only an admin revives
  * one, docs/06). A missing price or tag list keeps the row's own.
  */
-// DECISION-PENDING: an existing row keeps its source; OWNER_VERIFIED and REMOVED rows are not changed.
+// Decided 2026-11-04: an existing row keeps its source; OWNER_VERIFIED and REMOVED rows are not changed.
 export function menuVerification(
   row: { status: string; confidence: number },
   items: readonly MenuEvidence[],
@@ -374,7 +374,7 @@ export async function parseMenuUpload(
     usage.outputTokens = read.usage.outputTokens;
     const { items, dropped } = toMenuItems(raw);
     if (dropped > 0) logEvent("menu.parse.items_dropped", { entityId: uploadId, dropped }, "warn");
-    // DECISION-PENDING: a photo with no items (not a menu, unreadable) fails, so an admin sees it.
+    // Decided 2026-11-04: a photo with no items (not a menu, unreadable) fails, so an admin sees it.
     if (items.length === 0) {
       throw new AppError("NO_ITEMS", "No menu items were found in the photo", 422);
     }
@@ -469,7 +469,7 @@ export async function parseMenuUpload(
         await updateMenuItem(created.id, { reviewItemId: review.id }, tx);
       }
       // Every item resolved (all matched automatically) → REVIEWED at once (docs/07 §3 step 4).
-      // DECISION-PENDING: no admin look is required for an upload whose items all matched.
+      // Decided 2026-11-04: no admin look is required for an upload whose items all matched.
       const status = needsReview === 0 ? ("REVIEWED" as const) : ("PARSED" as const);
       await updateMenuUpload(
         uploadId,

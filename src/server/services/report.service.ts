@@ -47,7 +47,7 @@ export async function reportProblem(
  * A dispute from anyone, signed in or not (docs/01 trust rules: "anyone can dispute"); limited per
  * IP. It goes to the review queue only.
  */
-// DECISION-PENDING: no e-mail provider is configured, so ADMIN_EMAIL is not notified; admins see disputes on /admin/review.
+// Decided 2026-11-04: no e-mail provider is configured, so ADMIN_EMAIL is not notified; admins see disputes on /admin/review.
 export async function fileDispute(
   actor: SessionUser | null,
   input: DisputeInput,

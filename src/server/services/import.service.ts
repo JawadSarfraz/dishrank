@@ -259,7 +259,7 @@ export async function createFromCandidate(
  * Link: the candidate is a restaurant we have. The restaurant takes the candidate's GERS id when
  * it has none, and Overture's coordinates when it has no location; nothing else changes.
  */
-// DECISION-PENDING: Link fills a missing location and overtureId from the candidate, never overwrites them.
+// Decided 2026-11-04: Link fills a missing location and overtureId from the candidate, never overwrites them.
 export async function linkCandidate(
   actor: SessionUser | null,
   input: CandidateLinkInput,

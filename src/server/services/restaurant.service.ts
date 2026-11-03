@@ -183,7 +183,7 @@ export async function resolveDishSlugs(slugs: readonly string[] | undefined): Pr
  * The (restaurant, dish) row for a dish an admin ticked: CANDIDATE / ADMIN / 0.4 when none exists.
  * An existing row of any status is left as it is.
  */
-// DECISION-PENDING: docs/07 §2 "unless a stronger row exists" — an existing STALE or REMOVED row is not revived by an admin tick.
+// Decided 2026-11-04: docs/07 §2 "unless a stronger row exists" — an existing STALE or REMOVED row is not revived by an admin tick.
 export async function ensureAdminDish(
   restaurant: { id: string; cityId: string },
   dishId: string,
@@ -438,7 +438,7 @@ export type RestaurantLookup =
  * GET /api/v1/restaurants/:slug and the restaurant page. A merged slug resolves to its surviving
  * restaurant (redirect); only ACTIVE restaurants are shown.
  */
-// DECISION-PENDING: CLOSED and HIDDEN restaurants answer 404 publicly (docs say nothing about closed pages).
+// Decided 2026-11-04: CLOSED and HIDDEN restaurants answer 404 publicly (docs say nothing about closed pages).
 export async function getPublicRestaurant(slug: string): Promise<RestaurantLookup> {
   let restaurant = await findRestaurantBySlug(slug);
   for (let hops = 0; restaurant?.status === "DUPLICATE" && restaurant.mergedIntoId; hops++) {
@@ -639,7 +639,7 @@ export async function mergeRestaurants(
     if (source.status === "DUPLICATE" || target.status === "DUPLICATE") {
       throw new AppError("RESTAURANT_MERGED", "One of these restaurants was already merged", 409);
     }
-    // DECISION-PENDING: merging across cities is refused (RestaurantDish.cityId must equal the restaurant's city).
+    // Decided 2026-11-04: merging across cities is refused (RestaurantDish.cityId must equal the restaurant's city).
     if (source.cityId !== target.cityId) {
       throw new AppError(
         "MERGE_CITY_MISMATCH",

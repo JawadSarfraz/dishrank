@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "Privacy – DishRank",
   description: "What DishRank keeps about you, why, and how to have it deleted.",
   alternates: { canonical: "/privacy" },
-  // DECISION-PENDING: kept out of search results until a lawyer has reviewed the draft.
+  // Decided 2026-11-04: kept out of search results until a lawyer has reviewed the draft.
   robots: { index: false, follow: true },
 };
 

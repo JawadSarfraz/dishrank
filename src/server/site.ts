@@ -49,7 +49,7 @@ export const OPERATOR = {
  * with Google; an empty list lets only the admin in. Live: everyone. Existing accounts are not
  * affected. ADMIN_EMAIL becomes ADMIN in both modes.
  */
-// DECISION-PENDING: in beta without BETA_ALLOWED_EMAILS only ADMIN_EMAIL can sign up (closed by default).
+// Decided 2026-11-04: in beta without BETA_ALLOWED_EMAILS only ADMIN_EMAIL can sign up (closed by default).
 export function newAccountDecision(
   user: { email: string; emailVerified?: boolean | null },
   input: { mode: SiteMode; allowed?: string; adminEmail?: string },

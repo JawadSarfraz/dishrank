@@ -449,7 +449,7 @@ export async function deleteOwn(
   }
   // A held or hidden rating stays until an admin decides; deleting it and rating again would undo
   // the hold or the hide.
-  // DECISION-PENDING: held and hidden ratings cannot be deleted by their author (no soft delete yet).
+  // Decided 2026-11-04: held and hidden ratings cannot be deleted by their author (no soft delete yet).
   if (rating.status !== "ACTIVE") {
     throw new AppError(
       "RATING_UNDER_REVIEW",

@@ -1,7 +1,7 @@
 // Who may upload a menu photo for a restaurant (docs/07 §3): admins, panel members and the owner
 // who claimed it; never a banned account, and only for an ACTIVE restaurant. Read from the
 // database on every call, never from the client.
-// DECISION-PENDING: "owners" = the user who claimed this restaurant (claimedByUserId), not every
+// Decided 2026-11-04: "owners" = the user who claimed this restaurant (claimedByUserId), not every
 // account with role OWNER; a panel member may upload for any restaurant.
 import { AppError } from "@/server/errors";
 import { findRestaurantById } from "@/server/repositories/restaurant.repo";

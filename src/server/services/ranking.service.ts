@@ -110,7 +110,7 @@ export type TrustStats = {
  * admin 0.3 → the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2
  * → ≥ 3 active and ≥ 1 with a photo 1.0 → 0.6.
  */
-// DECISION-PENDING: docs/04 gives no order for overlapping rows; this one puts the admin's override first, then penalties.
+// Decided 2026-11-04: docs/04 gives no order for overlapping rows; this one puts the admin's override first, then penalties.
 export function trustFor(s: TrustStats): number {
   if (s.trustOverride !== null) return Math.min(TRUST.max, Math.max(TRUST.min, s.trustOverride));
   if (s.isPanel) return TRUST.panel;
@@ -135,7 +135,7 @@ export function trustFor(s: TrustStats): number {
  * 1s, at more than one restaurant. Trust stays at the new-account value while this holds; there is
  * no review item yet.
  */
-// DECISION-PENDING: "until reviewed" has no review flow yet, and "across different restaurants" is read as "more than one".
+// Decided 2026-11-04: "until reviewed" has no review flow yet, and "across different restaurants" is read as "more than one".
 export function isExtremePattern(last: readonly { score: number; restaurantId: string }[]) {
   if (last.length < TRUST.extremeScores.lastRatings) return false;
   const recent = last.slice(0, TRUST.extremeScores.lastRatings);

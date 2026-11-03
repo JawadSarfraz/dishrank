@@ -23,7 +23,7 @@ export const LOCATION_RULES = {
   /** Browser accuracy radius kept, in metres. */
   maxAccuracyM: 50,
   /** An observation this far from the restaurant's location suggests moving it. */
-  // DECISION-PENDING: 150 m (accuracy up to 50 m plus the size of a market block).
+  // Decided 2026-11-04: 150 m (accuracy up to 50 m plus the size of a market block).
   farM: 150,
 } as const;
 
