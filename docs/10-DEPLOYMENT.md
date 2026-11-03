@@ -129,11 +129,13 @@ the S3 variables optional so local, preview and CI runs work without storage.
 }
 ```
 
-- **buildCommand** → `scripts/vercel-build.ts`: on production deployments (`VERCEL_ENV=production`)
-  `prisma migrate deploy` through `DIRECT_URL`, then `next build`; other builds never migrate. A
+- **buildCommand** → `scripts/vercel-build.ts`: `prisma generate`, then on production deployments
+  (`VERCEL_ENV=production`) `prisma migrate deploy` through `DIRECT_URL`, then `next build`; other
+  builds never migrate. The Prisma client (`src/generated`, git-ignored) is generated in the build
+  itself: the `postinstall` hook is not guaranteed to run on Vercel, and without the client `next
+  build` fails with "Module not found: Can't resolve '@/generated/prisma/…'" (2026-11-04). A
   migration runs before the new code is live, and a failed build leaves the old deployment serving,
-  so migrations must stay backwards compatible (add, then use, then remove). `prisma generate` runs
-  in `postinstall` and needs no database.
+  so migrations must stay backwards compatible (add, then use, then remove).
 - **regions** `bom1` (Mumbai) puts the functions next to the Supabase database; the default `iad1`
   would add a US–India round trip to every query. Hobby may pick any single region.
 - **fluid**: Fluid compute (on by default for new projects): Hobby functions run up to 300 s, the
@@ -180,7 +182,7 @@ account is created: accounts that already exist keep working (there is no remove
 | Env | DB | Notes |
 |---|---|---|
 | local | Homebrew PostgreSQL 17 with `pg_trgm` and `unaccent` | `pnpm db:migrate`, `pnpm db:seed`, `pnpm dev:demo` (demo data; `-- --undo` removes it; refuses any database not on this machine); no Docker. `SITE_MODE` defaults to `live` |
-| CI (GitHub Actions) | `postgres` service container, same major version | `prisma migrate deploy`, seed, lint, typecheck, test |
+| CI (GitHub Actions) | `postgres` service containers, same major version | job `check`: `prisma migrate deploy`, seed, lint, typecheck, test. Job `vercel-build`: the Vercel production build on a clean Linux checkout (no `.env`, no dependency cache, dummy values, an empty throwaway database, `src/generated` removed after the install) |
 | preview (Vercel) | none | off (`git.deploymentEnabled`) until Preview has its own database; never point previews at production data |
 | production | Supabase, Mumbai | migrations in the Vercel build (production only); a new database is prepared with `pnpm prod:bootstrap` |
 
@@ -209,7 +211,7 @@ hand if needed. To run the recompute now: "Recompute now" on /admin/rankings.
 ## Release steps
 
 1. PR → CI green → merge to `main`.
-2. Vercel builds `main` with `pnpm vercel-build` (migrations, then `next build`).
+2. Vercel builds `main` with `pnpm vercel-build` (Prisma client, migrations, then `next build`); CI's `vercel-build` job runs the same build first.
 3. Smoke test: `/`, one ranking page, `/rate` sign-in, `/admin` role check.
 4. Tag `vX.Y.Z`.
 

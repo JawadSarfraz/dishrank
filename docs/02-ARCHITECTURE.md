@@ -197,7 +197,7 @@ dishrank/
 │   ├── parse-menu.ts                # one MenuUpload → MenuItems + matching
 │   ├── recompute-rankings.ts        # calls RankingService.recomputeAll()
 │   ├── prod-bootstrap.ts            # pnpm prod:bootstrap: migrate deploy, taxonomy seed, Overture sync on the shell's database, after typing its host
-│   ├── vercel-build.ts              # Vercel build: prisma migrate deploy (production deployments only), then next build
+│   ├── vercel-build.ts              # Vercel build: prisma generate, prisma migrate deploy (production deployments only), then next build
 │   └── dev-demo.ts                  # pnpm dev:demo [-- --undo]: local demo data (local databases only)
 ├── src/
 │   ├── app/

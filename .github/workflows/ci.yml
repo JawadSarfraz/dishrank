@@ -47,3 +47,44 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  vercel-build:
+    # The Vercel production build (`pnpm vercel-build`) the way Vercel runs it without a build cache:
+    # a fresh Linux checkout (case-sensitive paths), no .env, no dependency cache, dummy values only,
+    # migrations on an empty throwaway database. src/generated is removed after the install, because
+    # Vercel does not guarantee the postinstall hook: the build must generate the Prisma client itself.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vercel_build
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d vercel_build"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      VERCEL_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/vercel_build
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/vercel_build
+      BETTER_AUTH_SECRET: ci-dummy-secret-for-the-build-check-only-01
+      BETTER_AUTH_URL: https://dishrank.example
+      NEXT_PUBLIC_SITE_URL: https://dishrank.example
+      GOOGLE_CLIENT_ID: ci-dummy-client-id
+      GOOGLE_CLIENT_SECRET: ci-dummy-client-secret
+      CRON_SECRET: ci-dummy-cron-secret-for-the-build-check-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: pnpm install --frozen-lockfile
+      - run: rm -rf src/generated
+      - run: pnpm vercel-build
