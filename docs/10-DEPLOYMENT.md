@@ -20,7 +20,8 @@ Prisma 7 docs on 2026-10-26.
 
 `.env.example` lists every variable with a comment; `src/env.ts` validates them. A production
 server refuses to start when a required one is missing or malformed: `DATABASE_URL`, `DIRECT_URL`,
-`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CRON_SECRET`.
+`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CRON_SECRET`,
+`IP_HASH_SECRET` (Phase 6).
 `next build` only warns. Where each production value comes from is in `docs/DEPLOY-CHECKLIST.md`.
 
 | Variable | Production value |
@@ -31,6 +32,7 @@ server refuses to start when a required one is missing or malformed: `DATABASE_U
 | `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL` | the production origin, e.g. `https://dishrank.vercel.app` (no path, no trailing slash) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | the Google OAuth web client |
 | `CRON_SECRET` | `openssl rand -hex 32` |
+| `IP_HASH_SECRET` | `openssl rand -hex 32`; keys the hash of client IPs in rate-limit keys (never the raw IP). Changing it only resets the per-IP limits |
 | `ADMIN_EMAIL` | the owner's Gmail: that account becomes ADMIN on its first sign-in |
 | `SITE_MODE` | `beta` (also the production default while unset), `live` at launch |
 | `BETA_ALLOWED_EMAILS` | the panel's Gmail addresses, comma-separated (beta only) |

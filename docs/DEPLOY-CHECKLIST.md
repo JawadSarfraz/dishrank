@@ -36,6 +36,7 @@ Why things are set up this way: `docs/10-DEPLOYMENT.md`.
 ```
 openssl rand -base64 32   # → BETTER_AUTH_SECRET
 openssl rand -hex 32      # → CRON_SECRET
+openssl rand -hex 32      # → IP_HASH_SECRET (a second, different value)
 ```
 
 ## 4. Prepare the database: `pnpm prod:bootstrap`
@@ -87,6 +88,7 @@ for the rest. Vercel uses a change only after a redeploy.
 | `DIRECT_URL` | session pooler URL | step 1.3 | Secret | now |
 | `BETTER_AUTH_SECRET` | 44 characters | step 3 | Secret | now |
 | `CRON_SECRET` | 64 hex characters | step 3 | Secret | now |
+| `IP_HASH_SECRET` | 64 hex characters (not the cron one) | step 3 | Secret | now (Phase 6: before deploying it) |
 | `SUPABASE_S3_ENDPOINT` | `https://<ref>.storage.supabase.co/storage/v1/s3` | step 2.4 | Config | now |
 | `SUPABASE_S3_REGION` | `ap-south-1` | step 2.4 | Config | now |
 | `SUPABASE_S3_ACCESS_KEY_ID` | key id | step 2.5 | Secret | now |

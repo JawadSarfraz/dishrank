@@ -30,6 +30,9 @@ const schema = z.object({
   ADMIN_EMAIL: z.email().optional(),
 
   CRON_SECRET: z.string().min(32, "must be at least 32 characters"),
+  // Keys the hash of client IPs in rate-limit keys (never the raw IP); its own secret, so rotating
+  // the auth secret never changes it (Phase 6, docs/10).
+  IP_HASH_SECRET: z.string().min(32, "must be at least 32 characters"),
   NEXT_PUBLIC_SITE_URL: z.url().optional(),
   // beta: noindex everywhere, robots.txt disallows all, "Beta" label. Unset = beta in production
   // and live elsewhere (src/lib/site-mode.ts). Read at build time: change it, then redeploy.

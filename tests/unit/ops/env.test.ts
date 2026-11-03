@@ -11,6 +11,7 @@ const valid = {
   GOOGLE_CLIENT_ID: "id",
   GOOGLE_CLIENT_SECRET: "secret",
   CRON_SECRET: "c".repeat(64),
+  IP_HASH_SECRET: "i".repeat(64),
 };
 
 describe("env schema", () => {
@@ -24,12 +25,14 @@ describe("env schema", () => {
     const result = parseEnv({
       ...valid,
       CRON_SECRET: "",
+      IP_HASH_SECRET: "",
       BETTER_AUTH_SECRET: "short",
       DATABASE_URL: "mysql://x",
     });
     expect(result.success).toBe(false);
     const text = describeEnvProblems(result.error!);
     expect(text).toContain("CRON_SECRET");
+    expect(text).toContain("IP_HASH_SECRET");
     expect(text).toContain("BETTER_AUTH_SECRET");
     expect(text).toContain("DATABASE_URL");
     expect(text).not.toContain("short"); // values are never echoed

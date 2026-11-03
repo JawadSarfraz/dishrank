@@ -45,6 +45,7 @@ export default defineConfig({
       GOOGLE_CLIENT_ID: "e2e-google-client-id",
       GOOGLE_CLIENT_SECRET: "e2e-google-client-secret",
       CRON_SECRET: E2E.cronSecret,
+      IP_HASH_SECRET: E2E.ipHashSecret,
       // The journeys check the public site (robots, sitemap); beta mode is unit-tested.
       SITE_MODE: "live",
       OPERATOR_NAME: "",

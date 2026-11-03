@@ -9,6 +9,7 @@ export const E2E = {
    */
   authSecret: "e2e-only-auth-secret-for-the-test-database-0001",
   cronSecret: "e2e-only-cron-secret-for-the-test-database-0001",
+  ipHashSecret: "e2e-only-ip-hash-secret-for-the-test-database-01",
   /** Written by the prepare step, read by the specs; gitignored. */
   fixtureFile: "playwright/.auth/e2e-fixture.json",
   restaurant: "E2E Karahi House",

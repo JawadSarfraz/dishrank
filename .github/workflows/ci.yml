@@ -79,6 +79,7 @@ jobs:
       GOOGLE_CLIENT_ID: ci-dummy-client-id
       GOOGLE_CLIENT_SECRET: ci-dummy-client-secret
       CRON_SECRET: ci-dummy-cron-secret-for-the-build-check-only
+      IP_HASH_SECRET: ci-dummy-ip-hash-secret-for-the-build-check-only
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6 # version from package.json "packageManager"
