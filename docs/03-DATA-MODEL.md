@@ -178,6 +178,14 @@ enum MenuUploadStatus {
   REVIEWED
 }
 
+/// One menu item's state on /admin/menus (docs/07 §3): matched (automatically at ≥ 0.85, or by an
+/// admin), waiting for a decision (an OPEN UNMATCHED_MENU_ITEM review item), or ignored by an admin.
+enum MenuItemStatus {
+  MATCHED
+  NEEDS_REVIEW
+  IGNORED
+}
+
 enum MatchMethod {
   ALIAS
   TRIGRAM
@@ -580,32 +588,64 @@ model MenuUpload {
   id               String           @id @default(cuid())
   restaurantId     String
   uploadedByUserId String
-  filePath         String
+  filePath         String           @unique // menus/<restaurantId>/<uploaderId>/<random>.(jpg|webp)
   status           MenuUploadStatus @default(PENDING)
   rawJson          Json?
   error            String?
   createdAt        DateTime         @default(now())
   parsedAt         DateTime?
 
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  uploadedBy User       @relation(fields: [uploadedByUserId], references: [id])
+  restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  uploadedBy User        @relation(fields: [uploadedByUserId], references: [id])
   items      MenuItem[]
+  parses     MenuParse[]
+
+  @@index([status, createdAt])
 }
 
 model MenuItem {
-  id              String      @id @default(cuid())
+  id              String         @id @default(cuid())
   menuUploadId    String
+  position        Int            @default(0) // order on the menu photo, from 0
   rawName         String
   rawPrice        Int?
   rawSection      String?
   matchedDishId   String?
   matchConfidence Float? // docs/05: ALIAS 1.0 / 0.75 / 0.60 · TRIGRAM similarity, max 0.80 · LLM; ≥ 0.85 auto, 0.45–0.85 review with suggestions
-  matchMethod     MatchMethod @default(NONE)
-  variantTags     String[]    @default([])
-  createdAt       DateTime    @default(now())
+  matchMethod     MatchMethod    @default(NONE)
+  variantTags     String[]       @default([])
+  status          MenuItemStatus @default(NEEDS_REVIEW)
+  reviewItemId    String?        @unique // its UNMATCHED_MENU_ITEM item, when it needed one
+  createdAt       DateTime       @default(now())
 
-  menuUpload  MenuUpload @relation(fields: [menuUploadId], references: [id], onDelete: Cascade)
-  matchedDish Dish?      @relation(fields: [matchedDishId], references: [id])
+  menuUpload  MenuUpload  @relation(fields: [menuUploadId], references: [id], onDelete: Cascade)
+  matchedDish Dish?       @relation(fields: [matchedDishId], references: [id])
+  reviewItem  ReviewItem? @relation(fields: [reviewItemId], references: [id], onDelete: SetNull)
+
+  @@index([menuUploadId])
+}
+
+/// One parse attempt of a menu photo (docs/07 §3): the vision call's model and tokens, and the
+/// matcher's LLM calls. The daily cap counts these rows; an unfinished one marks a parse in progress.
+model MenuParse {
+  id                String    @id @default(cuid())
+  menuUploadId      String
+  trigger           String // admin | cli | cron
+  model             String
+  startedAt         DateTime  @default(now())
+  finishedAt        DateTime?
+  ok                Boolean?
+  error             String?
+  inputTokens       Int       @default(0)
+  outputTokens      Int       @default(0)
+  matchCalls        Int       @default(0)
+  matchInputTokens  Int       @default(0)
+  matchOutputTokens Int       @default(0)
+
+  menuUpload MenuUpload @relation(fields: [menuUploadId], references: [id], onDelete: Cascade)
+
+  @@index([startedAt])
+  @@index([menuUploadId, startedAt])
 }
 
 // ---------- Moderation ----------
@@ -626,6 +666,7 @@ model ReviewItem {
   dish       Dish?       @relation(fields: [dishId], references: [id])
   createdBy  User?       @relation("creator", fields: [createdByUserId], references: [id])
   resolvedBy User?       @relation("resolver", fields: [resolvedByUserId], references: [id])
+  menuItem   MenuItem?
 
   @@index([status, type, createdAt])
 }

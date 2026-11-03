@@ -37,7 +37,10 @@ server refuses to start when a required one is missing or malformed: `DATABASE_U
 | `OPERATOR_NAME`, `CONTACT_EMAIL` | shown on /privacy and /terms |
 | `SUPABASE_S3_ENDPOINT`, `SUPABASE_S3_REGION`, `SUPABASE_S3_ACCESS_KEY_ID`, `SUPABASE_S3_SECRET_ACCESS_KEY` | Supabase Storage → S3 (see Photo storage) |
 | `ENABLE_EXPERIMENTAL_COREPACK` | `1` (a Vercel build setting, see Vercel) |
-| not needed yet | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_MENUS_BUCKET`, `ANTHROPIC_*` (Phase 5); `SUPABASE_DISH_PHOTOS_BUCKET` defaults to `dish-photos` |
+| `ANTHROPIC_API_KEY` | a Claude API key (Secret); without it menu photos are kept but not read, and the matcher skips its LLM step |
+| `ANTHROPIC_VISION_MODEL` | the model that reads menu photos, e.g. `claude-sonnet-5-5` (Phase 5; parsing runs only with the key and this) |
+| `ANTHROPIC_MATCH_MODEL` | a small model for the matcher's last step, e.g. `claude-haiku-5-5` |
+| not needed yet | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`; `SUPABASE_DISH_PHOTOS_BUCKET` and `SUPABASE_MENUS_BUCKET` default to `dish-photos` and `menus` |
 | never set | `NODE_ENV` (Vercel sets it; `NODE_ENV=production` during install would skip the devDependencies the build needs) |
 
 ## Supabase database
@@ -87,11 +90,13 @@ week before. The nightly recompute writes rows, which probably counts as activit
 not promise it: open the dashboard if the warning arrives. Upgrade to Pro before a wider launch
 (also for daily backups).
 
-## Photo storage (Phase 3)
+## Photo storage (Phase 3, menus Phase 5)
 
 1. Storage → Files → New bucket: `dish-photos`, **Public bucket** on, Restrict file size 5 MB,
    allowed MIME types `image/jpeg, image/webp`, Object versioning off (with versioning a delete
-   keeps old versions). `menus`: Public off (Phase 5). The bucket limits check the declared
+   keeps old versions). `menus` (Phase 5): **Public bucket off**, Restrict file size 5 MB, allowed
+   MIME types `image/jpeg, image/webp`, versioning off; the same S3 key reads and writes it, the
+   server downloads a photo to parse it and admins see one through a 10-minute GET link. The bucket limits check the declared
    `Content-Type`, so the server also checks each object (HEAD: exists, ≤ 5 MB, JPEG or WebP) before
    a rating accepts it.
 2. Storage → Configuration → S3: turn on **S3 protocol connection**. Copy **Endpoint** into
@@ -125,7 +130,10 @@ the S3 variables optional so local, preview and CI runs work without storage.
   "regions": ["bom1"],
   "fluid": true,
   "git": { "deploymentEnabled": { "**": false, "main": true } },
-  "crons": [{ "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }]
+  "crons": [
+    { "path": "/api/cron/parse-menus", "schedule": "0 20 * * *" },
+    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }
+  ]
 }
 ```
 
@@ -201,7 +209,10 @@ data, and every step is safe to run again.
 ## Crons (`vercel.json`)
 
 `0 21 * * *` is in UTC: 21:00 UTC = 02:00 PKT (Pakistan has no daylight saving). On Hobby a daily
-cron fires somewhere within that hour, so 02:00–02:59 PKT; Pro keeps the minute. Vercel sends the
+cron fires somewhere within that hour, so 02:00–02:59 PKT; Pro keeps the minute. `parse-menus`
+(`0 20 * * *`, 01:00–01:59 PKT) reads up to 20 waiting menu photos first, so the recompute sees the
+dish rows they verified; it answers ok and does nothing without the Anthropic variables. Hobby
+allows only daily crons; two is within every published Hobby limit. Vercel sends the
 request (GET) with `Authorization: Bearer $CRON_SECRET` when the variable is set, and the endpoints
 refuse every request when it is not. Vercel runs crons only for production deployments, does not
 retry a failed run and may, rarely, skip or repeat one; the job is idempotent and refuses to run

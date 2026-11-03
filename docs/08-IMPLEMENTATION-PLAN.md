@@ -84,12 +84,12 @@ Acceptance
 ## Phase 5 — Menu ingestion + review queue (8–10 h)
 
 Tasks
-- `src/server/vision/parseMenu.ts` (Anthropic tool-use, schema in docs/07), `MenuService.parse`
-- `scripts/parse-menu.ts`, admin "Parse now" button, nightly parse of PENDING ≤ 20
-- `/admin/review`: queue list by type, resolve actions per docs/07 table
-- `/admin/menu-uploads/[id]`: matched / needs review / ignored
-- "Upload menu photo" on the restaurant page
-- Flag rows and their upheld effects (Phase 4's "Report a problem" files FLAG review items only), proposal endpoints and UI entry points on restaurant page
+- `src/server/vision/parseMenu.ts` (Anthropic structured output, schema in docs/07), `MenuService.parse` (built 2026-11-04)
+- `scripts/parse-menu.ts`, admin "Parse now" button, nightly parse of PENDING ≤ 20 (`/api/cron/parse-menus`), 50 parses a day at most (built)
+- `/admin/review`: queue list by type, resolve actions per docs/07 table (menu items added)
+- `/admin/menus` and `/admin/menus/[id]`: the photo next to its items, matched / needs review / ignored (built)
+- "Upload menu photo" on the restaurant page, for panel members, owners and admins (built)
+- Flag rows and their upheld effects (Phase 4's "Report a problem" files FLAG review items only): not built yet (the owner's Phase 5 prompt left them out); proposal endpoints exist since Phase 3
 
 Acceptance
 - Upload a real menu photo → ≥ 80% of items auto-matched for a desi menu; unmatched ones appear in the queue and can be assigned in one click.

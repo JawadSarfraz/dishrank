@@ -194,7 +194,7 @@ dishrank/
 │   ├── overture-sync.ts             # stage Overture places as OvertureCandidate rows (docs/07 §1)
 │   ├── lib/overture.ts              # DuckDB download + reader (shared with research/)
 │   ├── research/overture-coverage.ts # the coverage report in docs/research/
-│   ├── parse-menu.ts                # one MenuUpload → MenuItems + matching
+│   ├── parse-menu.ts                # pnpm menu:parse -- --upload=<id>: one MenuUpload → MenuItems + matching
 │   ├── recompute-rankings.ts        # calls RankingService.recomputeAll()
 │   ├── prod-bootstrap.ts            # pnpm prod:bootstrap: migrate deploy, taxonomy seed, Overture sync on the shell's database, after typing its host
 │   ├── vercel-build.ts              # Vercel build: prisma generate, prisma migrate deploy (production deployments only), then next build
@@ -214,10 +214,10 @@ dishrank/
 │   │   │   ├── me/page.tsx
 │   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=)
 │   │   ├── owner/  (layout.tsx and every page call requirePageRole)  claim/  restaurants/[id]/
-│   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  restaurants/  users/  rankings/
+│   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  menus/ (menus/[id]: photo + items)  restaurants/  users/  rankings/
 │   │   ├── api/
 │   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ reports/ disputes/ uploads/ owner/ admin/  (flags/: Phase 5)
-│   │   │   ├── cron/ recompute-rankings/ mark-stale/   # mark-stale: manual only
+│   │   │   ├── cron/ parse-menus/ recompute-rankings/ mark-stale/   # mark-stale: manual only
 │   │   │   └── auth/[...all]/           # Better Auth handler: toNextJsHandler(auth)
 │   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme tokens (Tailwind 4)
 │   │   ├── sitemap.ts  robots.ts  opengraph-image.tsx           # sitemap: indexable pages only
@@ -226,11 +226,11 @@ dishrank/
 │   │   ├── ranking/       # RankingBrowser (filter bar + ranked list, client), ShareButton, CityDishGrid, CityPicker, DishSearch
 │   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
 │   │   ├── me/            # DeleteRatingButton
-│   │   ├── restaurant/    # ReportProblem
+│   │   ├── restaurant/    # ReportProblem, MenuUploadButton (panel, owner, admin only)
 │   │   ├── trust/         # DisputeForm, LegalDraftNotice
-│   │   ├── layout/        # Footer, OvertureCredit, JsonLd
+│   │   ├── layout/        # SiteHeader (every page: home, rate, my ratings, sign in/out), Footer, OvertureCredit, JsonLd
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
-│   │   └── admin/         # import review queue, Create form, restaurant forms, merge dialog (admin pages only)
+│   │   └── admin/         # import review queue, Create form, restaurant forms, merge dialog, review cards, menu item decisions (admin pages only)
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
@@ -238,8 +238,8 @@ dishrank/
 │   │   ├── rate-limit.ts           # DB-backed sliding window
 │   │   ├── cron.ts  revalidate.ts  # cron secret guard; pages revalidated after rating writes
 │   │   ├── seo.ts  site.ts         # JSON-LD builders (no aggregateRating); SITE_URL, canonical URLs
-│   │   ├── storage/                # StorageAdapter; Supabase Storage through S3 presigned URLs (sigv4.ts, ADR-14): PUT, HEAD, DELETE
-│   │   ├── actions/                # rating, report (problem reports, disputes), admin-* (incl. admin-rankings)
+│   │   ├── storage/                # StorageAdapter; Supabase Storage through S3 presigned URLs (sigv4.ts, ADR-14): PUT, HEAD, DELETE, GET
+│   │   ├── actions/                # rating, report (problem reports, disputes), menu (upload), admin-* (incl. admin-rankings, admin-menus)
 │   │   ├── services/
 │   │   │   ├── ranking.service.ts  # score math, eligibility, trust table, recomputeOne, getRanking
 │   │   │   ├── ranking-nightly.service.ts  # recomputeAll (cron, CLI, /admin/rankings), markStaleAll
@@ -253,11 +253,11 @@ dishrank/
 │   │   │   ├── import.service.ts   # /admin/import review queue: Create / Link / Skip
 │   │   │   ├── overture/           # places.ts (filters, area), duplicates.ts, dish-hints.ts (pure)
 │   │   │   ├── overture-sync.service.ts  data-credits.ts
-│   │   │   ├── menu.service.ts
+│   │   │   ├── menu.service.ts  menu-access.ts  # menu uploads, parse (vision + matching), nightly parse, upload page; who may upload
 │   │   │   ├── claim.service.ts
-│   │   │   └── review.service.ts
+│   │   │   └── review.service.ts  review-fingerprint.ts
 │   │   ├── repositories/           # *.repo.ts, Prisma only (public.repo: public pages; nightly.repo: recomputeAll SQL)
-│   │   ├── vision/                 # parseMenu.ts (Anthropic tool-use JSON schema)
+│   │   ├── vision/                 # parseMenu.ts (prompt, docs/07 schema, structured output), menu-items.ts (answer → items, prices)
 │   │   └── validation/             # zod schemas shared by actions + API
 │   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
@@ -281,12 +281,12 @@ dishrank/
 | Caching | Public pages `revalidate = 3600`; `revalidatePath` after a rating write for the affected ranking, restaurant and city pages and the home page; the nightly cron revalidates every page. Ranking pages never read `searchParams`: one cached page per city × dish, with area filter, sort and distance in the browser and city-wide rank numbers. Their Open Graph images are rendered on each request. |
 | Geo | `lat/lng` columns hold our own coordinates: from Overture (`locationSource OVERTURE`) or typed by an admin (`ADMIN`); NULL = location unknown. They are public data and drive the distance features (haversine, ADR-5). No PostGIS in v1. |
 | Search | `pg_trgm` GIN indexes on `restaurants.name`, `restaurants.search_text` and `dish_alias.alias` (one row per dish spelling; matched one alias at a time, docs/05). |
-| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. One scheduled cron: recompute (with stale marking); one run at a time (an unfinished run younger than 30 minutes refuses a second one with 409 `JOB_RUNNING`). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
+| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. Two scheduled crons: parse-menus (01:00 PKT, up to 20 PENDING menu photos) and recompute (02:00 PKT, with stale marking); one run of a job at a time (an unfinished run younger than 30 minutes refuses a second one with 409 `JOB_RUNNING`). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
 | Env | `src/env.ts` parses `process.env` with Zod. `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
 | Site mode | `SITE_MODE` (`src/lib/site-mode.ts`): `beta`, the production default until it is set to exactly `live`, puts `noindex, nofollow` on every page (root layout metadata) and every response (`X-Robots-Tag` from `next.config.ts`), makes robots.txt disallow everything, empties the sitemap and shows a small "Beta" label. `live` turns all of that off. It is read at build time: changing it needs a redeploy. Development and tests default to `live`. |
 | Observability | Vercel logs + optional Sentry (free tier). Every service logs `{ action, userId, entityId, durationMs }`. |
 | Concurrency | Writers take locks in one order: restaurant (a rating or a delete takes it shared; an edit, status change, merge or panel location exclusive, so each sees or waits for the others) → the (city, dish) lists' advisory locks, in (city id, dish id) order (re-rank, merge, review decisions) → dish rows in id order (a ban locks the rows of every rating it hides, and refuses with `ITEM_CHANGED` if one appeared since) → the user's rating → review item → user rows last, in id order (counters, ban, trust). Rating writes, deletes, admin decisions, panel locations, merges and trust updates all follow it. If two transactions still collide (a deadlock or serialization failure, reported by Prisma as P2034, or P2010 on raw SQL), `inTransaction` tries once more and then answers `409 CONFLICT` ("try again"). Recomputes after a commit are best effort: a failure is logged and the committed write still succeeds (a rating answers `stale: true`). |
-| Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under `<userId>/<random>.<ext>`; menu photos go to the private `menus` bucket. Uploads use presigned S3 `PUT` URLs for Supabase Storage (ADR-14: valid 10 minutes, one object key, content type signed) issued only by `/api/v1/uploads/sign`; a rating accepts a photo only after the server checked that the object exists, is at most 5 MB and is JPEG or WebP. The DB stores the path, not a URL. When no rating uses a photo any more (the rating was deleted, its photo replaced or removed, or the rating merged away), its file is deleted after the commit (presigned `DELETE`, best effort: a failure is logged with the path). Without the `SUPABASE_S3_*` variables uploads are off and the rate flow hides the photo step. |
+| Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under `<userId>/<random>.<ext>`; menu photos go to the private `menus` bucket under `<restaurantId>/<userId>/<random>.<ext>`; the server downloads them for parsing and admins see them through 10-minute GET links. Uploads use presigned S3 `PUT` URLs for Supabase Storage (ADR-14: valid 10 minutes, one object key, content type signed) issued only by `/api/v1/uploads/sign`; a rating accepts a photo only after the server checked that the object exists, is at most 5 MB and is JPEG or WebP. The DB stores the path, not a URL. When no rating uses a photo any more (the rating was deleted, its photo replaced or removed, or the rating merged away), its file is deleted after the commit (presigned `DELETE`, best effort: a failure is logged with the path). Without the `SUPABASE_S3_*` variables uploads are off and the rate flow hides the photo step. |
 | i18n | English only; `lang="en"`; dish aliases carry Roman Urdu. |
 
 ## ADRs (architecture decision records)

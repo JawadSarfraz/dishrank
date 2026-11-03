@@ -101,23 +101,47 @@ Admin-only (`PATCH /api/v1/admin/restaurants/:id { mergeIntoId }` or the merge d
 
 ## 3. Menu ingestion (photo → structured menu)
 
-**Who**: panel member or owner uploads from the restaurant page ("Upload menu photo"); admin can upload too.
+**Who**: panel members, the restaurant's owner (its `claimedByUserId`) and admins upload from the restaurant page ("Upload menu photo", shown only to them: the static page asks the server, `menuUploadAccessAction`). Never a banned account, only for an ACTIVE restaurant; checked again on the server at every step (`src/server/services/menu-access.ts`).
 
-1. Client: resize to ≤ 1600 px and re-encode (strips EXIF/GPS), `POST /api/v1/uploads/sign` → PUT to the private `menus` bucket at `menus/<restaurantId>/<cuid>.jpg` → `POST /owner/restaurants/:id/menus` (or server action) → `MenuUpload PENDING`.
-2. Parse (`MenuService.parse(uploadId)`), triggered by admin button, `scripts/parse-menu.ts`, or the nightly cron for PENDING uploads ≤ 20/night:
-   - Download image; call Anthropic Messages API (model from `ANTHROPIC_VISION_MODEL`) with a **tool** `extract_menu` whose input schema is:
+1. Upload (`MenuService.submit`):
+   - The browser resizes to ≤ 1600 px and re-encodes (WebP, JPEG where WebP is missing), which strips EXIF/GPS.
+   - `POST /api/v1/uploads/sign` `{ kind: "menu", restaurantId, … }` (or the server action) → a 10-minute presigned `PUT` into the private `menus` bucket at `<restaurantId>/<userId>/<random>.(jpg|webp)`; the path is `menus/<that key>`.
+   - Then `submitMenuUploadAction { restaurantId, path }` → `MenuUpload PENDING`, after checking the path is this user's for this restaurant and the object exists, is ≤ 5 MB and JPEG or WebP. `filePath` is unique.
+   - Limits: `user:{id}:upload` (20/day, shared with dish photos) at signing, `user:{id}:menu-upload` (10/day) at submitting.
+2. Parse (`parseMenuUpload(uploadId)` in `src/server/services/menu.service.ts`), for a PENDING or FAILED upload. Triggers: **Parse now** on `/admin/menus/[id]`, `pnpm menu:parse -- --upload=<id>`, and the nightly `/api/cron/parse-menus` (01:00 PKT, an hour before the recompute: up to 20 PENDING uploads, oldest first, none started after 200 s, stops at the cap).
+   - **Refusals, before any API call**:
+     - `PARSING_DISABLED` (503) without both `ANTHROPIC_API_KEY` and `ANTHROPIC_VISION_MODEL`; uploads still work and wait;
+     - `UPLOADS_DISABLED` (503) without storage;
+     - `MENU_ALREADY_PARSED` and `PARSE_RUNNING` (409);
+     - `DAILY_CAP_REACHED` (429): at most **50 parses start in any 24 hours** (all triggers), counted from `MenuParse` rows under one advisory lock.
+   - **Every attempt is a `MenuParse` row**: trigger, model, vision input/output tokens, matcher LLM calls and their tokens, ok or the error.
+   - **The model call**: the server downloads the photo and sends the Anthropic Messages API (`ANTHROPIC_VISION_MODEL`) **only the image (base64, before the text) and the system prompt below**, never the restaurant, the uploader or anything else. Structured output (`output_config.format`, effort low) with this schema:
      ```json
      { "sections": [ { "name": "string", "items": [ { "name": "string", "price": "integer|null", "note": "string|null" } ] } ] }
      ```
-   - System prompt (verbatim in `src/server/vision/parseMenu.ts`):
+     The original plan was a forced `extract_menu` tool, but current Claude models reject forced `tool_choice` (as for docs/05 step 5).
+   - **System prompt** (verbatim in `src/server/vision/parseMenu.ts`):
      > You read a photo of a restaurant menu from Pakistan. Return every food/drink item exactly as printed, with its PKR price as an integer if visible. Keep section headings. Do not translate, do not guess items that are not visible, do not merge sizes (if Half and Full have prices, output two items "X Half" and "X Full"). Prices like 1,850/- are 1850. Return nothing else.
-   - Store `rawJson`; create `MenuItem` rows (`rawName`, `rawPrice`, `rawSection`).
-   - Run matching (docs/05) per item. For matches with conf ≥ 0.85: upsert `RestaurantDish` → `status MENU_VERIFIED, source MENU_PHOTO, confidence = conf, menuName = rawName, price = min price across size variants, variantTags, lastVerifiedAt = now()`. Lower conf → `ReviewItem UNMATCHED_MENU_ITEM`.
-   - `MenuUpload.status = PARSED` (or `FAILED` with error).
-3. Admin reviews the upload page: items grouped as matched / needs review / ignored. Resolving a review item can **Assign dish**, **Create dish** (admin only, from DISH_PROPOSAL flow), or **Ignore** (e.g. "Raita").
-4. When all items are resolved → `MenuUpload.status = REVIEWED`.
+   - **Answers that fail**: a cut-off (`max_tokens`) or refused answer fails with the tokens it cost. The SDK retries a failed request once.
+   - **Items**: store `rawJson`, then create `MenuItem` rows in menu order (`position`, `rawName`, `rawPrice`, `rawSection`, at most 300). Prices are parsed leniently: `1,850/-`, `Rs. 2,200` and Urdu digits all work; two prices in one, or anything else, become no price. Sizes stay separate items, and the matcher strips the size words.
+   - **Matching** (docs/05) per item, outside any transaction. The LLM step uses `ANTHROPIC_MATCH_MODEL`, at most 25 calls per parse; later items go to review with their suggestions.
+   - **One transaction**, restaurant share-locked:
+     - each dish matched at ≥ 0.85 gets a RestaurantDish created (source `MENU_PHOTO`) or upgraded to `MENU_VERIFIED`, with `confidence` (the higher one), `menuName` = the first item's name, `price` = the lowest price of its items (Half below Full), `variantTags` = its items' tags and `lastVerifiedAt = now()`;
+     - an existing row keeps its source; an `OWNER_VERIFIED` row keeps the owner's name, price and tags and only gets `lastVerifiedAt`; a `REMOVED` row stays removed (only an admin revives one);
+     - lower confidence → `MenuItem NEEDS_REVIEW` plus a `ReviewItem UNMATCHED_MENU_ITEM` (payload in §6);
+     - `MenuUpload.status = PARSED`, or `REVIEWED` straight away when nothing needs review.
+   - **After commit**: the changed rows are recomputed (`MENU_VERIFIED` confirms a dish row for eligibility, docs/04) and their pages revalidated.
+   - **Failure**: storage, the API, no items in the photo, or a merge meanwhile → `FAILED` with the error, which the admin can parse again.
+3. Admin review: `/admin/menus` lists uploads by status (waiting, to review, failed, done) with the day's parse count. `/admin/menus/[id]` shows the photo (a 10-minute signed link to the private bucket) next to its items, grouped matched / needs review / ignored, with the parse attempts and their tokens. A waiting item is decided through the review queue (§6):
+   - **one tap on a suggestion** assigns it;
+   - **Other dish…** assigns any dish;
+   - **Create dish…** (admin only) creates a dish and assigns it;
+   - **Ignore** (e.g. "Raita").
 
-Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a few cents. Keep `ANTHROPIC_VISION_MODEL` configurable.
+   `/admin/review` shows the same items under "Menu items".
+4. When no item of the upload waits any more → `MenuUpload.status = REVIEWED` (the upload row is locked, so this happens exactly once).
+
+Cost: a 1600 px photo is ≈ 2.5–3k input tokens and a few hundred output tokens, about a cent on a Sonnet-class model. The real check on 2026-11-04 (synthetic 16-item menu, claude-sonnet-5-5) used 2,868 input + 490 output tokens for the photo and one matcher call of 550 + 78. Keep `ANTHROPIC_VISION_MODEL` configurable.
 
 ## 4. Owner claim
 
@@ -138,7 +162,7 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 
 | type | payload | admin actions |
 |---|---|---|
-| `UNMATCHED_MENU_ITEM` | `{ menuItemId, rawName, rawPrice, suggestions: [{dishSlug, conf}] }` | assign dish (→ RD MENU_VERIFIED) · ignore · create dish then assign |
+| `UNMATCHED_MENU_ITEM` | `{ menuItemId, menuUploadId, rawName, rawPrice, rawSection, suggestions: [{dishSlug, conf}] }` (`createdByUserId` = the uploader; the MenuItem links back through `reviewItemId`) | assign dish (the item becomes MATCHED, method HUMAN 1.0; the RD becomes MENU_VERIFIED from the upload's items of that dish, §3) · ignore (item IGNORED) · create dish then assign. The last decided item of an upload makes it REVIEWED |
 | `DISH_PROPOSAL` | `{ name, note, restaurantId }` (`restaurantId` null when the diner was not rating anywhere) | create dish (slug, category, aliases; not a launch dish) · map to existing dish · reject |
 | `RESTAURANT_PROPOSAL` | `{ name, cityId, areaId, note }` | create restaurant (source MANUAL, the admin types the fields; optional location and dishes) · link to existing · reject |
 | `FLAG` | Phase 4: `{ kind: "report", restaurantId, reason: CLOSED\|WRONG_LOCATION\|WRONG_DISH\|OTHER, dishId, note }` ("Report a problem", signed in) or `{ kind: "dispute", message, contact, page }` (/dispute, anyone). Phase 5 adds `{ restaurantDishId, reason, flagIds[] }` (Flag rows) | Phase 4: uphold = "Done (acted on it)": the admin makes the fix by hand (restaurant status, location, dish row) and the item is RESOLVED · dismiss (REJECTED). Phase 5, Flag rows: uphold (NOT_SERVED ×3 upheld → RD REMOVED; RESTAURANT_CLOSED → Restaurant CLOSED) · dismiss |
@@ -147,7 +171,7 @@ Cost: one menu photo ≈ 1–2k input tokens + a few hundred output tokens — a
 | `OWNER_CLAIM` | `{ claimId, phone, proofNote }` | approve · reject |
 | `DUPLICATE_RESTAURANT` | `{ restaurantIdA, restaurantIdB, similarity }` | merge B into A (rules in §2) · keep both |
 
-Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed. A decision is refused (`ITEM_CHANGED`) when the item changed after the admin opened it, so it never applies to ratings, comments or a location they did not see. A status change of a rating never moves its `updatedAt` (the decay clock, docs/04). Phase 3 builds the decisions for `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION` on `/admin/review`, Phase 4 those for `FLAG` reports and disputes; the other types arrive with their phases.
+Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed. A decision is refused (`ITEM_CHANGED`) when the item changed after the admin opened it, so it never applies to ratings, comments or a location they did not see. A status change of a rating never moves its `updatedAt` (the decay clock, docs/04). Phase 3 builds the decisions for `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION` on `/admin/review`, Phase 4 those for `FLAG` reports and disputes, Phase 5 those for `UNMATCHED_MENU_ITEM`; the other types arrive with their phases.
 
 ## 7. Panel operations (non-code, but the plan depends on it)
 

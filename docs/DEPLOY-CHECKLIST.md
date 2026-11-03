@@ -23,7 +23,8 @@ Why things are set up this way: `docs/10-DEPLOYMENT.md`.
 
 1. Storage → Files → **New bucket**: name `dish-photos`, **Public bucket on**, Restrict file size
    **5 MB**, Allowed MIME types `image/jpeg, image/webp`, Object versioning **off**. Create.
-2. Optional now (needed in Phase 5): New bucket `menus`, Public off.
+2. New bucket `menus` (menu photos): **Public bucket off**, Restrict file size **5 MB**, Allowed
+   MIME types `image/jpeg, image/webp`, Object versioning **off**. Create.
 3. Storage → Configuration → **S3**: turn on **S3 protocol connection**, Save.
 4. Copy **Endpoint** → `SUPABASE_S3_ENDPOINT` and **Region** (`ap-south-1`) → `SUPABASE_S3_REGION`.
 5. Access keys → **New access key**, name `vercel` → Create. Copy the **Access key ID** →
@@ -99,10 +100,15 @@ for the rest. Vercel uses a change only after a redeploy.
 | `NEXT_PUBLIC_SITE_URL` | `https://<domain>` | step 5.6 | Config | step 8 |
 | `GOOGLE_CLIENT_ID` | client id | step 7.5 | Config | step 8 |
 | `GOOGLE_CLIENT_SECRET` | client secret | step 7.5 | Secret | step 8 |
+| `ANTHROPIC_API_KEY` | an API key from console.anthropic.com | you | Secret | menus |
+| `ANTHROPIC_VISION_MODEL` | `claude-sonnet-5-5` | you | Config | menus |
+| `ANTHROPIC_MATCH_MODEL` | `claude-haiku-5-5` | you | Config | menus |
 
-Do not set `NODE_ENV`. Leave out `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-`SUPABASE_MENUS_BUCKET` and `ANTHROPIC_*` (nothing uses them yet) and `SUPABASE_DISH_PHOTOS_BUCKET`
-(defaults to `dish-photos`).
+Do not set `NODE_ENV`. Leave out `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (nothing uses them
+yet), and `SUPABASE_DISH_PHOTOS_BUCKET` and `SUPABASE_MENUS_BUCKET` (they default to `dish-photos` and
+`menus`). The three `ANTHROPIC_*` rows ("menus") turn on reading menu photos; without them uploads
+still work and wait on /admin/menus. At most 50 menu photos are read in any 24 hours (about a cent
+each).
 
 ## 7. Google sign-in (Google Auth Platform)
 
@@ -157,11 +163,16 @@ blocks sign-in there).
 5. My ratings → delete that rating. Supabase → Storage → `dish-photos`: its photo file is gone.
 6. Open a private (incognito) tab → `https://<domain>/sign-in` → Sign in with Google → **Use
    another account** → a Gmail that is not in `BETA_ALLOWED_EMAILS`. You land back on the sign-in
-   page with "DishRank is a private beta and this Google account is not invited yet". (The app has
-   no sign-out button yet, so use a private tab for this.)
+   page with "DishRank is a private beta and this Google account is not invited yet". (A private tab
+   keeps your own session; **Sign out** in the header works too.)
 7. `/admin/rankings` → **Recompute now**: a new run marked ok. The next morning a run marked
    `cron` should be there (it fires between 02:00 and 02:59 PKT).
-8. When all of this works: Supabase → Database Settings → SSL Configuration → turn on **Enforce
+8. Menu photo (needs the `menus` bucket, and the `ANTHROPIC_*` variables to be read): on a
+   restaurant page, **Upload menu photo** (shown to you as admin and to panel members) → a photo of
+   a menu → "Thanks! The menu photo is in." Then `/admin/menus` → the upload → **Parse now**: its
+   items appear next to the photo; tap a suggestion for an item under "Needs review", or Ignore it.
+   The restaurant page now lists the matched dishes with their menu prices.
+9. When all of this works: Supabase → Database Settings → SSL Configuration → turn on **Enforce
    SSL on incoming connections** (a short restart), then open the home page again.
 
 ## Later
