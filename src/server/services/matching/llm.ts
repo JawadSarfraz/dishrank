@@ -33,9 +33,16 @@ function userPrompt({ text, section, candidates }: LlmInput): string {
   ].join("\n");
 }
 
-/** Returns null (step 5 is skipped) unless both the API key and the model id are configured. */
-export function createLlmMatcher(config: { apiKey?: string; model?: string }): LlmMatcher | null {
-  const { apiKey, model } = config;
+/**
+ * Returns null (step 5 is skipped) unless both the API key and the model id are configured.
+ * `onUsage` hears the tokens of every answered call (menu parses record them, docs/07 §3).
+ */
+export function createLlmMatcher(config: {
+  apiKey?: string;
+  model?: string;
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
+}): LlmMatcher | null {
+  const { apiKey, model, onUsage } = config;
   if (!apiKey || !model) return null;
   const client = new Anthropic({ apiKey });
 
@@ -48,6 +55,10 @@ export function createLlmMatcher(config: { apiKey?: string; model?: string }): L
         system: SYSTEM,
         messages: [{ role: "user", content: userPrompt(input) }],
         output_config: { effort: "low", format: zodOutputFormat(VerdictSchema) },
+      });
+      onUsage?.({
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
       });
       if (response.stop_reason === "refusal" || !response.parsed_output) return null;
       const { dishSlug, confidence, reason } = response.parsed_output;

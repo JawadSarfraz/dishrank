@@ -16,10 +16,15 @@ export const E2E = {
   /** The ranking-page journey: Pizza in Islamabad, one ranked restaurant and one without votes. */
   ranked: "E2E Pizza Point",
   unranked: "E2E Pizza Corner",
+  /** The menu journey: a parsed menu photo with items waiting for an admin. */
+  menuRestaurant: "E2E Menu Grill",
 } as const;
 
 export type E2EFixture = {
   cookie: { name: string; value: string };
+  /** A real session of an admin (role ADMIN), signed like the diner's. */
+  adminCookie: { name: string; value: string };
+  menuUploadId: string;
   restaurant: { name: string; slug: string };
   dish: { name: string };
   pizza: { ranked: { name: string; slug: string }; unranked: { name: string; slug: string } };

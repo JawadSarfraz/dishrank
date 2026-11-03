@@ -1,10 +1,10 @@
-// /admin/review (docs/07 §6) for the items Phase 3 creates: held ratings (SUSPICIOUS_RATINGS with
-// reason COMMENT or BURST), dish and restaurant suggestions, and panel location suggestions. Every
+// /admin/review (docs/07 §6): held ratings (SUSPICIOUS_RATINGS with reason COMMENT or BURST), dish
+// and restaurant suggestions, panel location suggestions, problem reports and disputes (FLAG), and
+// menu items the matcher could not place (UNMATCHED_MENU_ITEM, Phase 5). Every
 // decision takes the item's locks in the shared order (restaurant → dish rows → item), needs it
 // OPEN, unchanged since the admin saw it (fingerprint) and an action allowed for its type, changes
 // rating status with plain SQL (the decay clock stays put), and recomputes the touched dish rows
-// after commit. Menu items, flags, claims and duplicates arrive with their phases.
-import { createHash } from "node:crypto";
+// after commit. Flag rows, claims and duplicates arrive with their phases.
 import type { Prisma, ReviewItemType } from "@/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
@@ -50,14 +50,19 @@ import {
   type ReviewResolveInput,
 } from "@/server/validation";
 import { refreshUserTrust } from "./admin-users.service";
+import { reviewFingerprint } from "./review-fingerprint";
 import { invalidateAliasIndex } from "./matching/aliases";
+import { decideMenuItemTx, lockMenuItemParents } from "./menu.service";
 import { normalize } from "./matching/normalize";
 import { recomputeEach } from "./ranking.service";
 import { addAdminDishesTx, insertRestaurantTx, resolveDishSlugs } from "./restaurant.service";
 import type { SuggestionPayload } from "./location.service";
 
-/** The item types /admin/review handles (menu items, claims and duplicates arrive later). */
+export { reviewFingerprint } from "./review-fingerprint";
+
+/** The item types /admin/review handles (claims and duplicates arrive later). */
 export const REVIEW_PAGE_TYPES = [
+  "UNMATCHED_MENU_ITEM",
   "SUSPICIOUS_RATINGS",
   "DISH_PROPOSAL",
   "RESTAURANT_PROPOSAL",
@@ -77,27 +82,6 @@ type RestaurantProposalPayload = {
   areaId: string;
   note: string | null;
 };
-
-/**
- * What an admin sees of an item: its payload, its restaurant and the listed ratings' state (an edit
- * moves `updatedAt`, a decision changes `status`). A decision sent with an older fingerprint is
- * refused, so it never applies to ratings or a location the admin did not see.
- */
-export function reviewFingerprint(
-  item: { payload: unknown; restaurantId: string | null },
-  ratings: readonly { id: string; status: string; updatedAt: Date }[],
-  /** A location card also shows the restaurant's current location, which approving replaces. */
-  location: { lat: number | null; lng: number | null; locationSource: string | null } | null = null,
-): string {
-  const state = [...ratings]
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((r) => [r.id, r.status, r.updatedAt.toISOString()]);
-  const place = location ? [location.lat, location.lng, location.locationSource] : null;
-  return createHash("sha256")
-    .update(JSON.stringify([item.payload, item.restaurantId, state, place]))
-    .digest("hex")
-    .slice(0, 32);
-}
 
 const listedRatings = <T extends { id: string }>(payload: unknown, byId: Map<string, T>) =>
   ((payload as HeldPayload).ratingIds ?? [])
@@ -285,26 +269,32 @@ async function decideHeldRatings(
   throw new AppError("ACTION_NOT_ALLOWED", "That action does not fit this item", 400);
 }
 
+type NewDish = Extract<ReviewResolveInput, { action: "create_dish" }>["payload"]["dish"];
+
+/** A dish an admin creates from the review queue (never a launch dish), with its spellings. */
+async function createDishTx(dish: NewDish, tx: Tx) {
+  if (await findDishBySlug(dish.slug, tx)) {
+    throw new AppError("DISH_EXISTS", `A dish with the slug "${dish.slug}" exists`, 409);
+  }
+  if (!(await findDishCategory(dish.categoryId, tx))) {
+    throw new AppError("NOT_FOUND", "Unknown dish category", 404);
+  }
+  // docs/05: the name and every alias are stored normalised, one row per spelling.
+  const aliases = [...new Set([dish.name, ...dish.aliases].map(normalize).filter(Boolean))];
+  const taken = await findTakenAliases(aliases, tx);
+  if (taken.length > 0) {
+    throw new AppError(
+      "ALIAS_TAKEN",
+      `Already used by another dish: ${taken.map((t) => `"${t.alias}" (${t.dish.slug})`).join(", ")}`,
+      409,
+    );
+  }
+  return insertDishWithAliases({ ...dish, aliases }, tx);
+}
+
 async function decideDishProposal(input: ReviewResolveInput, tx: Tx): Promise<Decision> {
   if (input.action === "create_dish") {
-    const { dish } = input.payload;
-    if (await findDishBySlug(dish.slug, tx)) {
-      throw new AppError("DISH_EXISTS", `A dish with the slug "${dish.slug}" exists`, 409);
-    }
-    if (!(await findDishCategory(dish.categoryId, tx))) {
-      throw new AppError("NOT_FOUND", "Unknown dish category", 404);
-    }
-    // docs/05: the name and every alias are stored normalised, one row per spelling.
-    const aliases = [...new Set([dish.name, ...dish.aliases].map(normalize).filter(Boolean))];
-    const taken = await findTakenAliases(aliases, tx);
-    if (taken.length > 0) {
-      throw new AppError(
-        "ALIAS_TAKEN",
-        `Already used by another dish: ${taken.map((t) => `"${t.alias}" (${t.dish.slug})`).join(", ")}`,
-        409,
-      );
-    }
-    const created = await insertDishWithAliases({ ...dish, aliases }, tx);
+    const created = await createDishTx(input.payload.dish, tx);
     return {
       status: "RESOLVED",
       resolution: `created dish ${created.slug}`,
@@ -380,6 +370,44 @@ async function decideRestaurantProposal(input: ReviewResolveInput, tx: Tx): Prom
 }
 
 /**
+ * A menu item the matcher could not place (docs/07 §6): assign a dish (the dish row becomes
+ * MENU_VERIFIED from the upload's items of that dish), create a dish and assign it, or ignore it.
+ */
+async function decideMenuItem(
+  item: { payload: unknown; restaurantId: string | null },
+  input: ReviewResolveInput,
+  now: Date,
+  tx: Tx,
+): Promise<Decision> {
+  if (!item.restaurantId) throw new AppError("NOT_FOUND", "Restaurant not found", 404);
+  let dish: { id: string; slug: string } | null = null;
+  if (input.action === "assign_dish") {
+    dish = await findDishById(input.payload.dishId, tx);
+    if (!dish) throw new AppError("NOT_FOUND", "Dish not found", 404);
+  } else if (input.action === "create_dish_and_assign") {
+    dish = await createDishTx(input.payload.dish, tx);
+  }
+  const { rowId } = await decideMenuItemTx(
+    {
+      menuItemId: (item.payload as { menuItemId: string }).menuItemId,
+      restaurantId: item.restaurantId,
+      dish,
+    },
+    now,
+    tx,
+  );
+  return {
+    status: "RESOLVED",
+    resolution: dish ? `assigned ${dish.slug}` : "ignored",
+    ...(dish ? { dishId: dish.id } : {}),
+    recompute: rowId ? [rowId] : [],
+    trustUsers: [],
+    invalidateAliases: input.action === "create_dish_and_assign",
+    restaurantSlugs: [],
+  };
+}
+
+/**
  * Problem reports and disputes (FLAG items with payload.kind "report" or "dispute"): the admin acts
  * by hand (close the restaurant, fix its location or dishes on /admin/restaurants) and marks the
  * item done, or dismisses it. Dish flags with automatic effects arrive in Phase 5.
@@ -433,9 +461,10 @@ const itemChanged = () =>
  */
 async function lockItemParents(
   item: { type: ReviewItemType; payload: unknown; restaurantId: string | null },
-  action: ReviewResolveInput["action"],
+  input: ReviewResolveInput,
   tx: Tx,
 ) {
+  const { action } = input;
   if (item.type === "SUSPICIOUS_RATINGS") {
     const payload = item.payload as HeldPayload;
     const ratings = await listRatingsForReview(payload.ratingIds ?? [], tx);
@@ -455,6 +484,15 @@ async function lockItemParents(
     await lockRestaurants([item.restaurantId], tx);
     return { rows: new Set<string>(), restaurantId: item.restaurantId };
   }
+  if (item.type === "UNMATCHED_MENU_ITEM") {
+    // The restaurant (share) and, for "assign", the dish row it verifies (created when absent).
+    const locked = await lockMenuItemParents(
+      item.restaurantId,
+      input.action === "assign_dish" ? input.payload.dishId : null,
+      tx,
+    );
+    return { rows: new Set(locked.rows.values()), restaurantId: locked.restaurantId };
+  }
   return { rows: new Set<string>(), restaurantId: null };
 }
 
@@ -471,7 +509,7 @@ export async function resolveReviewItem(
   const decision = await inTransaction(async (tx) => {
     const peek = await peekReviewItem(itemId, tx);
     if (!peek) throw new AppError("NOT_FOUND", "Review item not found", 404);
-    const locked = peek.status === "OPEN" ? await lockItemParents(peek, input.action, tx) : null;
+    const locked = peek.status === "OPEN" ? await lockItemParents(peek, input, tx) : null;
     const item = await lockReviewItem(itemId, tx);
     if (!item) throw new AppError("NOT_FOUND", "Review item not found", 404);
     if (item.status !== "OPEN" || !locked) {
@@ -495,7 +533,8 @@ export async function resolveReviewItem(
           (item.payload as HeldPayload).restaurantDishId,
           ...ratings.map((r) => r.restaurantDishId),
         ].every((row) => locked.rows.has(row))) ||
-      (item.type === "LOCATION_SUGGESTION" && item.restaurantId !== locked.restaurantId)
+      ((item.type === "LOCATION_SUGGESTION" || item.type === "UNMATCHED_MENU_ITEM") &&
+        item.restaurantId !== locked.restaurantId)
     ) {
       throw itemChanged();
     }
@@ -515,7 +554,9 @@ export async function resolveReviewItem(
             ? await decideRestaurantProposal(input, tx)
             : item.type === "FLAG"
               ? decideFlag(input)
-              : await decideLocation(item, input, tx);
+              : item.type === "UNMATCHED_MENU_ITEM"
+                ? await decideMenuItem(item, input, now, tx)
+                : await decideLocation(item, input, tx);
     await closeReviewItem(
       item.id,
       {

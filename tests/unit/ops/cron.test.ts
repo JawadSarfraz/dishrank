@@ -33,3 +33,29 @@ describe("requireCronSecret", () => {
     expect(requireCronSecret(req(`Bearer ${SECRET}`), SECRET)).toBeNull();
   });
 });
+
+describe("scheduled cron routes", () => {
+  it("every route in vercel.json refuses a request without the right bearer token", async () => {
+    const fs = await import("node:fs");
+    const crons = (
+      JSON.parse(fs.readFileSync("vercel.json", "utf8")) as { crons: { path: string }[] }
+    ).crons;
+    for (const { path } of crons) {
+      const route = (await import(`@/app${path}/route`)) as {
+        GET: (r: Request) => Promise<Response>;
+      };
+      for (const authorization of [undefined, "Bearer wrong"]) {
+        const res = await route.GET(
+          new Request(`http://localhost${path}`, {
+            headers: authorization ? { authorization } : {},
+          }),
+        );
+        // 401, or 500 CRON_SECRET_MISSING when the test environment has no secret: never run.
+        expect([401, 500], path).toContain(res.status);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toMatch(
+          /^(UNAUTHORIZED|CRON_SECRET_MISSING)$/,
+        );
+      }
+    }
+  });
+});

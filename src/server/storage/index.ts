@@ -26,6 +26,13 @@ export interface StorageAdapter {
   inspect(input: { bucket: string; key: string }): Promise<StoredObject | null>;
   /** Deletes an object; a key that does not exist is not an error. */
   remove(input: { bucket: string; key: string }): Promise<void>;
+  /** The object's bytes and type (menu photos for the vision model), or null when it is missing. */
+  download(input: {
+    bucket: string;
+    key: string;
+  }): Promise<{ data: Uint8Array; contentType: string } | null>;
+  /** A short-lived GET URL for one object of a private bucket (admins viewing a menu photo). */
+  signDownload(input: { bucket: string; key: string; expiresInSeconds: number }): Promise<string>;
 }
 
 export type S3Config = {
@@ -103,6 +110,37 @@ export function supabaseS3Storage(
       // configuration error and must not pass silently.
       if (res.status === 404 && !(await res.text()).includes("NoSuchBucket")) return;
       throw new Error(`Storage answered ${res.status}`);
+    },
+    async download({ bucket, key }) {
+      const url = presignS3({
+        method: "GET",
+        endpoint: config.endpoint,
+        bucket,
+        key,
+        expiresInSeconds: 60,
+        signedHeaders: {},
+        credentials,
+        now: now(),
+      });
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`Storage answered ${res.status}`);
+      return {
+        data: new Uint8Array(await res.arrayBuffer()),
+        contentType: res.headers.get("content-type") ?? "",
+      };
+    },
+    async signDownload({ bucket, key, expiresInSeconds }) {
+      return presignS3({
+        method: "GET",
+        endpoint: config.endpoint,
+        bucket,
+        key,
+        expiresInSeconds,
+        signedHeaders: {},
+        credentials,
+        now: now(),
+      });
     },
   };
 }

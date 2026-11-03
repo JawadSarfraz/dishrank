@@ -22,6 +22,9 @@ export const RATE_LIMITS = {
   proposal: { limit: 5, windowSeconds: 86_400 },
   /** `user:{id}:upload`: signed photo uploads. */
   upload: { limit: 20, windowSeconds: 86_400 },
+  /** `user:{id}:menu-upload`: menu photos sent for parsing (docs/07 §3). */
+  // DECISION-PENDING: docs/06 has no menu key; the owner's Phase 5 default, 10 a day.
+  menuUpload: { limit: 10, windowSeconds: 86_400 },
   /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
   flag: { limit: 10, windowSeconds: 86_400 },
   /** `ip:{hash}:dispute`: the /dispute form, open to anyone. */

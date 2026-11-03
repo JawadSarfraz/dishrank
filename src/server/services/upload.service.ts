@@ -1,6 +1,7 @@
-// POST /api/v1/uploads/sign (docs/06): a signed URL for one dish photo in the user's own folder of
-// the public dish-photos bucket, valid 10 minutes. The browser resizes and re-encodes the photo
-// first (src/lib/image.ts), which strips EXIF/GPS. Menu photos arrive with Phase 5.
+// POST /api/v1/uploads/sign (docs/06): a signed URL, valid 10 minutes, for one dish photo in the
+// user's own folder of the public dish-photos bucket, or one menu photo in the private menus bucket
+// (docs/07 §3: menus/<restaurantId>/<userId>/<random>). The browser resizes and re-encodes the
+// photo first (src/lib/image.ts), which strips EXIF/GPS.
 import { randomUUID } from "node:crypto";
 import { env } from "@/env";
 import { AppError } from "@/server/errors";
@@ -11,6 +12,7 @@ import { findRater } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { UploadSignInput } from "@/server/validation";
+import { assertMenuUploader } from "./menu-access";
 
 export const UPLOAD = {
   /** Owner's Phase 3 rule: a signed upload URL lives at most 10 minutes. */
@@ -21,6 +23,14 @@ export const UPLOAD = {
 
 /** A rating's photoPath is this prefix + the object key in the dish-photos bucket. */
 const PHOTO_PREFIX = "dish-photos/";
+/** A MenuUpload's filePath is this prefix + the object key in the private menus bucket. */
+export const MENU_PREFIX = "menus/";
+
+/** A stored object the app accepts as a photo: ≤ 5 MB, JPEG or WebP. */
+export function isAcceptedPhoto(object: { size: number; contentType: string }): boolean {
+  const types: readonly string[] = Object.keys(UPLOAD.extensions);
+  return object.size <= UPLOAD.maxBytes && types.includes(object.contentType.split(";")[0]);
+}
 
 /**
  * A rating's photo must be the user's own upload that really arrived: in their folder, present in
@@ -41,8 +51,7 @@ export async function verifyUploadedPhoto(
     key: path.slice(PHOTO_PREFIX.length),
   });
   if (!object) throw new AppError("PHOTO_NOT_FOUND", "The photo did not finish uploading", 400);
-  const types: readonly string[] = Object.keys(UPLOAD.extensions);
-  if (object.size > UPLOAD.maxBytes || !types.includes(object.contentType.split(";")[0])) {
+  if (!isAcceptedPhoto(object)) {
     throw new AppError(
       "PHOTO_INVALID",
       "The photo must be a JPEG or WebP image of 5 MB or less",
@@ -61,25 +70,36 @@ export async function signPhotoUpload(
   if (!storage) {
     throw new AppError("UPLOADS_DISABLED", "Photo uploads are not set up yet", 503);
   }
-  if (input.kind !== "dish-photo") {
-    throw new AppError("NOT_AVAILABLE", "Menu photo uploads arrive in Phase 5", 400);
-  }
   const rater = await findRater(user.id);
   if (!rater || rater.bannedAt)
     throw new AppError("USER_BANNED", "This account cannot upload", 403);
+  // Menus: only panel members, the restaurant's owner and admins (checked before counting).
+  const menu = input.kind === "menu";
+  if (menu) {
+    if (!input.restaurantId) {
+      throw new AppError("VALIDATION_FAILED", "A menu photo needs its restaurant", 400);
+    }
+    await assertMenuUploader(user, input.restaurantId);
+  }
   await assertRateLimit(`user:${user.id}:upload`, RATE_LIMITS.upload, now);
 
-  // A random file name in the user's own folder: RatingService accepts only the user's own path.
-  const key = `${user.id}/${randomUUID().replace(/-/g, "")}.${UPLOAD.extensions[input.contentType]}`;
+  // A random file name in the user's own folder: the rating and menu services accept only that.
+  const file = `${randomUUID().replace(/-/g, "")}.${UPLOAD.extensions[input.contentType]}`;
+  const key = menu ? `${input.restaurantId}/${user.id}/${file}` : `${user.id}/${file}`;
   const signed = await storage.signUpload({
-    bucket: env.SUPABASE_DISH_PHOTOS_BUCKET,
+    bucket: menu ? env.SUPABASE_MENUS_BUCKET : env.SUPABASE_DISH_PHOTOS_BUCKET,
     key,
     contentType: input.contentType,
     expiresInSeconds: UPLOAD.expiresInSeconds,
   });
-  logEvent("upload.sign", { userId: user.id, storage: storage.name, bytes: input.sizeBytes });
+  logEvent("upload.sign", {
+    userId: user.id,
+    kind: input.kind,
+    storage: storage.name,
+    bytes: input.sizeBytes,
+  });
   return {
-    path: `${PHOTO_PREFIX}${key}`,
+    path: `${menu ? MENU_PREFIX : PHOTO_PREFIX}${key}`,
     uploadUrl: signed.uploadUrl,
     method: "PUT" as const,
     headers: signed.headers,

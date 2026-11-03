@@ -7,6 +7,7 @@ import { getReviewQueue, REVIEW_PAGE_TYPES } from "@/server/services/review.serv
 import { reviewQueueQuery } from "@/server/validation";
 
 const LABELS: Record<(typeof REVIEW_PAGE_TYPES)[number], string> = {
+  UNMATCHED_MENU_ITEM: "Menu items",
   SUSPICIOUS_RATINGS: "Held ratings",
   DISH_PROPOSAL: "Dish suggestions",
   RESTAURANT_PROPOSAL: "Restaurant suggestions",
@@ -38,7 +39,8 @@ export default async function AdminReviewPage({ searchParams }: PageProps<"/admi
       <p className="text-sm">
         Held ratings do not count until approved. Suggestions are never public until you create
         them. Reports and disputes change nothing by themselves: act on /admin/restaurants, then
-        mark them done. Menu items and claims arrive in Phases 5 and 6.
+        mark them done. Assigning a dish to a menu item marks the dish as on the restaurant&apos;s
+        menu; /admin/menus shows each photo with all its items. Claims arrive in Phase 6.
       </p>
       <nav aria-label="Item types" className="flex flex-wrap gap-3 text-sm">
         <Link href={tab()} className={query.type ? "underline" : "font-semibold"}>

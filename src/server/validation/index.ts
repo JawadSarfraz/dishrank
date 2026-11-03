@@ -120,15 +120,36 @@ export const claimInput = z.strictObject({
 export type ClaimInput = z.infer<typeof claimInput>;
 
 /** POST /api/v1/uploads/sign: the client re-encodes to JPEG or WebP before upload (docs/06). */
-export const uploadSignInput = z.strictObject({
-  kind: z.enum(["dish-photo", "menu"]),
-  contentType: z.enum(["image/jpeg", "image/webp"]),
-  sizeBytes: z
-    .int()
-    .min(1)
-    .max(5 * 1024 * 1024),
-});
+export const uploadSignInput = z
+  .strictObject({
+    kind: z.enum(["dish-photo", "menu"]),
+    contentType: z.enum(["image/jpeg", "image/webp"]),
+    sizeBytes: z
+      .int()
+      .min(1)
+      .max(5 * 1024 * 1024),
+    /** Menus only (docs/07 §3): the restaurant whose menu this is. */
+    restaurantId: id.optional(),
+  })
+  .refine((u) => (u.kind === "menu") === (u.restaurantId !== undefined), {
+    message: "restaurantId goes with a menu photo, and only with one",
+    path: ["restaurantId"],
+  });
 export type UploadSignInput = z.infer<typeof uploadSignInput>;
+
+/** A menu photo the browser uploaded with a signed URL (docs/07 §3) → MenuUpload PENDING. */
+export const menuUploadInput = z.strictObject({ restaurantId: id, path: z.string().max(300) });
+export type MenuUploadInput = z.infer<typeof menuUploadInput>;
+
+/** /admin/menus: one status at a time, newest first. */
+export const menuUploadsQuery = z.object({
+  status: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.enum(["PENDING", "PARSED", "FAILED", "REVIEWED"]).default("PENDING"),
+  ),
+  cursor: optionalQuery(id),
+});
+export type MenuUploadsQuery = z.infer<typeof menuUploadsQuery>;
 
 /** GET /api/v1/rankings query (all values arrive as strings). Ranks stay city-wide under any filter. */
 export const rankingQuery = z

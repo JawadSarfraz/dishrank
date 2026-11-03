@@ -1,10 +1,10 @@
 import type { StorageAdapter, StoredObject } from "@/server/storage";
 
 /**
- * Records signing requests and serves `objects` (key → size and type) instead of a storage service;
- * `removed` lists the keys deleted.
+ * Records signing requests and serves `objects` (key → size and type, and `data` for downloads)
+ * instead of a storage service; `removed` lists the keys deleted.
  */
-export function fakeStorage(objects: Record<string, StoredObject> = {}) {
+export function fakeStorage(objects: Record<string, StoredObject & { data?: Uint8Array }> = {}) {
   const calls: Parameters<StorageAdapter["signUpload"]>[0][] = [];
   const removed: string[] = [];
   const adapter: StorageAdapter = {
@@ -23,6 +23,14 @@ export function fakeStorage(objects: Record<string, StoredObject> = {}) {
     async remove({ key }) {
       removed.push(key);
       delete objects[key];
+    },
+    async download({ key }) {
+      const object = objects[key];
+      if (!object) return null;
+      return { data: object.data ?? new Uint8Array(object.size), contentType: object.contentType };
+    },
+    async signDownload({ bucket, key, expiresInSeconds }) {
+      return `https://storage.test/view/${bucket}/${key}?expires=${expiresInSeconds}`;
     },
   };
   return { adapter, calls, objects, removed };

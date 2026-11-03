@@ -4,7 +4,7 @@ import { supabaseS3Storage } from "@/server/storage";
 import { presignRequest } from "@/server/storage/sigv4";
 import { signPhotoUpload, UPLOAD } from "@/server/services/upload.service";
 import { resetAppData } from "../../setup/db-reset";
-import { actorOf, makeUser } from "../restaurants/fixtures";
+import { actorOf, makeRestaurant, makeUser } from "../restaurants/fixtures";
 import { fakeStorage } from "./fake-storage";
 
 const input = {
@@ -40,18 +40,22 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
     expect(jpeg.path).toMatch(/\.jpg$/);
   });
 
-  it("answers 503 when storage is not set up, refuses menus and anonymous users, limits 20 a day", async () => {
+  it("answers 503 when storage is not set up, refuses anonymous users and other people's menus, limits 20 a day", async () => {
     const user = await makeUser("Diner");
     await expect(signPhotoUpload(actorOf(user), input, null)).rejects.toMatchObject({
       code: "UPLOADS_DISABLED",
       status: 503,
     });
     const { adapter } = fakeStorage();
+    // Menus: panel members, owners and admins only (tests/unit/menu).
+    const restaurant = await makeRestaurant("Menu Place");
     await expect(
-      signPhotoUpload(actorOf(user), { ...input, kind: "menu" }, adapter),
-    ).rejects.toMatchObject({
-      code: "NOT_AVAILABLE",
-    });
+      signPhotoUpload(
+        actorOf(user),
+        { ...input, kind: "menu", restaurantId: restaurant.id },
+        adapter,
+      ),
+    ).rejects.toMatchObject({ code: "MENU_UPLOAD_NOT_ALLOWED", status: 403 });
     await expect(signPhotoUpload(null, input, adapter)).rejects.toMatchObject({
       code: "UNAUTHENTICATED",
     });

@@ -1,8 +1,9 @@
 // Runs before the e2e server is built (playwright.config.ts webServer command), on the test database
 // only: migrate and seed, empty the app tables, then create what the specs need: a restaurant with
 // Chicken Karahi on its list, a Pizza list with one ranked restaurant and one without votes, a
-// diner, and a real Better Auth session for that diner. The specs set its signed cookie, exactly
-// what Google sign-in would have set; the app has no sign-in bypass.
+// diner and an admin with real Better Auth sessions, and a menu photo parsed by a fake vision client
+// (no network). The specs set the signed cookies, exactly what Google sign-in would have set; the
+// app has no sign-in bypass.
 import "dotenv/config";
 import { createHmac, randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -33,6 +34,10 @@ async function main() {
   const { addAdminDishesTx, insertRestaurantTx } =
     await import("@/server/services/restaurant.service");
   const { recomputeOne } = await import("@/server/services/ranking.service");
+  const { parseMenuUpload } = await import("@/server/services/menu.service");
+  const { createMenuVision } = await import("@/server/vision");
+  const { fakeAnthropic } = await import("../../unit/menu/fake-anthropic");
+  const { fakeStorage } = await import("../../unit/storage/fake-storage");
   try {
     await resetAppData();
     const area = await db.area.findFirstOrThrow({
@@ -101,18 +106,75 @@ async function main() {
         createdAt: new Date(Date.now() - 30 * 86_400_000),
       },
     });
-    const token = randomBytes(24).toString("base64url");
-    await db.session.create({
+    const admin = await db.user.create({
       data: {
-        token,
-        userId: diner.id,
-        expiresAt: new Date(Date.now() + 7 * 86_400_000),
-        userAgent: "playwright",
+        email: "e2e-admin@test.local",
+        name: "E2E Admin",
+        emailVerified: true,
+        role: "ADMIN",
       },
     });
-    const fixture: E2EFixture = {
+    const session = async (userId: string) => {
+      const token = randomBytes(24).toString("base64url");
+      await db.session.create({
+        data: {
+          token,
+          userId,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          userAgent: "playwright",
+        },
+      });
       // Over http Better Auth uses this name (no __Secure- prefix).
-      cookie: { name: "better-auth.session_token", value: signedSessionCookie(token, secret) },
+      return { name: "better-auth.session_token", value: signedSessionCookie(token, secret) };
+    };
+
+    // A menu photo of its own restaurant, read by a fake vision client: one item matched, one typo
+    // with a suggestion, one item that is not a ranked dish.
+    const grill = await inTransaction((tx) =>
+      insertRestaurantTx(
+        {
+          name: E2E.menuRestaurant,
+          areaId: area.id,
+          address: "E2E address",
+          source: "MANUAL",
+          location: null,
+        },
+        tx,
+      ),
+    );
+    const key = `${grill.id}/${admin.id}/${"e".repeat(32)}.webp`;
+    const upload = await db.menuUpload.create({
+      data: { restaurantId: grill.id, uploadedByUserId: admin.id, filePath: `menus/${key}` },
+    });
+    const parsed = await parseMenuUpload(
+      upload.id,
+      { trigger: "cli" },
+      {
+        storage: fakeStorage({ [key]: { size: 3, contentType: "image/webp" } }).adapter,
+        vision: createMenuVision({
+          model: "e2e-fake",
+          client: fakeAnthropic({
+            sections: [
+              {
+                name: "Karahi",
+                items: [
+                  { name: "Chicken Karahi Full", price: 2000, note: null },
+                  { name: "Chikan Kadhai", price: 1900, note: null },
+                  { name: "Raita", price: 150, note: null },
+                ],
+              },
+            ],
+          }).client,
+        }),
+        llm: () => null,
+      },
+    );
+    if (parsed.status !== "PARSED") throw new Error(`e2e menu parse: ${parsed.status}`);
+
+    const fixture: E2EFixture = {
+      cookie: await session(diner.id),
+      adminCookie: await session(admin.id),
+      menuUploadId: upload.id,
       restaurant: { name: restaurant.name, slug: restaurant.slug },
       dish: { name: karahi.name },
       pizza: {

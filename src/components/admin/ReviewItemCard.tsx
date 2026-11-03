@@ -1,17 +1,18 @@
 "use client";
 
-// One review item with its decisions (docs/07 §6, Phase 3 types). Approve and reject for every
-// type; dish suggestions are approved by creating the dish or mapping to one, restaurant
-// suggestions by creating the restaurant (typed form) or linking to one.
+// One review item with its decisions (docs/07 §6). Dish suggestions are approved by creating the
+// dish or mapping to one, restaurant suggestions by creating the restaurant (typed form) or linking
+// to one, menu items by assigning a dish (MenuItemActions).
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { slugify } from "@/lib/slug";
+import { formatPrice } from "@/lib/format";
 import { resolveReviewItemAction } from "@/server/actions/admin-review";
 import type { ReviewQueue } from "@/server/services/review.service";
 import { describeActionError } from "./action-error";
+import { CreateDishForm, MapDishSelect } from "./DishForms";
+import { MenuItemActions } from "./MenuItemActions";
 import { RestaurantCreateFields } from "./RestaurantCreateFields";
 import { RestaurantPicker } from "./RestaurantPicker";
 
@@ -23,7 +24,6 @@ const date = new Intl.DateTimeFormat("en-PK", {
   timeStyle: "short",
   timeZone: "Asia/Karachi",
 });
-const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
 const REPORT_LABELS: Record<string, string> = {
   CLOSED: "closed",
   WRONG_LOCATION: "wrong location",
@@ -125,6 +125,20 @@ export function ReviewItemCard({
             <li className="p-2">The ratings were deleted or merged away.</li>
           )}
         </ul>
+      )}
+
+      {item.type === "UNMATCHED_MENU_ITEM" && (
+        <p>
+          Menu item: <span className="font-medium">“{String(p.rawName)}”</span>
+          <span className="text-muted-foreground">
+            {typeof p.rawPrice === "number" ? ` · ${formatPrice(p.rawPrice)}` : ""}
+            {p.rawSection ? ` · ${String(p.rawSection)}` : ""}
+          </span>{" "}
+          ·{" "}
+          <a href={`/admin/menus/${String(p.menuUploadId)}`} className="underline">
+            menu photo
+          </a>
+        </p>
       )}
 
       {item.type === "DISH_PROPOSAL" && (
@@ -249,19 +263,38 @@ export function ReviewItemCard({
               </Button>
             </>
           )}
-          {item.type !== "SUSPICIOUS_RATINGS" && item.type !== "FLAG" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={() => resolve({ action: "reject" })}
-            >
-              Reject
-            </Button>
-          )}
+          {item.type !== "SUSPICIOUS_RATINGS" &&
+            item.type !== "FLAG" &&
+            item.type !== "UNMATCHED_MENU_ITEM" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => resolve({ action: "reject" })}
+              >
+                Reject
+              </Button>
+            )}
         </div>
       )}
 
+      {open && item.type === "UNMATCHED_MENU_ITEM" && (
+        <MenuItemActions
+          defaultName={String(p.rawName ?? "")}
+          suggestions={((p.suggestions as { dishSlug: string; conf: number }[] | undefined) ?? [])
+            .map((sg) => {
+              const dish = dishes.find((d) => d.slug === sg.dishSlug);
+              return dish
+                ? { dishId: dish.id, slug: dish.slug, name: dish.name, conf: sg.conf }
+                : null;
+            })
+            .filter((sg) => sg !== null)}
+          dishes={dishes}
+          categories={categories}
+          pending={pending}
+          onResolve={resolve}
+        />
+      )}
       {open && item.type === "DISH_PROPOSAL" && mode === "create" && (
         <CreateDishForm
           defaultName={String(p.name)}
@@ -368,93 +401,5 @@ function LocationDetails({
         )}
       </p>
     </div>
-  );
-}
-
-function MapDishSelect({ dishes }: { dishes: { id: string; slug: string; name: string }[] }) {
-  return (
-    <label className="flex flex-col gap-1">
-      Existing dish
-      <select name="dishId" required defaultValue="" className={selectClass}>
-        <option value="" disabled>
-          Choose a dish
-        </option>
-        {dishes.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function CreateDishForm({
-  defaultName,
-  categories,
-  pending,
-  onSubmit,
-}: {
-  defaultName: string;
-  categories: { id: string; name: string }[];
-  pending: boolean;
-  onSubmit: (dish: { slug: string; name: string; categoryId: string; aliases: string[] }) => void;
-}) {
-  const [name, setName] = useState(defaultName);
-  const [slug, setSlug] = useState(slugify(defaultName));
-  return (
-    <form
-      className="flex flex-col gap-2 rounded-md bg-muted/40 p-3"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const form = new FormData(e.currentTarget);
-        onSubmit({
-          slug,
-          name: name.trim(),
-          categoryId: String(form.get("categoryId") ?? ""),
-          aliases: String(form.get("aliases") ?? "")
-            .split(",")
-            .map((a) => a.trim())
-            .filter(Boolean),
-        });
-      }}
-    >
-      <label className="flex flex-col gap-1">
-        Name
-        <Input
-          value={name}
-          required
-          maxLength={80}
-          onChange={(e) => {
-            setName(e.target.value);
-            setSlug(slugify(e.target.value));
-          }}
-        />
-      </label>
-      <label className="flex flex-col gap-1">
-        Slug
-        <Input value={slug} required maxLength={80} onChange={(e) => setSlug(e.target.value)} />
-      </label>
-      <label className="flex flex-col gap-1">
-        Category
-        <select name="categoryId" required defaultValue="" className={selectClass}>
-          <option value="" disabled>
-            Choose a category
-          </option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex flex-col gap-1">
-        Other spellings (comma-separated, Roman Urdu welcome)
-        <Input name="aliases" maxLength={600} />
-      </label>
-      <Button type="submit" size="sm" disabled={pending} className="self-start">
-        Create dish
-      </Button>
-    </form>
   );
 }

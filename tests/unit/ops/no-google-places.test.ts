@@ -36,6 +36,9 @@ describe("no Google Places anywhere", () => {
 
   it("schedules no Places refresh", () => {
     const crons = (JSON.parse(read("vercel.json")) as { crons: { path: string }[] }).crons;
-    expect(crons.map((c) => c.path)).toEqual(["/api/cron/recompute-rankings"]);
+    expect(crons.map((c) => c.path)).toEqual([
+      "/api/cron/parse-menus",
+      "/api/cron/recompute-rankings",
+    ]);
   });
 });

@@ -33,6 +33,11 @@ export default async function AdminOverviewPage() {
       detail: `${o.openReviewItems} open item${o.openReviewItems === 1 ? "" : "s"}`,
     },
     {
+      href: "/admin/menus",
+      label: "Menus",
+      detail: `${o.menusByStatus.PENDING ?? 0} waiting to be read · ${o.menusByStatus.PARSED ?? 0} to review · ${o.menusByStatus.FAILED ?? 0} failed`,
+    },
+    {
       href: "/admin/users",
       label: "Users",
       detail: `${o.usersByRole.USER} users · ${o.usersByRole.OWNER} owners · ${o.usersByRole.ADMIN} admins`,

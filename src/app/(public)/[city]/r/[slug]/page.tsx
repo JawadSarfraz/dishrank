@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { JsonLd } from "@/components/layout/JsonLd";
+import { MenuUploadButton } from "@/components/restaurant/MenuUploadButton";
 import { ReportProblem } from "@/components/restaurant/ReportProblem";
 import { formatPrice, formatScore, formatVotes } from "@/lib/format";
 import { restaurantJsonLd } from "@/server/seo";
@@ -154,6 +155,8 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
           Rate another dish here
         </Link>
       </section>
+
+      <MenuUploadButton restaurantId={restaurant.id} />
 
       <ReportProblem
         restaurantId={restaurant.id}

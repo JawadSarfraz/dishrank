@@ -4,5 +4,8 @@
   "regions": ["bom1"],
   "fluid": true,
   "git": { "deploymentEnabled": { "**": false, "main": true } },
-  "crons": [{ "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }]
+  "crons": [
+    { "path": "/api/cron/parse-menus", "schedule": "0 20 * * *" },
+    { "path": "/api/cron/recompute-rankings", "schedule": "0 21 * * *" }
+  ]
 }

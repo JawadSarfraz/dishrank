@@ -145,3 +145,19 @@ export async function updateDishPriceAndTags(
 export async function deleteRestaurantDish(id: string, tx: Tx) {
   return tx.restaurantDish.delete({ where: { id } });
 }
+
+/** What a menu verification reads of a dish row it has locked (docs/07 §3). */
+export async function findDishRowForMenu(id: string, tx: Tx) {
+  return tx.restaurantDish.findUniqueOrThrow({
+    where: { id },
+    select: { id: true, status: true, confidence: true },
+  });
+}
+
+export async function updateDishRowFromMenu(
+  id: string,
+  data: Prisma.RestaurantDishUncheckedUpdateInput,
+  tx: Tx,
+) {
+  return tx.restaurantDish.update({ where: { id }, data, select: { id: true, status: true } });
+}
