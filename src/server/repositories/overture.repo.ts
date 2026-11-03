@@ -47,6 +47,11 @@ export async function setLastSeenRelease(ids: readonly string[], release: string
   return count;
 }
 
+/** Candidates waiting for a decision on /admin/import, in every city (the admin home). */
+export async function countNewCandidates() {
+  return db.overtureCandidate.count({ where: { status: "NEW" } });
+}
+
 /** NEW candidates per suggested area of a city (key null: no area suggested). */
 export async function countNewCandidatesByArea(cityId: string) {
   const rows = await db.overtureCandidate.groupBy({

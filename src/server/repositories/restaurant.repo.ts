@@ -72,6 +72,14 @@ export async function updateRestaurantById(
   });
 }
 
+/** Restaurants per status (the admin home). */
+export async function countRestaurantsByStatus() {
+  const rows = await db.restaurant.groupBy({ by: ["status"], _count: { _all: true } });
+  return Object.fromEntries(rows.map((r) => [r.status, r._count._all])) as Partial<
+    Record<RestaurantStatus, number>
+  >;
+}
+
 /** Row locks for a merge, taken in id order so two merges cannot deadlock. */
 export async function lockRestaurants(ids: readonly string[], tx: Tx) {
   return tx.$queryRaw<{ id: string }[]>`
