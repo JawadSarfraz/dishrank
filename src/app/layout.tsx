@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { BetaLabel } from "@/components/layout/BetaLabel";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SITE_URL, isBeta } from "@/server/site";
 import "./globals.css";
 
@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        {isBeta && <BetaLabel />}
+        <SiteHeader beta={isBeta} />
         {children}
       </body>
     </html>

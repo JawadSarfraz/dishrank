@@ -64,7 +64,7 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   await expectNoSideScroll(page);
 
   // Saved for this diner: /me lists it.
-  await page.getByRole("link", { name: "My ratings" }).tap();
+  await page.getByRole("main").getByRole("link", { name: "My ratings" }).tap();
   await expect(page.getByText(restaurant.name)).toBeVisible();
   await expect(page.getByText(dish.name).first()).toBeVisible();
   test.info().annotations.push({ type: "elapsed", description: `${elapsed} ms, ${taps} taps` });
