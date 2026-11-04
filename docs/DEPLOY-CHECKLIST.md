@@ -177,9 +177,20 @@ blocks sign-in there).
 9. When all of this works: Supabase → Database Settings → SSL Configuration → turn on **Enforce
    SSL on incoming connections** (a short restart), then open the home page again.
 
+## Every push to `main`
+
+1. **New environment variables go into Vercel first.** When the code you are about to push needs a
+   new variable (its commit, `.env.example` or `docs/10` names it), add it in Vercel → Settings →
+   Environment Variables (Production) **before** you push. The build checks every variable a
+   production server needs (`src/env.ts`) before it migrates anything: if one is missing or
+   invalid, the build stops and lists only the names (never values), and the last good deployment
+   keeps serving. Then add the variable and **Redeploy** the failed deployment.
+2. Push `main`. If the build fails, its log says why (Deployments → the deployment → Building).
+
 ## Updating an existing beta to Phase 6
 
-Do these in order; step 1 first, or the new deployment refuses to start.
+Do these in order; step 1 first, or the build stops at its environment check (the old version
+keeps serving).
 
 1. Vercel → Settings → Environment Variables: add `IP_HASH_SECRET` (Production, Secret) = a new
    `openssl rand -hex 32`, different from `CRON_SECRET`.

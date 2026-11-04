@@ -22,7 +22,10 @@ Prisma 7 docs on 2026-10-26.
 server refuses to start when a required one is missing or malformed: `DATABASE_URL`, `DIRECT_URL`,
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `CRON_SECRET`,
 `IP_HASH_SECRET` (Phase 6).
-`next build` only warns. Where each production value comes from is in `docs/DEPLOY-CHECKLIST.md`.
+`next build` only warns, but the Vercel build (`scripts/vercel-build.ts`) checks the same schema
+(`src/env-schema.ts`) before anything else and stops, naming only the missing or invalid variables
+(never values), so such a deployment never goes live: add a new variable in Vercel before pushing
+the code that needs it. Where each production value comes from is in `docs/DEPLOY-CHECKLIST.md`.
 
 | Variable | Production value |
 |---|---|
@@ -140,9 +143,12 @@ the S3 variables optional so local, preview and CI runs work without storage.
 }
 ```
 
-- **buildCommand** → `scripts/vercel-build.ts`: `prisma generate`, then on production deployments
-  (`VERCEL_ENV=production`) `prisma migrate deploy` through `DIRECT_URL`, then `next build`; other
-  builds never migrate. The Prisma client (`src/generated`, git-ignored) is generated in the build
+- **buildCommand** → `scripts/vercel-build.ts`: first the environment check (the variables a
+  production server needs, with the server's own schema; a missing or invalid one stops the build
+  with the names only, since 2026-11-04, when a deployment without the new `IP_HASH_SECRET` went
+  live and every request failed for two hours), then `prisma generate`, then on production
+  deployments (`VERCEL_ENV=production`) `prisma migrate deploy` through `DIRECT_URL`, then `next
+  build`; other builds never migrate. The Prisma client (`src/generated`, git-ignored) is generated in the build
   itself: the `postinstall` hook is not guaranteed to run on Vercel, and without the client `next
   build` fails with "Module not found: Can't resolve '@/generated/prisma/…'" (2026-11-04). A
   migration runs before the new code is live, and a failed build leaves the old deployment serving,
@@ -231,10 +237,11 @@ hand if needed. To run the recompute now: "Recompute now" on /admin/rankings.
 
 ## Release steps
 
-1. PR → CI green → merge to `main`.
-2. Vercel builds `main` with `pnpm vercel-build` (Prisma client, migrations, then `next build`); CI's `vercel-build` job runs the same build first.
-3. Smoke test: `/`, one ranking page, `/rate` sign-in, `/admin` role check.
-4. Tag `vX.Y.Z`.
+1. New environment variables go into Vercel (Production) before the push that needs them.
+2. PR → CI green → merge to `main`.
+3. Vercel builds `main` with `pnpm vercel-build` (environment check, Prisma client, migrations, then `next build`); CI's `vercel-build` job runs the same build first.
+4. Smoke test: `/`, one ranking page, `/rate` sign-in, `/admin` role check.
+5. Tag `vX.Y.Z`.
 
 ## Backups and safety
 
