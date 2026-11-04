@@ -111,7 +111,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
   O[("Overture Maps release<br/>places theme, S3")] --> S["pnpm overture:sync<br/>food and drink, Meta + Microsoft only<br/>Google links stripped, placeholder points = location unknown"]
-  S --> C["OvertureCandidate NEW<br/>city + suggested area (≤ 1.5 km)"]
+  S --> C["OvertureCandidate NEW<br/>city + suggested area (within the area's radius)"]
   C --> A["/admin/import<br/>one area at a time, by confidence<br/>dish hints, likely duplicates (50 m)"]
   A -->|Create: prefilled form, admin corrects| R["Restaurant source OVERTURE<br/>Overture's lat/lng<br/>+ RestaurantDish CANDIDATE source=ADMIN conf=0.4 per ticked dish"]
   A -->|Link| L["existing Restaurant<br/>(fills a missing Overture id / location)"]

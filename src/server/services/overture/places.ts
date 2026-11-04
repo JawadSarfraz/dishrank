@@ -31,8 +31,9 @@ export const OVERTURE_RULES = {
   placeholderMin: 10,
   /** A place counts for the city of its nearest seed area centre within this distance (`--margin-km`). */
   marginKm: 5,
-  /** Suggested area: the nearest seed area centre within this distance. */
-  // DECISION-PENDING: 1.5 km covers a 2 km Islamabad sector from its centre; big areas (Bahria, DHA) get no suggestion farther out.
+  /** Suggested area: the default radius of a seed area (`Area.radiusKm`). */
+  // The default radius of a seed area (seed/areas.json `radiusKm`; owner 2026-11-04): 1.5 km covers
+  // a 2 km Islamabad sector from its centre; big areas (Bahria Town, DHA) set a larger one.
   areaKm: 1.5,
   websiteMax: 300,
 } as const;
@@ -152,7 +153,53 @@ export function placeholderPoints(
   );
 }
 
-export type SeedArea = { id: string; cityId: string; citySlug: string; lat: number; lng: number };
+export type SeedArea = {
+  id: string;
+  cityId: string;
+  citySlug: string;
+  lat: number;
+  lng: number;
+  /** The area is suggested within this distance of its centre (seed/areas.json, default 1.5). */
+  radiusKm: number;
+};
+
+/**
+ * The area a point lies in: among the areas whose own radius covers it, the one it is deepest inside
+ * (the smallest distance as a share of the radius), so a sector's 1.5 km and Bahria Town's 3.5 km
+ * can sit side by side. Ties: the first in `areas`. None covers it → null.
+ */
+export function coveringArea(point: LatLng, areas: readonly SeedArea[]) {
+  let best: { area: SeedArea; km: number; depth: number } | null = null;
+  for (const area of areas) {
+    const km = haversineKm(point, area);
+    if (km > area.radiusKm) continue;
+    const depth = km / area.radiusKm;
+    if (!best || depth < best.depth) best = { area, km, depth };
+  }
+  return best;
+}
+
+/**
+ * docs/07 §1: where a candidate goes. Outside `marginKm` of every seed area centre → null (left
+ * out). Otherwise its suggested area is the covering area (none for a point whose location is
+ * unknown), and its city is that area's city, or else the nearest centre's.
+ */
+export function placeCandidate(
+  point: LatLng,
+  areas: readonly SeedArea[],
+  marginKm: number,
+  locationKnown = true,
+) {
+  const nearest = nearestArea(point, areas);
+  if (!nearest || nearest.km > marginKm) return null;
+  const covering = locationKnown ? coveringArea(point, areas) : null;
+  const area = covering?.area ?? nearest.area;
+  return {
+    cityId: area.cityId,
+    citySlug: area.citySlug,
+    suggestedAreaId: covering?.area.id ?? null,
+  };
+}
 
 /** The nearest seed area centre (ties: the first in `areas`). */
 export function nearestArea(point: LatLng, areas: readonly SeedArea[]) {
@@ -240,21 +287,19 @@ export function buildCandidates(
       stats.closed++;
       continue;
     }
-    const nearest = nearestArea(p, areas);
-    if (!nearest || nearest.km > marginKm) {
+    const unknown = placeholders.has(pointKey(p));
+    const place = placeCandidate(p, areas, marginKm, !unknown);
+    if (!place) {
       stats.outside++;
       continue;
     }
-    const unknown = placeholders.has(pointKey(p));
     if (unknown) stats.locationUnknown++;
     const rawAddress = tidyText(p.address);
     const address = stripGoogleLinks(rawAddress);
     if (address !== rawAddress || p.websites.some(isGoogleLink)) stats.googleLinksRemoved++;
     drafts.push({
       overtureId: p.id,
-      cityId: nearest.area.cityId,
-      citySlug: nearest.area.citySlug,
-      suggestedAreaId: !unknown && nearest.km <= OVERTURE_RULES.areaKm ? nearest.area.id : null,
+      ...place,
       name,
       address,
       phone: pickPhone(p.phones),

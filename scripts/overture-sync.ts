@@ -1,12 +1,18 @@
-// pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--refresh]
+// pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--refresh] [--areas-only]
 // Stages Overture Maps food and drink places (Meta and Microsoft records only) as candidates for
 // /admin/import (docs/07 §1). Downloads the release once into tmp/overture/ (DuckDB, Overture's
 // public S3 bucket), then writes only the OvertureCandidate table: never a restaurant, never Google.
+// A newer release refreshes NEW candidates; reviewed ones keep their data. --areas-only skips the
+// download and only places NEW candidates again with the seed areas' current radii.
 import "dotenv/config";
 import areas from "../seed/areas.json";
 import { db } from "@/server/db";
 import { OVERTURE_RULES, RELEASE_PATTERN } from "@/server/services/overture/places";
-import { syncOvertureCandidates } from "@/server/services/overture-sync.service";
+import {
+  replaceAreaSuggestions,
+  syncOvertureCandidates,
+  type AreaSummary,
+} from "@/server/services/overture-sync.service";
 import {
   argValue,
   downloadPlaces,
@@ -17,8 +23,17 @@ import {
 } from "./lib/overture";
 
 const USAGE =
-  "usage: pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--refresh]";
-const KNOWN_FLAGS = ["city", "release", "margin-km", "refresh"];
+  "usage: pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--refresh] [--areas-only]";
+const KNOWN_FLAGS = ["city", "release", "margin-km", "refresh", "areas-only"];
+
+function printAreas(areas: AreaSummary) {
+  for (const [slug, a] of Object.entries(areas)) {
+    console.log(
+      `${slug} NEW candidates with a location: ${a.located}; ${a.withArea} with a suggested area, ` +
+        `${a.withoutArea} without; ${a.changed} placed differently than before.`,
+    );
+  }
+}
 const CITIES = [...new Set(areas.map((a) => a.city))].sort();
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -35,6 +50,11 @@ async function main(argv: readonly string[]): Promise<number> {
   if (!citySlugs.every((slug) => CITIES.includes(slug))) {
     console.error(`unknown city "${city}" (${[...CITIES, "all"].join(", ")})`);
     return 1;
+  }
+  if (argValue(argv, "areas-only") === "true") {
+    const marginArg = Number(argValue(argv, "margin-km") ?? OVERTURE_RULES.marginKm);
+    printAreas(await replaceAreaSuggestions({ citySlugs, marginKm: marginArg }));
+    return 0;
   }
   const releaseArg = argValue(argv, "release") ?? "latest";
   const release = releaseArg === "latest" ? await latestRelease() : releaseArg;
@@ -75,11 +95,13 @@ async function main(argv: readonly string[]): Promise<number> {
   for (const [slug, s] of Object.entries(summary.cities)) {
     console.log(
       `${slug}: ${s.inRelease} candidates in this release, ${s.inserted} new, ` +
-        `${s.alreadyStaged} already staged (unchanged; ${s.lastSeenUpdated} marked as still in this release); ` +
+        `${s.alreadyStaged} already staged (${s.refreshed} unreviewed refreshed from this release, ` +
+        `${s.lastSeenUpdated} marked as still in it; reviewed ones unchanged); ` +
         `${s.withArea} with a suggested area, ${s.withoutArea} without, ${s.locationUnknown} location unknown; ` +
         `${s.likelyDuplicatePairs} likely duplicate pairs (flagged on /admin/import).`,
     );
   }
+  printAreas(summary.areas);
   return 0;
 }
 

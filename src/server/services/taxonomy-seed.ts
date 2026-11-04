@@ -11,13 +11,24 @@ import {
   upsertDishAlias,
 } from "@/server/repositories/taxonomy.repo";
 import { normalize } from "./matching/normalize";
+import { OVERTURE_RULES } from "./overture/places";
 
 const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "must be a lowercase ASCII slug");
 const lat = z.number().min(-90).max(90);
 const lng = z.number().min(-180).max(180);
 
 const citiesFile = z.array(z.strictObject({ slug, name: z.string().min(1), lat, lng }));
-const areasFile = z.array(z.strictObject({ city: slug, slug, name: z.string().min(1), lat, lng }));
+/** `radiusKm`: how far from its centre an area is suggested for Overture candidates (default 1.5). */
+const areasFile = z.array(
+  z.strictObject({
+    city: slug,
+    slug,
+    name: z.string().min(1),
+    lat,
+    lng,
+    radiusKm: z.number().positive().max(10).optional(),
+  }),
+);
 const categoriesFile = z.array(
   z.strictObject({ slug, name: z.string().min(1), sortOrder: z.number().int() }),
 );
@@ -130,8 +141,11 @@ export async function applySeedPlan(plan: SeedPlan) {
       const cityIds = new Map<string, string>();
       for (const c of plan.cities) cityIds.set(c.slug, (await upsertCity(c, tx)).id);
       for (const a of plan.areas) {
-        const { city, ...area } = a;
-        await upsertArea({ ...area, cityId: cityIds.get(city)! }, tx);
+        const { city, radiusKm, ...area } = a;
+        await upsertArea(
+          { ...area, radiusKm: radiusKm ?? OVERTURE_RULES.areaKm, cityId: cityIds.get(city)! },
+          tx,
+        );
       }
       const categoryIds = new Map<string, string>();
       for (const c of plan.categories) categoryIds.set(c.slug, (await upsertCategory(c, tx)).id);

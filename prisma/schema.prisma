@@ -230,6 +230,7 @@ model Area {
   name        String
   lat         Float
   lng         Float
+  radiusKm    Float               @default(1.5) // Overture candidates within this distance of the centre get it suggested (seed/areas.json)
   city        City                @relation(fields: [cityId], references: [id])
   restaurants Restaurant[]
   candidates  OvertureCandidate[]
@@ -287,10 +288,10 @@ model Restaurant {
 model OvertureCandidate {
   id               String               @id @default(cuid())
   overtureId       String               @unique // GERS id
-  release          String // first Overture release that had it, e.g. 2026-10-21.0
+  release          String // the release its data comes from (a newer one refreshes a NEW row), e.g. 2026-10-21.0
   lastSeenRelease  String // newest synced release that still had it
   cityId           String // city of the nearest seed area centre
-  suggestedAreaId  String? // nearest seed area centre within 1.5 km; NULL when farther or location unknown
+  suggestedAreaId  String? // the seed area whose radius covers the point (deepest inside); NULL when none or location unknown
   name             String
   address          String? // Overture's freeform address without Google links
   phone            String?

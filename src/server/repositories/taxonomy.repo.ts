@@ -18,13 +18,13 @@ export async function upsertCity(
 }
 
 export async function upsertArea(
-  a: { cityId: string; slug: string; name: string; lat: number; lng: number },
+  a: { cityId: string; slug: string; name: string; lat: number; lng: number; radiusKm: number },
   client: Client = db,
 ) {
   return client.area.upsert({
     where: { cityId_slug: { cityId: a.cityId, slug: a.slug } },
     create: a,
-    update: { name: a.name, lat: a.lat, lng: a.lng },
+    update: { name: a.name, lat: a.lat, lng: a.lng, radiusKm: a.radiusKm },
     select: { id: true },
   });
 }

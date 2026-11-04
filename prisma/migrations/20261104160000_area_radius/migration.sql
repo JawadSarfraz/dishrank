@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Area" ADD COLUMN     "radiusKm" DOUBLE PRECISION NOT NULL DEFAULT 1.5;
+

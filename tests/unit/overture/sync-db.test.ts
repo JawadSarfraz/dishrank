@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import type { OverturePlace } from "@/server/services/overture/places";
 import {
   latestOvertureSync,
+  replaceAreaSuggestions,
   syncOvertureCandidates,
 } from "@/server/services/overture-sync.service";
 import { resetAppData } from "../../setup/db-reset";
@@ -76,18 +77,28 @@ describe("pnpm overture:sync (test DB)", () => {
     expect(run).toMatchObject({ ok: true, summary: { release: "2026-10-21.0" } });
   });
 
-  it("a newer release only adds new GERS ids and never overwrites staged or reviewed rows", async () => {
-    await sync([place("08f-one"), place("08f-two")], "2026-10-21.0");
+  it("a newer release refreshes NEW candidates and never changes reviewed ones", async () => {
+    await sync([place("08f-one"), place("08f-two"), place("08f-same")], "2026-10-21.0");
     await db.overtureCandidate.update({
       where: { overtureId: "08f-one" },
       data: { status: "SKIPPED", skipReason: "CLOSED" },
     });
-    const before = await row("08f-two");
+    const same = await row("08f-same");
 
     const summary = await sync(
       [
         place("08f-one", { name: "Renamed", confidence: 0.99 }),
-        place("08f-two", { address: "Moved Market", lat: F7.lat + 0.01 }),
+        place("08f-two", {
+          name: "Two Renamed",
+          address: "Moved Market",
+          phones: ["051 7654321"],
+          websites: ["https://two.example"],
+          category: "pakistani_restaurant",
+          alternates: ["bbq_restaurant"],
+          lat: SADDAR.lat,
+          lng: SADDAR.lng,
+        }),
+        place("08f-same"),
         place("08f-three"),
       ],
       "2026-11-18.0",
@@ -96,8 +107,16 @@ describe("pnpm overture:sync (test DB)", () => {
       inRelease: 3,
       inserted: 1,
       alreadyStaged: 2,
-      lastSeenUpdated: 2,
+      refreshed: 0,
     });
+    // 08f-two moved to Saddar: refreshed under its new city.
+    expect(summary.cities.rawalpindi).toMatchObject({
+      inRelease: 1,
+      alreadyStaged: 1,
+      refreshed: 1,
+    });
+
+    // Reviewed: only lastSeenRelease moves.
     expect(await row("08f-one")).toMatchObject({
       name: "Fixture 08f-one",
       confidence: 0.8,
@@ -106,18 +125,55 @@ describe("pnpm overture:sync (test DB)", () => {
       release: "2026-10-21.0",
       lastSeenRelease: "2026-11-18.0",
     });
-    const after = await row("08f-two");
+    // NEW: name, address, phone, website, location and categories come from the newer release.
+    const saddar = await seedPlace("rawalpindi", "saddar");
+    expect(await row("08f-two")).toMatchObject({
+      name: "Two Renamed",
+      address: "Moved Market",
+      phone: "0517654321",
+      website: "https://two.example",
+      category: "pakistani_restaurant",
+      alternates: ["bbq_restaurant"],
+      lat: SADDAR.lat,
+      lng: SADDAR.lng,
+      cityId: saddar.city.id,
+      suggestedAreaId: saddar.area.id,
+      release: "2026-11-18.0",
+      lastSeenRelease: "2026-11-18.0",
+      status: "NEW",
+    });
+    // NEW and unchanged: only lastSeenRelease.
     expect({
-      ...after,
-      lastSeenRelease: before.lastSeenRelease,
-      updatedAt: before.updatedAt,
-    }).toEqual(before);
+      ...(await row("08f-same")),
+      lastSeenRelease: same.lastSeenRelease,
+      updatedAt: same.updatedAt,
+    }).toEqual(same);
     expect(await row("08f-three")).toMatchObject({ release: "2026-11-18.0", status: "NEW" });
 
     // Re-running an older release changes nothing.
-    await sync([place("08f-one")], "2026-10-21.0");
-    expect((await row("08f-one")).lastSeenRelease).toBe("2026-11-18.0");
-    expect(await db.overtureCandidate.count()).toBe(3);
+    await sync([place("08f-two", { name: "Old name" })], "2026-10-21.0");
+    expect(await row("08f-two")).toMatchObject({
+      name: "Two Renamed",
+      lastSeenRelease: "2026-11-18.0",
+    });
+    expect(await db.overtureCandidate.count()).toBe(4);
+  });
+
+  it("--areas-only places NEW candidates again with each area's radius; reviewed rows stay", async () => {
+    // 2.8 km from the Bahria Town (Islamabad) centre: outside 1.5 km, inside its 3.5 km radius.
+    const bahria = { lat: 33.5225 - 2.8 / 111.2, lng: 73.1081 };
+    await sync([place("08f-bahria", bahria), place("08f-reviewed", bahria)], "2026-10-21.0");
+    // As staged before areas had their own radius: no suggestion.
+    await db.overtureCandidate.updateMany({ data: { suggestedAreaId: null } });
+    await db.overtureCandidate.update({
+      where: { overtureId: "08f-reviewed" },
+      data: { status: "SKIPPED" },
+    });
+    const summary = await replaceAreaSuggestions({ citySlugs: ["islamabad", "rawalpindi"] });
+    const isb = await seedPlace("islamabad", "bahria-town-isb");
+    expect((await row("08f-bahria")).suggestedAreaId).toBe(isb.area.id);
+    expect((await row("08f-reviewed")).suggestedAreaId).toBeNull();
+    expect(summary.islamabad).toMatchObject({ located: 1, withArea: 1, changed: 1 });
   });
 
   it("refuses an unknown city and records the failed run", async () => {

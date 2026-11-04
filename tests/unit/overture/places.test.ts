@@ -15,8 +15,15 @@ import {
 
 const F7 = { lat: 33.7215, lng: 73.0569 };
 const AREAS: SeedArea[] = [
-  { id: "area-f7", cityId: "city-isb", citySlug: "islamabad", ...F7 },
-  { id: "area-saddar", cityId: "city-rwp", citySlug: "rawalpindi", lat: 33.597, lng: 73.0516 },
+  { id: "area-f7", cityId: "city-isb", citySlug: "islamabad", ...F7, radiusKm: 1.5 },
+  {
+    id: "area-saddar",
+    cityId: "city-rwp",
+    citySlug: "rawalpindi",
+    lat: 33.597,
+    lng: 73.0516,
+    radiusKm: 1.5,
+  },
 ];
 const KM_NORTH = 1 / 111.2; // degrees of latitude per km
 
@@ -107,6 +114,29 @@ describe("Overture filters (docs/07 §1)", () => {
     expect(drafts[1]).toMatchObject({ lat: far.lat, lng: far.lng, cityId: "city-isb" });
     expect(stats.outside).toBe(1);
     expect(buildCandidates([outside], AREAS, 10).drafts).toHaveLength(1);
+  });
+
+  it("each area has its own radius; a point covered by two goes to the one it is deepest inside", () => {
+    // A big area 6 km south of F-7 with a 4 km radius, in the other city.
+    const big: SeedArea = {
+      id: "area-big",
+      cityId: "city-rwp",
+      citySlug: "rawalpindi",
+      lat: F7.lat - 6 * KM_NORTH,
+      lng: F7.lng,
+      radiusKm: 4,
+    };
+    const areas = [...AREAS, big];
+    const inBig = place({ lat: big.lat + 3 * KM_NORTH }); // 3 km from the big centre, 3 km from F-7
+    const edge = place({ lat: F7.lat - 1.4 * KM_NORTH }); // inside both: 1.4/1.5 of F-7, 4.6 km from big
+    const deep = place({ lat: F7.lat - 2.5 * KM_NORTH }); // only the big one covers it (3.5/4)
+    const { drafts } = buildCandidates([inBig, edge, deep], areas, 5);
+    expect(drafts.map((d) => [d.citySlug, d.suggestedAreaId])).toEqual([
+      // Nearest centres are equally far, but only the big area's radius covers it: its city too.
+      ["rawalpindi", "area-big"],
+      ["islamabad", "area-f7"],
+      ["rawalpindi", "area-big"],
+    ]);
   });
 
   it("treats places on a placeholder point as location unknown: no coordinates, no area, the point's city", () => {

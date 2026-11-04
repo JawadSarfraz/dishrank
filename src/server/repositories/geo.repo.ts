@@ -56,7 +56,14 @@ export async function findAreaWithCityById(id: string, client: Client = db) {
 export async function listAreasWithCity(client: Client = db) {
   const rows = await client.area.findMany({
     orderBy: [{ cityId: "asc" }, { slug: "asc" }],
-    select: { id: true, cityId: true, lat: true, lng: true, city: { select: { slug: true } } },
+    select: {
+      id: true,
+      cityId: true,
+      lat: true,
+      lng: true,
+      radiusKm: true,
+      city: { select: { slug: true } },
+    },
   });
   return rows.map(({ city, ...area }) => ({ ...area, citySlug: city.slug }));
 }

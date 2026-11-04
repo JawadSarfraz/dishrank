@@ -38,15 +38,21 @@ Restaurants come from two sources, and an admin confirms every one before it is 
    - every whole-record source is Meta or Microsoft under CDLA-Permissive-2.0;
    - it has a name;
    - it is not `permanently_closed`;
-   - the nearest seed area centre is within the margin (default 5 km). That area's city is the candidate's city.
+   - the nearest seed area centre is within the margin (default 5 km). The candidate's city is its suggested area's city (step 6), else that nearest centre's city.
 4. Clean:
    - Google links are removed from the address, as are links to any google.* host, goo.gl, g.page, g.co and share.google (e.g. Maps short links). Literal `\n` escapes and links glued to the word before them count as word breaks.
    - The website is the first http(s) website that is not a Google link.
    - The phone is the first one our phone format accepts, normalised.
 5. Location unknown: some points are geocoder fallbacks rather than locations. A point (rounded to 4 decimals, about 10 m) with at least 10 places, most of them with different addresses, is one; this is counted over all places in the box. A place on such a point gets no coordinates and no suggested area, and its city comes from the point. Every other place keeps Overture's coordinates.
-6. Suggested area: the nearest seed area centre within 1.5 km, else none ("No area suggested" on /admin/import).
-7. Stage: a GERS id not yet in `OvertureCandidate` is inserted as `NEW`, with `release` set to this release. An existing row keeps its data and its review state; only `lastSeenRelease` moves forward when this release is newer. Overture ids churn between releases (11.9% in 2026-10-21.0), so the same place can come back under a new id as `NEW`; /admin/import then flags it as a likely duplicate of the earlier candidate or of the restaurant made from it (§2).
-8. Every run writes a `JobRun` named `overture-sync`. Its summary has the release, the filter counts and, per city: candidates in the release, inserted, already staged, last seen updated, with or without an area, location unknown, and likely duplicate pairs.
+6. Suggested area (owner, 2026-11-04): each seed area has its own radius (`radiusKm` in `seed/areas.json`, `Area.radiusKm`; default 1.5 km, larger for big areas such as Bahria Town and DHA). Among the areas whose radius covers the point, the one it lies deepest inside (the smallest distance as a share of the radius) is suggested; none covers it → none ("No area suggested" on /admin/import).
+7. Stage: a GERS id not yet in `OvertureCandidate` is inserted as `NEW`, with `release` set to this release. When this release is newer than a row's `lastSeenRelease`:
+   - a `NEW` (unreviewed) row is refreshed from it: name, address, phone, website, location (with its city and suggested area), categories, confidence and sources; `release` becomes this release;
+   - a reviewed row (`CREATED`, `LINKED`, `SKIPPED`) is never changed, apart from `lastSeenRelease`;
+   - a refresh writes only while the row is still `NEW`, so a review that happens meanwhile wins.
+
+   Overture ids churn between releases (11.9% in 2026-10-21.0), so the same place can come back under a new id as `NEW`; /admin/import then flags it as a likely duplicate of the earlier candidate or of the restaurant made from it (§2).
+8. Place again: every run then places every `NEW` candidate with a location again (city and suggested area) with the seed areas as they are now. `pnpm overture:sync -- --city=all --areas-only` does only this, without a download, e.g. after changing a radius in `seed/areas.json` and running `pnpm db:seed`.
+9. Every run writes a `JobRun` named `overture-sync` (`overture-sync-areas` for `--areas-only`). Its summary has the release, the filter counts and, per city: candidates in the release, inserted, already staged, refreshed, last seen updated, with or without an area, location unknown, likely duplicate pairs, and the NEW candidates with and without an area after placing them again.
 
 Rerun it after each monthly Overture release. Overture's confidence and categories only order the review list and suggest dishes; they never touch a ranking.
 

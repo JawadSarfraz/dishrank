@@ -11,18 +11,57 @@ function chunks<T>(items: readonly T[]): T[][] {
   return out;
 }
 
-/** Existing rows for these GERS ids (the sync never changes them, except lastSeenRelease). */
+/** The fields a newer release refreshes on a NEW candidate (docs/07 §1, owner 2026-11-04). */
+const refreshable = {
+  name: true,
+  address: true,
+  phone: true,
+  website: true,
+  category: true,
+  alternates: true,
+  confidence: true,
+  lat: true,
+  lng: true,
+  sources: true,
+  cityId: true,
+  suggestedAreaId: true,
+} as const;
+
+/** Existing rows for these GERS ids, with their status and the fields a newer release refreshes. */
 export async function findCandidatesByOvertureIds(overtureIds: readonly string[]) {
-  const rows: { id: string; overtureId: string; lastSeenRelease: string }[] = [];
+  const select = {
+    id: true,
+    overtureId: true,
+    lastSeenRelease: true,
+    status: true,
+    ...refreshable,
+  };
+  const rows: Prisma.OvertureCandidateGetPayload<{ select: typeof select }>[] = [];
   for (const part of chunks(overtureIds)) {
     rows.push(
-      ...(await db.overtureCandidate.findMany({
-        where: { overtureId: { in: part } },
-        select: { id: true, overtureId: true, lastSeenRelease: true },
-      })),
+      ...(await db.overtureCandidate.findMany({ where: { overtureId: { in: part } }, select })),
     );
   }
   return rows;
+}
+
+/**
+ * Overwrites a candidate's data from a newer release, only while it is still NEW: a row an admin
+ * reviewed meanwhile (CREATED, LINKED, SKIPPED) is never changed. Returns 1 when written.
+ */
+export async function refreshNewCandidate(
+  id: string,
+  data: Prisma.OvertureCandidateUncheckedUpdateManyInput,
+) {
+  return (await db.overtureCandidate.updateMany({ where: { id, status: "NEW" }, data })).count;
+}
+
+/** NEW candidates of these cities with a known location (to place them again). */
+export async function listLocatedNewCandidates(cityIds: readonly string[]) {
+  return db.overtureCandidate.findMany({
+    where: { cityId: { in: [...cityIds] }, status: "NEW", lat: { not: null }, lng: { not: null } },
+    select: { id: true, cityId: true, suggestedAreaId: true, lat: true, lng: true },
+  });
 }
 
 /** Inserts new candidates; a GERS id that appeared meanwhile is skipped, never overwritten. */
