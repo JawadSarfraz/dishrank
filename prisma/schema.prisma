@@ -609,6 +609,24 @@ model RateLimitBucket {
   @@id([key, windowStart])
 }
 
+/// Light analytics (owner, Phase 6): what was looked at, never who. No user, no IP, no exact time.
+enum AnalyticsEventName {
+  RATING_SUBMITTED
+  SEARCH
+  RANKING_VIEW
+}
+
+model AnalyticsEvent {
+  id       String             @id @default(cuid())
+  name     AnalyticsEventName
+  citySlug String?
+  dishSlug String?
+  day      DateTime           @db.Date // the day in Pakistan (UTC+5), not the moment
+
+  @@index([name, day])
+  @@index([day])
+}
+
 model JobRun {
   id         String    @id @default(cuid())
   name       String

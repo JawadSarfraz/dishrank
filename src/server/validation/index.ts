@@ -137,6 +137,14 @@ export const uploadSignInput = z
   });
 export type UploadSignInput = z.infer<typeof uploadSignInput>;
 
+/** POST /api/v1/events: a ranking page reports one view (city and dish only, Phase 6). */
+export const rankingViewInput = z.strictObject({
+  name: z.literal("ranking_view"),
+  city: slug,
+  dish: slug,
+});
+export type RankingViewInput = z.infer<typeof rankingViewInput>;
+
 /** A menu photo the browser uploaded with a signed URL (docs/07 §3) → MenuUpload PENDING. */
 export const menuUploadInput = z.strictObject({ restaurantId: id, path: z.string().max(300) });
 export type MenuUploadInput = z.infer<typeof menuUploadInput>;

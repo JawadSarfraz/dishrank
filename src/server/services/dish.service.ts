@@ -3,6 +3,7 @@ import { AppError } from "@/server/errors";
 import { findCityWithAreasBySlug, listCitiesWithAreas } from "@/server/repositories/geo.repo";
 import { searchDishes } from "@/server/repositories/taxonomy.repo";
 import type { DishSearchQuery } from "@/server/validation";
+import { recordEvent } from "./analytics.service";
 import { cleanText } from "./matching/normalize";
 
 export const DISH_SEARCH_LIMIT = 20;
@@ -13,6 +14,8 @@ export async function listDishes(query: DishSearchQuery) {
   if (query.city && !city) throw new AppError("CITY_NOT_FOUND", "Unknown city", 404);
   const text = query.q ? cleanText(query.q) : undefined;
   if (query.q && !text) return [];
+  // Light analytics: a search with its city, never the words searched for.
+  if (text) await recordEvent("SEARCH", { citySlug: city?.slug ?? null });
   const rows = await searchDishes({
     text,
     cityId: city?.id,

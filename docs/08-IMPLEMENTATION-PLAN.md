@@ -100,7 +100,7 @@ Tasks
 - Claim flow + admin approval; owner dishes page (confirm/remove/edit); basic report page
 - Security pass: role checks in every action/handler, CSRF (server actions), input limits, storage path validation, headers (CSP basic), dependency audit
 - Performance pass: bundle check, image sizes, DB indexes verified with `EXPLAIN` on the ranking query
-- Analytics: Vercel Analytics + a tiny event table (`page_view` not needed; track `rating_submitted`, `search`, `ranking_view` with dish/city)
+- Analytics: a tiny event table, no third-party tracker (owner, 2026-11-04: no Vercel Analytics): `rating_submitted`, `search`, `ranking_view` with city and dish only, weekly counts on /admin/analytics (built)
 - Error monitoring (Sentry free) — optional
 - Launch checklist in docs/11
 

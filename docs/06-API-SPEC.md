@@ -25,6 +25,7 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `ip:{hash}:search` | 120 / min |
 | `ip:{hash}:api` | 600 / hour (public GETs) |
 | `ip:{hash}:dispute` | 5 / day, the /dispute form (DECISION-PENDING) |
+| `ip:{hash}:event` | 300 / hour, ranking-page views reported by the browser (Phase 6, DECISION-PENDING) |
 | `user:{id}:admin-write` | 600 / hour (every admin write: import create/link/skip/reopen, add, edit, status, merge, review decisions, panel toggle) |
 
 Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. The nightly job deletes buckets older than 2 days (twice the longest window). Windows roll: hits are counted in buckets of max(5 s, window / 12), so a daily key frees up over 22–24 h. Every call that reaches a check counts, also one that a later check refuses. Rating keys: every submission counts, new or edited (docs/04 abuse control 2); a rating that adds the dish row does not spend `add-dish`, which only `POST /api/v1/restaurant-dishes` spends when it creates a row.
@@ -91,6 +92,9 @@ Own ratings of any status, newest first (`limit` ≤ 100, default 50) → `{ dat
 ### `POST /api/v1/reports` (Phase 4, "Report a problem" on restaurant pages)
 `{ restaurantId, reason: CLOSED|WRONG_LOCATION|WRONG_DISH|OTHER, dishId?, note? (≤ 280) }` (strict) → `201 { id }`: one `ReviewItem FLAG` with payload `{ kind: "report", restaurantId, reason, dishId, note }`; nothing changes on the public pages until an admin acts. Banned users → `403 USER_BANNED`; an unknown or merged restaurant → `404 NOT_FOUND`; an unknown dish → `404 DISH_NOT_FOUND`. Limit: `user:{id}:flag`. The page uses the server action `reportProblemAction`.
 
+### `POST /api/v1/events` (Phase 6, light analytics; no sign-in needed)
+`{ name: "ranking_view", city, dish }` (strict) → `204`. A ranking page is static, so the browser reports each view once (`ViewBeacon`). Unknown city or dish → `404 NOT_FOUND`. One `AnalyticsEvent` row: the name, the city and dish slugs and the day in Pakistan; never a user, an IP address or a time of day. `rating_submitted` (after a rating is saved) and `search` (a dish or restaurant search with text: the city only, never the words) are recorded on the server. `/admin/analytics` shows the weekly counts. No third-party tracker. Limit: `ip:{hash}:event`.
+
 ### `POST /api/v1/disputes` (Phase 4, the /dispute form; no sign-in needed)
 `{ message (10–1000), contact? (≤ 200), page? (≤ 300) }` (strict) → `201 { id }`: one `ReviewItem FLAG` with payload `{ kind: "dispute", message, contact, page }`. No e-mail is sent yet (DECISION-PENDING: no e-mail provider; admins see disputes on /admin/review). Limit: `ip:{hash}:dispute`. The page uses the server action `fileDisputeAction`.
 
@@ -140,4 +144,4 @@ All cron handlers fail closed: `500 { error: { code: "CRON_SECRET_MISSING" } }` 
 
 ## Zod schemas (`src/server/validation/`)
 
-`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; Phase 3: `locationObservationInput`, `meRatingsQuery`, `dishSearchQuery`; Phase 4: `reportInput`, `disputeInput`, `cityLaunchInput`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`, `adminUserListQuery`, `adminUserUpdateInput`, `reviewQueueQuery`; Phase 5: `menuUploadInput`, `menuUploadsQuery` (and `uploadSignInput` takes `restaurantId` for menus). Export inferred types; reuse in both actions and handlers.
+`ratingInput`, `restaurantDishInput`, `flagInput`, `proposalInput`, `claimInput`, `uploadSignInput`, `rankingQuery`, `restaurantSearchQuery`, `adminRestaurantInput`, `reviewResolveInput`; Phase 3: `locationObservationInput`, `meRatingsQuery`, `dishSearchQuery`; Phase 4: `reportInput`, `disputeInput`, `cityLaunchInput`; for /admin: `adminRestaurantUpdateInput`, `candidateCreateInput`, `candidateLinkInput`, `candidateSkipInput`, `candidateReopenInput`, `importQueueQuery`, `adminUserListQuery`, `adminUserUpdateInput`, `reviewQueueQuery`; Phase 5: `menuUploadInput`, `menuUploadsQuery`; Phase 6: `rankingViewInput` (and `uploadSignInput` takes `restaurantId` for menus). Export inferred types; reuse in both actions and handlers.

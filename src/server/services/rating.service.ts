@@ -50,6 +50,7 @@ import type { MeRatingsQuery, RatingInput } from "@/server/validation";
 import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, USER_DISH } from "./ranking.constants";
+import { recordEvent } from "./analytics.service";
 import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
 import { deleteUnusedPhotos, verifyUploadedPhoto } from "./upload.service";
 
@@ -399,6 +400,12 @@ export async function createOrReplace(
   await deleteUnusedPhotos(
     [written.droppedPhotoPath],
     ctx.storage === undefined ? getStorage() : ctx.storage,
+  );
+  // Light analytics (Phase 6): the city and dish only.
+  await recordEvent(
+    "RATING_SUBMITTED",
+    { citySlug: restaurant.city.slug, dishSlug: dish.slug },
+    now,
   );
   logEvent("rating.write", {
     userId: rater.id,

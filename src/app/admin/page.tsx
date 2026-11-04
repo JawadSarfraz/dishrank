@@ -49,6 +49,11 @@ export default async function AdminOverviewPage() {
         ? `Last recompute ${dateTime.format(run.startedAt)}: ${run.ok === null ? "running" : run.ok ? "ok" : "failed"}`
         : "No recompute yet",
     },
+    {
+      href: "/admin/analytics",
+      label: "Analytics",
+      detail: "Ratings, searches and ranking views per week (city and dish only)",
+    },
   ];
 
   return (

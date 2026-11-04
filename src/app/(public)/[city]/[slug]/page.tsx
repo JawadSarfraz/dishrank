@@ -8,6 +8,7 @@ import { cache } from "react";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
+import { ViewBeacon } from "@/components/ranking/ViewBeacon";
 import { formatNeeded, formatScore, formatVotes } from "@/lib/format";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
@@ -168,6 +169,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
       </p>
 
       <ShareButton title={titleOf(ranking)} text={shareText} path={pathOf(ranking)} />
+      <ViewBeacon city={ranking.city.slug} dish={ranking.dish.slug} />
 
       {eligible.length > 0 && (
         <JsonLd

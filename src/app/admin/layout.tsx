@@ -16,6 +16,7 @@ const sections = [
   ["/admin/restaurants", "Restaurants"],
   ["/admin/users", "Users"],
   ["/admin/rankings", "Rankings"],
+  ["/admin/analytics", "Analytics"],
 ] as const;
 
 // Every page under admin/ also calls requirePageRole: layouts do not re-run on client navigation.

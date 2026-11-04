@@ -63,6 +63,7 @@ import type {
   AdminRestaurantUpdateInput,
   RestaurantSearchQuery,
 } from "@/server/validation";
+import { recordEvent } from "./analytics.service";
 import { rethrowConflict } from "./conflict";
 import { recomputeEach, rerankRestaurant } from "./ranking.service";
 import { deleteUnusedPhotos } from "./upload.service";
@@ -360,6 +361,8 @@ export async function searchRestaurants(
   if (!city) throw new AppError("CITY_NOT_FOUND", "Unknown city", 404);
   const text = cleanText(query.q);
   if (!text) return [];
+  // Light analytics: a search with its city, never the words searched for.
+  await recordEvent("SEARCH", { citySlug: city.slug });
   const rows = await searchRestaurantsByText({
     cityId: city.id,
     text,

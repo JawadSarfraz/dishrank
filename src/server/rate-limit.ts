@@ -27,6 +27,9 @@ export const RATE_LIMITS = {
   menuUpload: { limit: 10, windowSeconds: 86_400 },
   /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
   flag: { limit: 10, windowSeconds: 86_400 },
+  /** `ip:{hash}:event`: ranking-page views the browser reports (light analytics, Phase 6). */
+  // DECISION-PENDING: 300 an hour per IP: far above one person reading pages.
+  event: { limit: 300, windowSeconds: 3600 },
   /** `ip:{hash}:dispute`: the /dispute form, open to anyone. */
   // Decided 2026-11-04: docs/06 has no key for disputes; 5 a day per IP.
   dispute: { limit: 5, windowSeconds: 86_400 },
