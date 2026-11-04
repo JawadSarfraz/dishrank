@@ -51,20 +51,19 @@ async function main(argv: readonly string[]): Promise<number> {
     console.error(`unknown city "${city}" (${[...CITIES, "all"].join(", ")})`);
     return 1;
   }
+  const marginKm = Number(argValue(argv, "margin-km") ?? OVERTURE_RULES.marginKm);
+  if (!Number.isFinite(marginKm) || marginKm <= 0 || marginKm > 20) {
+    console.error(`bad --margin-km "${argValue(argv, "margin-km")}" (0 < km ≤ 20)`);
+    return 1;
+  }
   if (argValue(argv, "areas-only") === "true") {
-    const marginArg = Number(argValue(argv, "margin-km") ?? OVERTURE_RULES.marginKm);
-    printAreas(await replaceAreaSuggestions({ citySlugs, marginKm: marginArg }));
+    printAreas(await replaceAreaSuggestions({ citySlugs, marginKm }));
     return 0;
   }
   const releaseArg = argValue(argv, "release") ?? "latest";
   const release = releaseArg === "latest" ? await latestRelease() : releaseArg;
   if (!RELEASE_PATTERN.test(release)) {
     console.error(`bad --release "${releaseArg}" (e.g. 2026-10-21.0 or latest)`);
-    return 1;
-  }
-  const marginKm = Number(argValue(argv, "margin-km") ?? OVERTURE_RULES.marginKm);
-  if (!Number.isFinite(marginKm) || marginKm <= 0 || marginKm > 20) {
-    console.error(`bad --margin-km "${argValue(argv, "margin-km")}" (0 < km ≤ 20)`);
     return 1;
   }
 
