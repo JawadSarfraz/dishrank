@@ -108,9 +108,10 @@ describe("security surface (Phase 6)", () => {
     expect(problems).toEqual([]);
   });
 
-  it("security headers: a basic CSP, no framing, no sniffing; HSTS and no eval in production", () => {
+  it("security headers: a basic CSP, no framing, no sniffing; HSTS on Vercel, no eval in production", () => {
     const prod = securityHeaders({
       NODE_ENV: "production",
+      VERCEL: "1",
       SUPABASE_S3_ENDPOINT: "https://ref.storage.supabase.co/storage/v1/s3",
     });
     const get = (h: typeof prod, key: string) => h.find((x) => x.key === key)?.value ?? "";
@@ -124,9 +125,14 @@ describe("security surface (Phase 6)", () => {
     expect(get(prod, "X-Content-Type-Options")).toBe("nosniff");
     expect(get(prod, "X-Frame-Options")).toBe("DENY");
     expect(get(prod, "Strict-Transport-Security")).toMatch(/max-age=\d+/);
+    expect(csp).toContain("upgrade-insecure-requests");
     const dev = securityHeaders({ NODE_ENV: "development" });
     expect(get(dev, "Content-Security-Policy")).toContain("'unsafe-eval'");
     expect(get(dev, "Strict-Transport-Security")).toBe("");
+    // A local production build on http (e2e) gets no https-only rules.
+    const local = securityHeaders({ NODE_ENV: "production" });
+    expect(get(local, "Content-Security-Policy")).not.toContain("upgrade-insecure-requests");
+    expect(get(local, "Strict-Transport-Security")).toBe("");
   });
 
   it("refuses JSON bodies over the limit, and dev-only scripts refuse production", async () => {

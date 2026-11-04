@@ -177,6 +177,23 @@ blocks sign-in there).
 9. When all of this works: Supabase → Database Settings → SSL Configuration → turn on **Enforce
    SSL on incoming connections** (a short restart), then open the home page again.
 
+## Updating an existing beta to Phase 6
+
+Do these in order; step 1 first, or the new deployment refuses to start.
+
+1. Vercel → Settings → Environment Variables: add `IP_HASH_SECRET` (Production, Secret) = a new
+   `openssl rand -hex 32`, different from `CRON_SECRET`.
+2. Push `main`. The build runs the new migrations (menu Urdu names, analytics, area radii, claim
+   review fields, uploads, account deletion).
+3. New area radii and Overture refresh on production, from your laptop (as step 4 above):
+   `pnpm prod:bootstrap`. It reseeds the areas with their radii, then syncs the newest Overture
+   release: unreviewed candidates get the release's data and are placed again with the radii;
+   reviewed ones keep theirs.
+4. Smoke test: on a restaurant page, **Is this your restaurant?** → send a claim with a second
+   Google account → `/admin/review` → **Owner claims** → **Approve owner** → that account sees
+   **Owner** in the header and its restaurant on `/owner`. `/admin/analytics` shows counts after a
+   few page views. On `/me`, **Delete my account** with a test account (not the admin).
+
 ## Later
 
 - Invite someone: add the Gmail to `BETA_ALLOWED_EMAILS`, then Redeploy.

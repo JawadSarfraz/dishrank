@@ -7,9 +7,12 @@
 // DECISION-PENDING: 'unsafe-inline' for scripts until pages can carry a nonce (they are static now).
 export function securityHeaders(source: {
   NODE_ENV?: string;
+  VERCEL?: string;
   SUPABASE_S3_ENDPOINT?: string;
 }): { key: string; value: string }[] {
   const production = source.NODE_ENV === "production";
+  // HTTPS-only rules apply on Vercel (always https), not to a local production build on http.
+  const https = Boolean(source.VERCEL);
   let storage = "";
   try {
     storage = source.SUPABASE_S3_ENDPOINT ? new URL(source.SUPABASE_S3_ENDPOINT).origin : "";
@@ -28,7 +31,7 @@ export function securityHeaders(source: {
     "font-src 'self'",
     `img-src 'self' data: blob:${storage ? ` ${storage}` : ""}`,
     `connect-src 'self'${storage ? ` ${storage}` : ""}`,
-    ...(production ? ["upgrade-insecure-requests"] : []),
+    ...(https ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
   return [
     { key: "Content-Security-Policy", value: csp },
@@ -40,6 +43,6 @@ export function securityHeaders(source: {
       key: "Permissions-Policy",
       value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)",
     },
-    ...(production ? [{ key: "Strict-Transport-Security", value: "max-age=63072000" }] : []),
+    ...(https ? [{ key: "Strict-Transport-Security", value: "max-age=63072000" }] : []),
   ];
 }

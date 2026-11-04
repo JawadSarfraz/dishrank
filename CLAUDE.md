@@ -43,7 +43,7 @@ pnpm test:e2e         # playwright
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json
 pnpm db:studio        # prisma studio
-pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import; never writes a restaurant
+pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--areas-only]   # stage Overture places for /admin/import (refreshes unreviewed ones); --areas-only re-places NEW candidates with the area radii; never writes a restaurant
 pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu upload via vision model
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 pnpm dev:demo [-- --undo]                                     # local demo data in F-7/F-6/Blue Area/G-9; --undo removes it (local DB only)
