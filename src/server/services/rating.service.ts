@@ -41,6 +41,7 @@ import {
   reviveRestaurantDish,
 } from "@/server/repositories/restaurant-dish.repo";
 import { findRestaurantById, lockRestaurantForRating } from "@/server/repositories/restaurant.repo";
+import { lockUploadForUse } from "@/server/repositories/upload.repo";
 import { findDishById } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, isUniqueViolation, type Tx } from "@/server/repositories/transaction";
 import { adjustRatingCounters, findRater } from "@/server/repositories/user.repo";
@@ -52,7 +53,7 @@ import { rethrowConflict } from "./conflict";
 import { BURST, USER_DISH } from "./ranking.constants";
 import { recordEvent } from "./analytics.service";
 import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
-import { deleteUnusedPhotos, verifyUploadedPhoto } from "./upload.service";
+import { deleteUnusedPhotos, PHOTO_PREFIX, verifyUploadedPhoto } from "./upload.service";
 
 /** Why a rating is held: its comment (docs/04 control 5) or a burst of new accounts (control 3). */
 export type HoldReason = "COMMENT" | "BURST";
@@ -284,6 +285,16 @@ export async function createOrReplace(
     // that photo may be deleted by now, so ask for a retry, which checks it.
     if (input.photoPath && !photoChecked && input.photoPath !== previous?.photoPath) {
       throw new AppError("CONFLICT", "This changed at the same time elsewhere. Try again.", 409);
+    }
+    // A new photo signed since Phase 6: share-lock its Upload row, so the nightly clean-up waits
+    // for this rating and then sees the photo in use (a path signed before has no row).
+    if (
+      photoChecked &&
+      input.photoPath &&
+      !input.photoPath.startsWith(`${PHOTO_PREFIX}${rater.id}/`) &&
+      !(await lockUploadForUse(input.photoPath, rater.id, tx))
+    ) {
+      throw new AppError("PHOTO_NOT_FOUND", "The photo did not finish uploading", 400);
     }
     // An admin's HELD or HIDDEN decision survives an edit; a flagged comment holds an active one.
     const status: RatingStatus =

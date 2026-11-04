@@ -3,12 +3,11 @@ import type { MenuItemStatus, MenuUploadStatus, Prisma } from "@/generated/prism
 import { db } from "@/server/db";
 import type { Client, Tx } from "./transaction";
 
-export async function insertMenuUpload(data: {
-  restaurantId: string;
-  uploadedByUserId: string;
-  filePath: string;
-}) {
-  return db.menuUpload.create({ data, select: { id: true, status: true } });
+export async function insertMenuUpload(
+  data: { restaurantId: string; uploadedByUserId: string; filePath: string },
+  client: Client = db,
+) {
+  return client.menuUpload.create({ data, select: { id: true, status: true } });
 }
 
 /** What a parse needs about an upload. */

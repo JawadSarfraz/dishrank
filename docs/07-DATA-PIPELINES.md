@@ -111,8 +111,8 @@ Admin-only (`PATCH /api/v1/admin/restaurants/:id { mergeIntoId }` or the merge d
 
 1. Upload (`MenuService.submit`):
    - The browser resizes to ≤ 1600 px and re-encodes (WebP, JPEG where WebP is missing), which strips EXIF/GPS.
-   - `POST /api/v1/uploads/sign` `{ kind: "menu", restaurantId, … }` (or the server action) → a 10-minute presigned `PUT` into the private `menus` bucket at `<restaurantId>/<userId>/<random>.(jpg|webp)`; the path is `menus/<that key>`.
-   - Then `submitMenuUploadAction { restaurantId, path }` → `MenuUpload PENDING`, after checking the path is this user's for this restaurant and the object exists, is ≤ 5 MB and JPEG or WebP. `filePath` is unique.
+   - `POST /api/v1/uploads/sign` `{ kind: "menu", restaurantId, … }` (or the server action) → a 10-minute presigned `PUT` into the private `menus` bucket at `<restaurantId>/<random>.(jpg|webp)` (no user id since Phase 6; the `Upload` row records the signer); the path is `menus/<that key>`.
+   - Then `submitMenuUploadAction { restaurantId, path }` → `MenuUpload PENDING`, after checking the path's `Upload` row is this user's, signed for a menu of this restaurant, and the object exists, is ≤ 5 MB and JPEG or WebP. `filePath` is unique.
    - Limits: `user:{id}:upload` (20/day, shared with dish photos) at signing, `user:{id}:menu-upload` (10/day) at submitting.
 2. Parse (`parseMenuUpload(uploadId)` in `src/server/services/menu.service.ts`), for a PENDING or FAILED upload. Triggers: **Parse now** on `/admin/menus/[id]`, `pnpm menu:parse -- --upload=<id>`, and the nightly `/api/cron/parse-menus` (01:00 PKT, an hour before the recompute: up to 20 PENDING uploads, oldest first, none started after 120 s, stops at the cap).
    - **Refusals, before any API call**:

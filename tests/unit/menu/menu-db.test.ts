@@ -279,7 +279,7 @@ describe("menu photos → dishes (docs/07 §3)", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("only panel members, the owner and admins upload menus, into their own folder", async () => {
+  it("only panel members, the owner and admins upload menus; only the signer files the photo", async () => {
     const restaurant = await makeRestaurant("Upload Place");
     const diner = actorOf(await makeUser("Diner"));
     const panel = actorOf(await makeUser("Panel", { isPanel: true }));
@@ -298,9 +298,8 @@ describe("menu photos → dishes (docs/07 §3)", () => {
 
     await expect(sign(diner)).rejects.toMatchObject({ code: "MENU_UPLOAD_NOT_ALLOWED" });
     const signed = await sign(panel);
-    expect(signed.path).toMatch(
-      new RegExp(`^menus/${restaurant.id}/${panel.id}/[a-f0-9]{32}\\.webp$`),
-    );
+    // No user id in the path (Phase 6): the Upload row records who signed it.
+    expect(signed.path).toMatch(new RegExp(`^menus/${restaurant.id}/[a-f0-9]{32}\\.webp$`));
     expect(storage.calls.at(-1)?.bucket).toBe("menus");
     await expect(sign(owner)).resolves.toBeTruthy();
     await expect(sign(admin)).resolves.toBeTruthy();

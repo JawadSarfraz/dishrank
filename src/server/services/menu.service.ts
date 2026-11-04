@@ -33,6 +33,7 @@ import {
   updateMenuUpload,
 } from "@/server/repositories/menu.repo";
 import { createReviewItem } from "@/server/repositories/moderation.repo";
+import { findUploadByPath, lockUploadForUse } from "@/server/repositories/upload.repo";
 import { startExclusiveJobRun } from "@/server/repositories/nightly.repo";
 import { finishJobRun } from "@/server/repositories/ops.repo";
 import {
@@ -136,11 +137,13 @@ export async function submitMenuUpload(
   const user = assertRole(actor, ["USER", "OWNER", "ADMIN"]);
   await assertMenuUploader(user, input.restaurantId);
   await assertRateLimit(`user:${user.id}:menu-upload`, RATE_LIMITS.menuUpload, now);
-  const folder = `${MENU_PREFIX}${input.restaurantId}/${user.id}/`;
-  const extensions = Object.values(UPLOAD.extensions).join("|");
+  // The caller's own upload, signed for this restaurant (its Upload row; the path is random).
+  const signed = await findUploadByPath(input.path);
   if (
-    !input.path.startsWith(folder) ||
-    !new RegExp(`^[a-f0-9]{32}\\.(${extensions})$`).test(input.path.slice(folder.length))
+    !signed ||
+    signed.userId !== user.id ||
+    signed.kind !== "MENU" ||
+    signed.restaurantId !== input.restaurantId
   ) {
     throw new AppError("PHOTO_NOT_YOURS", "That photo was not uploaded by you for this menu", 400);
   }
@@ -159,10 +162,15 @@ export async function submitMenuUpload(
   }
   let upload;
   try {
-    upload = await insertMenuUpload({
-      restaurantId: input.restaurantId,
-      uploadedByUserId: user.id,
-      filePath: input.path,
+    upload = await inTransaction(async (tx) => {
+      // The nightly clean-up waits for this and then sees the menu upload using the file.
+      if (!(await lockUploadForUse(input.path, user.id, tx))) {
+        throw new AppError("PHOTO_NOT_FOUND", "The photo did not finish uploading", 400);
+      }
+      return insertMenuUpload(
+        { restaurantId: input.restaurantId, uploadedByUserId: user.id, filePath: input.path },
+        tx,
+      );
     });
   } catch (error) {
     if (isUniqueViolation(error)) {

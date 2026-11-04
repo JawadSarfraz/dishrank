@@ -116,8 +116,9 @@ the rating merged away), the app deletes the file after the database change (pre
 hour: a failed delete leaves the file until someone removes it in the bucket). An edit that sends
 no photo keeps the earlier one; only an explicit removal deletes it. On Free (Basic CDN, no cache
 purge) a deleted public photo can still be served from a cache for a while; Pro's Smart CDN purges
-it within a minute. Photos uploaded but never attached to a rating stay in the bucket (no clean-up
-job yet). Free includes 1 GB of storage and 5 GB + 5 GB (cached) egress a month.
+it within a minute. Uploads that no rating and no menu upload has used for 24 hours are
+deleted every night (after the menu parses, Phase 6), file and `Upload` row; photos signed
+before Phase 6 and never attached have no row and stay until removed by hand. Free includes 1 GB of storage and 5 GB + 5 GB (cached) egress a month.
 
 Production should not launch without photo uploads (DECISION-PENDING, docs/OPEN-QUESTIONS.md):
 without them no non-panel rater can reach the 1.0 or 1.2 trust rows of docs/04. `src/env.ts` keeps

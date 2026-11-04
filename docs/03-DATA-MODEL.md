@@ -738,6 +738,28 @@ model RateLimitBucket {
   @@id([key, windowStart])
 }
 
+/// A signed upload (Phase 6): who may use the file. Storage paths are random and never contain the
+/// user id; a rating or menu accepts a path only when its Upload row is the caller's. The nightly
+/// clean-up deletes files no rating or menu has used for 24 hours, with their row.
+enum UploadKind {
+  DISH_PHOTO
+  MENU
+}
+
+model Upload {
+  id           String     @id @default(cuid())
+  userId       String
+  kind         UploadKind
+  path         String     @unique // dish-photos/<random>.<ext> or menus/<restaurantId>/<random>.<ext>
+  restaurantId String? // menus: the restaurant the photo was signed for
+  createdAt    DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
 /// Light analytics (owner, Phase 6): what was looked at, never who. No user, no IP, no exact time.
 enum AnalyticsEventName {
   RATING_SUBMITTED

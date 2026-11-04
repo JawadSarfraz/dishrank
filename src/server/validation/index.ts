@@ -27,7 +27,7 @@ export { parseInput } from "./common";
 
 const subScore = z.int().min(1).max(5).optional();
 
-/** POST /api/v1/ratings. photoPath ownership (dish-photos/<userId>/…) is checked by the rating service. */
+/** POST /api/v1/ratings. photoPath ownership (its Upload row, docs/06) is checked by the rating service. */
 export const ratingInput = z.strictObject({
   restaurantId: id,
   dishId: id,
@@ -39,7 +39,8 @@ export const ratingInput = z.strictObject({
   /** On an edit: missing keeps the earlier photo, null removes it (its file is deleted). */
   photoPath: z
     .string()
-    .regex(/^dish-photos\/[a-z0-9]+\/[a-z0-9]+\.(jpg|jpeg|webp)$/, "Invalid photo path")
+    // dish-photos/<random>.<ext>; dish-photos/<userId>/<random>.<ext> was signed before Phase 6.
+    .regex(/^dish-photos\/(?:[a-z0-9]+\/)?[a-z0-9]+\.(jpg|jpeg|webp)$/, "Invalid photo path")
     .nullable()
     .optional(),
 });

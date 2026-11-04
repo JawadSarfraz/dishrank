@@ -21,7 +21,12 @@ describe("photo uploads (docs/06 uploads/sign)", () => {
     const user = await makeUser("Diner");
     const { adapter, calls } = fakeStorage();
     const signed = await signPhotoUpload(actorOf(user), input, adapter);
-    expect(signed.path).toMatch(new RegExp(`^dish-photos/${user.id}/[a-f0-9]{32}\\.webp$`));
+    // A random path without the user id; the Upload row says whose it is (Phase 6).
+    expect(signed.path).toMatch(/^dish-photos\/[a-f0-9]{32}\.webp$/);
+    expect(await db.upload.findUniqueOrThrow({ where: { path: signed.path } })).toMatchObject({
+      userId: user.id,
+      kind: "DISH_PHOTO",
+    });
     expect(signed).toMatchObject({ method: "PUT", headers: { "content-type": "image/webp" } });
     expect(calls).toEqual([
       {
