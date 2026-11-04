@@ -70,7 +70,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [x] `JobRun` rows for crons; admin can see last runs and trigger recompute; a second recompute while one runs is refused (`409 JOB_RUNNING`). ✅ `/admin/rankings`, `ranking-nightly.service.ts`, `menu.service.ts` (parse-menus job); `tests/unit/ranking/nightly-db.test.ts`.
 - [ ] An uptime monitor checks `GET /api/health` (200 only when the database answers within 3 s). ✅ code and test: `src/app/api/health/route.ts`, `src/server/services/health.service.ts`, `tests/unit/ops/health-db.test.ts`, `tests/e2e/health.spec.ts`. ⏳ owner: create the monitor (DEPLOY-CHECKLIST "Uptime monitor").
 - [ ] Error monitoring or at least Vercel log drains checked. ⏳ owner: Vercel → Logs once a day during the beta (Hobby keeps an hour of logs), or add a log drain / Sentry.
-- [ ] Backup plan documented and tested once (restore to a scratch project). ✅ documented: docs/10 Backups. ⏳ owner: Supabase Free has no backups; take a `pg_dump` and restore it once into a scratch database (or move to Pro).
+- [ ] Backup plan documented and tested once (restore to a scratch project). ✅ daily encrypted backup: `.github/workflows/db-backup.yml`, `scripts/db-backup.sh`; restore steps in docs/10 "Backups and restore", tested 2026-11-04 with a backup of the local dev database (row counts, extensions, indexes and `prisma migrate status` matched). ⏳ owner: add the two secrets, run the first backup and restore it once (DEPLOY-CHECKLIST "Daily database backup").
 - [x] `.env.example` complete; README setup works on a clean machine. ✅ `.env.example` lists every variable (incl. `IP_HASH_SECRET`); CI's `vercel-build` job builds from a clean checkout.
 
 ## Launch day

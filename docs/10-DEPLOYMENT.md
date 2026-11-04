@@ -8,9 +8,9 @@ Prisma 7 docs on 2026-10-26.
 
 | Service | Purpose | Notes |
 |---|---|---|
-| GitHub | repo + CI | the personal account `JawadSarfraz` only (repo `JawadSarfraz/dishrank`), never an office organization |
+| GitHub | repo + CI + daily database backup (Actions artifacts, see Backups) | the personal account `JawadSarfraz` only (repo `JawadSarfraz/dishrank`), never an office organization |
 | Vercel | hosting, crons | Hobby: personal, non-commercial use only; move to Pro ($20/mo) before a public or commercial launch. Hobby crons run at most once a day, within the hour (see Crons) |
-| Supabase | Postgres + Storage | One production project in **South Asia (Mumbai)**, `ap-south-1`, for the beta (Free allows 2 active projects). Free has no automatic backups and pauses a project after a week of low activity (see Supabase database) |
+| Supabase | Postgres + Storage | One production project in **South Asia (Mumbai)**, `ap-south-1`, for the beta (Free allows 2 active projects). Free has no automatic backups (a GitHub Actions workflow takes one daily, see Backups and restore) and pauses a project after a week of low activity (see Supabase database) |
 | Google Cloud | OAuth client (sign-in only) | Google Auth Platform. No Places API: Google Places is not used (ADR-13) |
 | Overture Maps | restaurant candidates (open data) | No account or key: `pnpm overture:sync` reads the public S3 bucket from the admin's machine (DuckDB) and writes the staging table of the database `DATABASE_URL` points at. `pnpm prod:bootstrap` runs it once; run it by hand after each monthly release |
 | Anthropic Console | API key for vision + matcher | Not needed for the beta: no code calls it yet (menu parsing is Phase 5). Set a monthly spend limit when it is |
@@ -254,9 +254,79 @@ minutes, alerting by e-mail when the status is not 200. It catches a deployment 
 request, a paused or unreachable Supabase project and a broken `DATABASE_URL`; it does not check
 pages, sign-in or the crons (their record is the JobRun list on /admin/rankings).
 
-## Backups and safety
+## Backups and restore
 
-- Supabase daily backups (Pro) or weekly `pg_dump` via a GitHub Action to a private bucket (Free has none).
+Supabase Free has no automatic backups, so the GitHub Actions workflow
+`.github/workflows/db-backup.yml` takes one every day at 22:00 UTC (03:00 PKT; GitHub may start a
+scheduled run a little late), and on demand. It runs `scripts/db-backup.sh`:
+
+1. `pg_dump` 17 (the server's major version, from the PostgreSQL apt repository) through the
+   session pooler (`PROD_DIRECT_URL`; the transaction pooler cannot serve a dump): the `public`
+   schema, which holds every DishRank table, plus the `pg_trgm` and `unaccent` extensions, in
+   custom format. Not in it: Supabase's own schemas (`auth`, `storage` and the like, which
+   DishRank does not use) and the photo files in Storage.
+2. `pg_restore --list` must read the dump and find the data of the core tables (`User`,
+   `Restaurant`, `Rating` and others).
+3. gpg encrypts it with `BACKUP_PASSPHRASE` (symmetric AES-256, the classic OpenPGP format every gpg
+   2.x reads), decrypts the result again and compares it with the dump.
+4. A file under 150 KB fails the run: an empty DishRank database dumps to about 90 KB, the dev
+   database with its Overture candidates to 390 KB (2026-11-04). Raise or lower it with
+   `BACKUP_MIN_BYTES` in the workflow if ever needed.
+5. The encrypted file is kept as a workflow artifact for 30 days.
+
+Any failure fails the run, and GitHub e-mails you: a scheduled run notifies whoever last changed
+the workflow's `cron` line, so check GitHub → Settings → Notifications → Actions (e-mail, failed
+workflows only). Neither the URL nor the passphrase is printed: GitHub hides secrets in logs, and
+the job also hides the URL's host, user and password in case an error message names one. In a
+public repository anyone signed in to GitHub can download a run's artifacts, so the encryption is
+what keeps the data private: keep the passphrase in your password manager, and remember that
+without it no backup can be read. GitHub turns off scheduled workflows in a public repository after
+60 days without activity; Actions → Database backup → Enable workflow turns it on again. Artifacts count against the account's Actions storage (500 MB on a free private
+repository): about 12 MB for 30 daily backups of today's size.
+
+**Secrets** (GitHub → the repository → Settings → Secrets and variables → Actions → New repository
+secret):
+
+| Name | Value |
+|---|---|
+| `PROD_DIRECT_URL` | the same value as Vercel's `DIRECT_URL`: the session pooler, port 5432, `?sslmode=require` |
+| `BACKUP_PASSPHRASE` | `openssl rand -base64 32`, a new value: save it in your password manager first |
+
+**Run one by hand**: Actions → Database backup → Run workflow → branch `main` → Run workflow. After
+a couple of minutes the run has a green tick and, under Artifacts, `dishrank-<date>T<time>Z`.
+
+**Restore into a scratch database** on your laptop (Homebrew PostgreSQL 17 on port 5433;
+`brew install gnupg` once). Tested on 2026-11-04 with a backup of the local dev database: every
+table's row count, the extensions, the indexes and `prisma migrate status` matched.
+
+```
+# 1. Download: the run's page → Artifacts → dishrank-<date>T<time>Z (a zip), then unzip it
+cd ~/Downloads && unzip dishrank-<date>T<time>Z.zip
+# 2. Decrypt; gpg asks for BACKUP_PASSPHRASE
+gpg --output dishrank.dump --decrypt dishrank-<date>T<time>Z.dump.gpg
+# 3. A new scratch database. The backup brings its own public schema, so drop the new, empty one
+#    (Postgres refuses this on a database that has tables in it)
+/opt/homebrew/opt/postgresql@17/bin/createdb -p 5433 dishrank_restore
+/opt/homebrew/opt/postgresql@17/bin/psql -p 5433 -d dishrank_restore -c 'drop schema public'
+# 4. Restore tables, data, indexes and the two extensions
+/opt/homebrew/opt/postgresql@17/bin/pg_restore -p 5433 -d dishrank_restore \
+  --no-owner --no-privileges --exit-on-error dishrank.dump
+# 5. Look at it
+/opt/homebrew/opt/postgresql@17/bin/psql -p 5433 -d dishrank_restore \
+  -c 'select count(*) from "Restaurant"' -c 'select count(*) from "Rating"'
+# 6. Clean up: the scratch database and the decrypted file (it holds every user's e-mail address)
+/opt/homebrew/opt/postgresql@17/bin/dropdb -p 5433 dishrank_restore
+rm dishrank.dump
+```
+
+If step 4 stops at `CREATE EXTENSION` with `schema "extensions" does not exist` (production keeps
+the extensions in Supabase's `extensions` schema), drop and create the scratch database again, run
+`psql -p 5433 -d dishrank_restore -c 'drop schema public' -c 'create schema extensions'`, and
+restore again. Putting a backup back into production is a separate decision (a new Supabase
+project, or the same one after a mistake): restore it into a scratch database first and check it.
+
+**Safety**
+
 - Admin "merge" and "remove" actions are soft (status changes, history kept). Hard deletes for a user's own requests: deleting a rating, and "Delete my account" on /me (Phase 6; what goes and what stays: docs/06, /privacy).
 - Keep `tmp/` out of git; menu photos are in Storage, not the repo.
 

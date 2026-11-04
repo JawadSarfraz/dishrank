@@ -16,6 +16,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
 - [ ] Q (Phase 6): Analytics. | Default taken: every dish or restaurant search request with text counts, with its city only (DECISION-PENDING in analytics.service.ts); ranking views come from the browser, at most 300 an hour per IP hash (rate-limit.ts); the events are kept without an end date (they hold nothing about anyone).
 - [ ] Q (Phase 6): Content-Security-Policy. | Default taken: `'unsafe-inline'` for scripts and styles, because ISR pages cannot carry a per-request nonce (DECISION-PENDING in security-headers.ts); revisit if pages become dynamic.
 - [ ] Q (hardening, 2026-11-04): Health check. | Default taken: `GET /api/health` allows 12 checks a minute per IP hash (one every 5 s; a monitor checks once a minute) and answers 429 `{"ok":false}` beyond that (DECISION-PENDING in rate-limit.ts); the rate-limit write and the `SELECT 1` share the 3 s budget; a 503 is logged as `health.fail` with the reason, a 429 is not logged.
+- [ ] Q (hardening, 2026-11-04): Database backups. | Default taken: a daily GitHub Actions workflow (03:00 PKT) dumps only the `public` schema (every DishRank table) with pg_trgm and unaccent; Supabase's own schemas and the photo files in Storage are not backed up; encrypted backups are kept 30 days as workflow artifacts; a backup under 150 KB fails the run (DECISION-PENDING in scripts/db-backup.sh).
 ## Decided
 
 - 2026-10-22: Single Next.js app; Postgres + Prisma on Supabase; TypeScript only (ADR-1..3).

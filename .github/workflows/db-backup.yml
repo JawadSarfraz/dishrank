@@ -1,0 +1,68 @@
+name: Database backup
+
+# Daily encrypted backup of the production database (docs/10 "Backups and restore"): pg_dump 17
+# through Supabase's session pooler, checked, encrypted with gpg (AES-256) and kept as a workflow
+# artifact for 30 days (scripts/db-backup.sh). 22:00 UTC is 03:00 PKT; GitHub may start a scheduled
+# run a little late. By hand: Actions → Database backup → Run workflow. A failed run e-mails the owner.
+on:
+  schedule:
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # pg_dump must match the server's major version (Supabase: 17); the runner image has 16.
+      - name: Install the PostgreSQL 17 client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -qq postgresql-client-17
+      # GitHub hides each secret's exact value in logs. This also hides the URL's parts (host, user,
+      # project ref, password, also percent-decoded), in case an error message prints one of them.
+      - name: Hide the parts of the database URL in logs
+        env:
+          PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import unquote, urlsplit
+
+          url = urlsplit(os.environ.get("PROD_DIRECT_URL", ""))
+          parts = {url.hostname, url.username, url.password}
+          parts |= {unquote(p) for p in parts if p}
+          if url.username and "." in url.username:
+              parts.add(url.username.split(".", 1)[1])
+          for part in sorted(p for p in parts if p):
+              for line in part.splitlines():
+                  if len(line) >= 4:
+                      print(f"::add-mask::{line}")
+          PY
+      - name: Dump, check and encrypt
+        id: backup
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.PROD_DIRECT_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          PG_BIN_DIR: /usr/lib/postgresql/17/bin
+        run: bash scripts/db-backup.sh "$RUNNER_TEMP/backup"
+      - name: Keep the encrypted backup for 30 days
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.backup.outputs.name }}
+          path: ${{ steps.backup.outputs.file }}
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0

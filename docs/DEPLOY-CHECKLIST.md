@@ -198,6 +198,25 @@ blocks sign-in there).
    A 503 means the database did not answer within 3 s: Vercel → Logs → `health.fail` says whether
    it timed out or failed, and why (Hobby keeps an hour of logs).
 
+## Daily database backup (once)
+
+Supabase Free keeps no backups; a GitHub Actions workflow takes one every night at 03:00 PKT
+(how it works and how to restore: `docs/10` "Backups and restore").
+
+1. On your laptop: `openssl rand -base64 32` → save it in your password manager as
+   **DishRank backup passphrase** first. Without it no backup can ever be read.
+2. github.com/JawadSarfraz/dishrank → Settings → Secrets and variables → Actions → **New repository
+   secret**:
+   - `PROD_DIRECT_URL` = the same value as Vercel's `DIRECT_URL` (session pooler, port 5432,
+     `?sslmode=require`).
+   - `BACKUP_PASSPHRASE` = the passphrase from step 1.
+3. Actions → **Database backup** → **Run workflow** → branch `main` → Run workflow. After a couple of
+   minutes: a green tick, and under Artifacts `dishrank-<date>T<time>Z`.
+4. Restore that backup once into a scratch database on your laptop (`docs/10`, six commands), then
+   drop it.
+5. GitHub → Settings → Notifications → Actions: e-mail on, failed workflows only. A failed backup
+   then sends you an e-mail.
+
 ## Updating an existing beta to Phase 6
 
 Do these in order; step 1 first, or the build stops at its environment check (the old version
@@ -221,5 +240,5 @@ keeps serving).
 - Invite someone: add the Gmail to `BETA_ALLOWED_EMAILS`, then Redeploy.
 - Go public: `SITE_MODE=live`, then Redeploy.
 - Supabase Free pauses a project after a week of low activity; if its warning e-mail arrives, open
-  the dashboard. Plan Pro (backups) before a wider launch.
+  the dashboard. Plan Pro (Supabase's own daily backups) before a wider launch.
 - Hobby is for non-commercial use: move Vercel to Pro before charging anyone.

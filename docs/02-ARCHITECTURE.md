@@ -183,6 +183,7 @@ flowchart LR
 dishrank/
 ├── CLAUDE.md
 ├── README.md
+├── .github/workflows/  ci.yml  db-backup.yml   # CI on every push and PR; daily encrypted database backup (docs/10 Backups)
 ├── .env.example
 ├── .nvmrc                           # 24 (Node.js 24 LTS; package.json engines "24.x")
 ├── package.json  pnpm-lock.yaml  tsconfig.json  next.config.ts  vercel.json
@@ -205,6 +206,7 @@ dishrank/
 │   ├── recompute-rankings.ts        # calls RankingService.recomputeAll()
 │   ├── prod-bootstrap.ts            # pnpm prod:bootstrap: migrate deploy, taxonomy seed, Overture sync on the shell's database, after typing its host
 │   ├── vercel-build.ts              # Vercel build: environment check (names only), prisma generate, prisma migrate deploy (production deployments only), then next build
+│   ├── db-backup.sh                 # daily backup (GitHub Actions): pg_dump of public, checked, gpg AES-256, decrypted and compared
 │   └── dev-demo.ts                  # pnpm dev:demo [-- --undo]: local demo data (local databases only)
 ├── src/
 │   ├── app/
