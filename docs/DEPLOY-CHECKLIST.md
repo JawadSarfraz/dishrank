@@ -186,6 +186,17 @@ blocks sign-in there).
    invalid, the build stops and lists only the names (never values), and the last good deployment
    keeps serving. Then add the variable and **Redeploy** the failed deployment.
 2. Push `main`. If the build fails, its log says why (Deployments → the deployment → Building).
+   When the deployment is ready, `https://<domain>/api/health` shows `{"ok":true}`.
+
+## Uptime monitor (once)
+
+1. Sign up with your own e-mail at a free uptime monitor, for example uptimerobot.com or
+   betterstack.com.
+2. New monitor → **HTTP(S)** → URL `https://<domain>/api/health`, method GET, interval 5 minutes
+   (1 minute if the plan allows), alert by e-mail when it is down (any status other than 200).
+3. Check: the monitor shows the site up, and the URL shows `{"ok":true}` in a browser.
+   A 503 means the database did not answer within 3 s: Vercel → Logs → `health.fail` says whether
+   it timed out or failed, and why (Hobby keeps an hour of logs).
 
 ## Updating an existing beta to Phase 6
 

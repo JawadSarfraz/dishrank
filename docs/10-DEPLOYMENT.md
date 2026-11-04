@@ -243,6 +243,17 @@ hand if needed. To run the recompute now: "Recompute now" on /admin/rankings.
 4. Smoke test: `/`, one ranking page, `/rate` sign-in, `/admin` role check.
 5. Tag `vX.Y.Z`.
 
+## Uptime monitor
+
+`GET https://<domain>/api/health` answers `200 {"ok":true}` when the database answers a trivial
+query within 3 s, otherwise `503 {"ok":false}`; the reason is only in the log (`health.fail`, with
+`timeout` or the database error). It needs no sign-in, is never cached, records no analytics event
+and allows each IP 12 checks a minute, far above a monitor's one. Point a free uptime monitor at it
+(for example UptimeRobot or Better Stack): an HTTP(S) check with GET (HEAD works too) every 1 to 5
+minutes, alerting by e-mail when the status is not 200. It catches a deployment that fails every
+request, a paused or unreachable Supabase project and a broken `DATABASE_URL`; it does not check
+pages, sign-in or the crons (their record is the JobRun list on /admin/rankings).
+
 ## Backups and safety
 
 - Supabase daily backups (Pro) or weekly `pg_dump` via a GitHub Action to a private bucket (Free has none).

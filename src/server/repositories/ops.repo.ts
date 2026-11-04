@@ -41,6 +41,11 @@ export async function finishJobRun(
   return db.jobRun.update({ where: { id }, data });
 }
 
+/** GET /api/health: the trivial query that shows the database answers. */
+export async function pingDatabase() {
+  await db.$queryRaw`SELECT 1`;
+}
+
 /**
  * Adds one hit to the bucket starting at `windowStart` and returns the hits of every bucket that
  * started after `since` (this one included). The CTE's insert is invisible to the outer SELECT, so

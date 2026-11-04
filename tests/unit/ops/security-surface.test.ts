@@ -80,7 +80,11 @@ describe("security surface (Phase 6)", () => {
         if (anonymousWrite && !/ipHash\(/.test(fn.body)) problems.push(`${file}: no IP limit`);
       }
       const get = exportedFunctions(source).find((f) => f.name === "GET");
-      if (get && !AUTH.test(get.body) && !/assertRateLimit\(/.test(get.body)) {
+      // The health check's limit runs inside its 3 s budget (checkHealth), keyed by the IP hash.
+      const healthCheck =
+        file.endsWith(path.join("api", "health", "route.ts")) &&
+        /checkHealth\(ipHash\(/.test(get?.body ?? "");
+      if (get && !AUTH.test(get.body) && !/assertRateLimit\(/.test(get.body) && !healthCheck) {
         problems.push(`${file}: public GET without a rate limit`);
       }
     }

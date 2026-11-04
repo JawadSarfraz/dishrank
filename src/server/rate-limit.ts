@@ -38,6 +38,9 @@ export const RATE_LIMITS = {
   /** `ip:{hash}:event`: ranking-page views the browser reports (light analytics, Phase 6). */
   // DECISION-PENDING: 300 an hour per IP: far above one person reading pages.
   event: { limit: 300, windowSeconds: 3600 },
+  /** `ip:{hash}:health`: GET /api/health, an uptime monitor's check. */
+  // DECISION-PENDING: 12 a minute per IP, one every 5 s; a monitor checks once a minute.
+  health: { limit: 12, windowSeconds: 60 },
   /** `ip:{hash}:dispute`: the /dispute form, open to anyone. */
   // Decided 2026-11-04: docs/06 has no key for disputes; 5 a day per IP.
   dispute: { limit: 5, windowSeconds: 86_400 },

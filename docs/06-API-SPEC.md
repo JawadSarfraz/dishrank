@@ -29,6 +29,7 @@ Auth: Better Auth session cookie (database session). Roles enforced server-side.
 | `ip:{hash}:api` | 600 / hour (public GETs) |
 | `ip:{hash}:dispute` | 5 / day, the /dispute form (DECISION-PENDING) |
 | `ip:{hash}:event` | 300 / hour, ranking-page views reported by the browser (Phase 6, DECISION-PENDING) |
+| `ip:{hash}:health` | 12 / min, `GET /api/health` for an uptime monitor (DECISION-PENDING) |
 | `user:{id}:admin-write` | 600 / hour (every admin write: import create/link/skip/reopen, add, edit, status, merge, review decisions, panel toggle) |
 
 Exceeding → `429 { error: { code: "RATE_LIMITED" } }`. The nightly job deletes buckets older than 2 days (twice the longest window). Windows roll: hits are counted in buckets of max(5 s, window / 12), so a daily key frees up over 22–24 h. Every call that reaches a check counts, also one that a later check refuses. Rating keys: every submission counts, new or edited (docs/04 abuse control 2); a rating that adds the dish row does not spend `add-dish`, which only `POST /api/v1/restaurant-dishes` spends when it creates a row.
@@ -137,6 +138,11 @@ Panel members only (`403 PANEL_ONLY`, read from the database): `{ restaurantId, 
 - `POST /api/v1/admin/rankings/recompute` — `recomputeAll()`. Phase 4 builds it as the server action `recomputeNowAction` on /admin/rankings (no JSON route yet, as AP-07): it waits for the run and returns `{ jobRunId, ok, summary }`; `409 JOB_RUNNING` while another run is going. Then every page is revalidated.
 - `POST /api/v1/admin/cities/:slug/launch` — sets `City.launchedAt = now()` once (launch day); bootstrap mode applies while it is NULL and for 60 days after. Phase 4 builds it as the server action `launchCityAction { city }` (confirm dialog): an unknown city → `404 CITY_NOT_FOUND`, one launched already → `409 CITY_LAUNCHED`. Limit for both: `user:{id}:admin-write`.
 - `/admin/import` review of Overture candidates (server actions in `src/server/actions/admin-import.ts`; no JSON route yet; docs/07 §2). The page reads `?city=&area=<slug>|none&show=new|skipped|done`. Create `createFromCandidateAction { candidateId, name, areaId, address, phone?, website?, priceBand?, aliases?, dishSlugs? }` (the location comes from the candidate, never from the client) → `{ restaurant, dishesAdded }`; Link `linkCandidateAction { candidateId, restaurantId }` → `{ restaurant, citySlug, overtureIdSet, locationSet }`; Skip `skipCandidateAction { candidateId, reason?: CLOSED|DUPLICATE|NOT_A_RESTAURANT }`; Reopen `reopenCandidateAction { candidateId }`. A candidate that is not `NEW` (not `SKIPPED` for Reopen) answers `409 CANDIDATE_REVIEWED` (`CANDIDATE_NOT_SKIPPED`).
+
+## Health (no auth)
+
+### `GET /api/health` (uptime monitor)
+→ `200 {"ok":true}` when a trivial database query (`SELECT 1`) answers within 3 s, otherwise `503 {"ok":false}`; past the limit `429 {"ok":false}`. The rate-limit write and the query share the 3 s, so the answer comes after about 3 s at most. Nothing else in the answer: the reason of a 503 is logged (`health.fail`: `timeout`, or `database` with the error). `Cache-Control: no-store`, no sign-in, outside `/api/v1`, never counted in analytics. HEAD works too (Next.js answers it from GET). Limit: `ip:{hash}:health`.
 
 ## Cron (Bearer CRON_SECRET)
 
