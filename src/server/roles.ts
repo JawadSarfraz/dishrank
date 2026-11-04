@@ -64,10 +64,13 @@ export function safeCallbackPath(value: unknown): string {
 
 /**
  * Where /sign-in sends a visitor who is signed in already: the callbackUrl when it is a path on
- * this site (safeCallbackPath), home otherwise, and never /sign-in itself (one hop, no loop).
+ * this site (safeCallbackPath), home otherwise, and never /sign-in itself (one hop, no loop). The
+ * path goes through the URL parser as a browser would read it: non-ASCII is percent-encoded (a
+ * Location header takes Latin-1 only) and dot segments are resolved, then it is checked again
+ * ("/.//x" resolves to "//x", which is refused).
  */
 export function signedInRedirectPath(value: unknown): string {
-  const path = safeCallbackPath(value);
-  const pathname = path.split(/[?#]/, 1)[0];
-  return pathname === "/sign-in" || pathname === "/sign-in/" ? "/" : path;
+  const url = new URL(safeCallbackPath(value), PARSER_ORIGIN);
+  if (url.pathname === "/sign-in" || url.pathname === "/sign-in/") return "/";
+  return safeCallbackPath(`${url.pathname}${url.search}${url.hash}`);
 }

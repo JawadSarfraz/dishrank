@@ -88,5 +88,19 @@ describe("helpers", () => {
     expect(signedInRedirectPath("/sign-in?callbackUrl=%2Fme")).toBe("/");
     expect(signedInRedirectPath("/sign-in/")).toBe("/");
     expect(signedInRedirectPath("/sign-in-help")).toBe("/sign-in-help");
+    expect(signedInRedirectPath("/me?next=%2F%2Fok")).toBe("/me?next=%2F%2Fok");
+  });
+
+  it("reads the callbackUrl as a browser would: dot segments resolved, non-ASCII encoded", () => {
+    // Back to /sign-in or out to another site through dot segments: home.
+    expect(signedInRedirectPath("/x/../sign-in?callbackUrl=%2Fme")).toBe("/");
+    expect(signedInRedirectPath("/x/%2e%2e/sign-in")).toBe("/");
+    expect(signedInRedirectPath("/sign-in/.")).toBe("/");
+    expect(signedInRedirectPath("/.//evil.example")).toBe("/");
+    expect(signedInRedirectPath("/x/..//evil.example")).toBe("/");
+    // A Location header takes Latin-1 only: Urdu letters and U+FFFD (a broken %XX) are encoded.
+    expect(signedInRedirectPath("/\u0643")).toBe("/%D9%83");
+    expect(signedInRedirectPath("/rate?d=\u0643")).toBe("/rate?d=%D9%83");
+    expect(signedInRedirectPath("/\uFFFD")).toBe("/%EF%BF%BD");
   });
 });
