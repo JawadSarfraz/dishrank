@@ -23,6 +23,11 @@ export function blankToUndefined(value: unknown): unknown {
   return value;
 }
 
+/** Form values where "" (or only spaces) means "clear it": null. */
+export function blankToNull(value: unknown): unknown {
+  return typeof value === "string" && value.trim() === "" ? null : value;
+}
+
 export function optionalQuery<T extends z.ZodType>(schema: T) {
   return z.preprocess(blankToUndefined, schema.optional());
 }

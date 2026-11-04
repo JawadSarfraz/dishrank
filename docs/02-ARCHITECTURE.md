@@ -143,16 +143,21 @@ stateDiagram-v2
   CANDIDATE --> USER_CONFIRMED: 3 distinct raters
   CANDIDATE --> MENU_VERIFIED: menu item matched at conf 0.85 or more, or admin
   USER_CONFIRMED --> MENU_VERIFIED: menu item matched
-  USER_CONFIRMED --> OWNER_VERIFIED: owner confirms
-  MENU_VERIFIED --> OWNER_VERIFIED: owner confirms
+  CANDIDATE --> OWNER_VERIFIED: owner confirms or fixes name/price
+  USER_CONFIRMED --> OWNER_VERIFIED: owner confirms or fixes name/price
+  MENU_VERIFIED --> OWNER_VERIFIED: owner confirms or fixes name/price
+  STALE --> OWNER_VERIFIED: owner confirms
   CANDIDATE --> STALE: 9 months, no rating/verification
   USER_CONFIRMED --> STALE: 9 months, no rating/verification
   MENU_VERIFIED --> STALE: 12 months, no rating/verification
   OWNER_VERIFIED --> STALE: 12 months, no rating/verification
   STALE --> USER_CONFIRMED: new rating
   USER_CONFIRMED --> REMOVED: 3 upheld not-served flags
+  CANDIDATE --> REMOVED: owner removes
+  USER_CONFIRMED --> REMOVED: owner removes
   MENU_VERIFIED --> REMOVED: owner/admin removes
   OWNER_VERIFIED --> REMOVED: owner/admin removes
+  STALE --> REMOVED: owner removes
   REMOVED --> [*]
 ```
 
@@ -213,7 +218,7 @@ dishrank/
 │   │   │   ├── rate/page.tsx                    # rating flow
 │   │   │   ├── me/page.tsx
 │   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=)
-│   │   ├── owner/  (layout.tsx and every page call requirePageRole)  claim/  restaurants/[id]/
+│   │   ├── owner/  (layout.tsx and every page call requirePageRole)  page.tsx (your restaurants)  restaurants/[id]/ (dishes, menu upload, weekly report); claims are filed on the restaurant page
 │   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  menus/ (menus/[id]: photo + items)  restaurants/  users/  rankings/
 │   │   ├── api/
 │   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ reports/ disputes/ uploads/ owner/ admin/  (flags/: Phase 5)
@@ -254,7 +259,7 @@ dishrank/
 │   │   │   ├── overture/           # places.ts (filters, area), duplicates.ts, dish-hints.ts (pure)
 │   │   │   ├── overture-sync.service.ts  data-credits.ts
 │   │   │   ├── menu.service.ts  menu-access.ts  # menu uploads, parse (vision + matching), nightly parse, upload page; who may upload
-│   │   │   ├── claim.service.ts
+│   │   │   ├── claim.service.ts  owner.service.ts  # claims (any signed-in user) and their decision; the owner area
 │   │   │   └── review.service.ts  review-fingerprint.ts
 │   │   ├── repositories/           # *.repo.ts, Prisma only (public.repo: public pages; nightly.repo: recomputeAll SQL)
 │   │   ├── vision/                 # parseMenu.ts (prompt, docs/07 schema, structured output), menu-items.ts (answer → items, prices)

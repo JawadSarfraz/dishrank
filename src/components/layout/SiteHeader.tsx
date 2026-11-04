@@ -13,6 +13,9 @@ export function SiteHeader({ beta }: { beta: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data, isPending } = authClient.useSession();
+  // The role the server stored (Better Auth additional field); it only picks which links show,
+  // every page and action checks it again on the server.
+  const role = (data?.user as { role?: string } | undefined)?.role;
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState(false);
 
@@ -43,6 +46,16 @@ export function SiteHeader({ beta }: { beta: boolean }) {
         <Link href="/me" className={linkClass}>
           My ratings
         </Link>
+        {role === "OWNER" && (
+          <Link href="/owner" className={linkClass}>
+            Owner
+          </Link>
+        )}
+        {role === "ADMIN" && (
+          <Link href="/admin" className={linkClass}>
+            Admin
+          </Link>
+        )}
         <span className="ml-auto inline-flex min-w-14 justify-end">
           {isPending ? null : data ? (
             <button

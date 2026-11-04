@@ -11,6 +11,7 @@ import {
   ReviewItemType,
 } from "@/generated/prisma/enums";
 import {
+  blankToNull,
   id,
   latitude,
   longitude,
@@ -136,6 +137,18 @@ export const uploadSignInput = z
     path: ["restaurantId"],
   });
 export type UploadSignInput = z.infer<typeof uploadSignInput>;
+
+/** An owner's change to one dish row of their restaurant (docs/07 §4, Phase 6). */
+export const ownerDishInput = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("confirm") }),
+  z.strictObject({ action: z.literal("remove"), reason: optionalText(280) }),
+  z.strictObject({
+    action: z.literal("edit"),
+    menuName: z.preprocess(blankToNull, text(120).nullable()),
+    price: z.preprocess(blankToNull, z.coerce.number().int().min(1).max(1_000_000).nullable()),
+  }),
+]);
+export type OwnerDishInput = z.infer<typeof ownerDishInput>;
 
 /** POST /api/v1/events: a ranking page reports one view (city and dish only, Phase 6). */
 export const rankingViewInput = z.strictObject({

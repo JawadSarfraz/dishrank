@@ -157,8 +157,15 @@ Cost: a 1600 px photo is ≈ 2.5–3k input tokens and a few hundred output toke
 2. On /admin/review the admin verifies by calling the restaurant's own number or checking its official page, then:
    - **Approve**: `Restaurant.claimedByUserId` and `claimedAt` are set, `OwnerClaim` becomes APPROVED (with `reviewedByUserId`, `reviewedAt`), a USER becomes OWNER (an ADMIN keeps ADMIN). That user can no longer rate the restaurant, and their earlier ratings there stop counting (docs/04 control 1; the rows are recomputed). The restaurant row is locked first, so a rating in flight finishes before and every later one sees the owner.
    - **Reject** with a reason (required), shown to the claimant on /me.
-3. Approved owner can: confirm dishes (→ `OWNER_VERIFIED`), remove dishes (→ `REMOVED`, logged), fix menu names/prices, upload menus, view the basic report.
-4. Owners cannot see who rated, cannot edit or hide ratings, cannot change scores.
+3. The owner area, `/owner` (OWNER or ADMIN; an owner opens only restaurants whose `claimedByUserId` is theirs, anything else answers 404; an admin may open any), `src/server/services/owner.service.ts`:
+   - **Confirm** a dish (`CANDIDATE`, `USER_CONFIRMED`, `MENU_VERIFIED` or `STALE` → `OWNER_VERIFIED`, `lastVerifiedAt` now).
+   - **Fix the name and price** on their menu: `menuName` (≤ 120) and `price` (PKR), which also makes it `OWNER_VERIFIED`, so a later menu photo never overwrites them (§3).
+   - **Remove** a dish they do not serve (→ `REMOVED`, logged as `owner.dish.remove` with the optional reason); only an admin brings it back.
+   - **Upload menus** (the same button as on the restaurant page).
+   - **Report**: per dish its status, score, votes and city rank now, and its rank, score and votes in each weekly `RankingSnapshot` of the last 12 weeks ("not ranked" when it was not in that week's top 50).
+
+   Every change share-locks the restaurant, then the row, and recomputes the row after commit (its status decides eligibility); limit `user:{id}:owner-write` 200/hour.
+4. Owners cannot see who rated, cannot edit or hide ratings, cannot change scores, and cannot rate their own restaurant; their ratings given there before the claim stop counting (docs/04 control 1).
 
 ## 5. Freshness and hygiene jobs (nightly recompute, docs/04)
 

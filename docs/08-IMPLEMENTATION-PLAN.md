@@ -97,7 +97,7 @@ Acceptance
 ## Phase 6 — Owner area + hardening + launch (8–10 h)
 
 Tasks
-- Claim flow + admin approval; owner dishes page (confirm/remove/edit); basic report page
+- Claim flow + admin approval; owner dishes page (confirm/remove/edit); basic report page (built 2026-11-04: claims on the restaurant page, /owner, weekly snapshot report)
 - Security pass: role checks in every action/handler, CSRF (server actions), input limits, storage path validation, headers (CSP basic), dependency audit
 - Performance pass: bundle check, image sizes, DB indexes verified with `EXPLAIN` on the ranking query
 - Analytics: a tiny event table, no third-party tracker (owner, 2026-11-04: no Vercel Analytics): `rating_submitted`, `search`, `ranking_view` with city and dish only, weekly counts on /admin/analytics (built)
