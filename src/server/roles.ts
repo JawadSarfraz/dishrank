@@ -61,3 +61,13 @@ export function safeCallbackPath(value: unknown): string {
     return "/";
   }
 }
+
+/**
+ * Where /sign-in sends a visitor who is signed in already: the callbackUrl when it is a path on
+ * this site (safeCallbackPath), home otherwise, and never /sign-in itself (one hop, no loop).
+ */
+export function signedInRedirectPath(value: unknown): string {
+  const path = safeCallbackPath(value);
+  const pathname = path.split(/[?#]/, 1)[0];
+  return pathname === "/sign-in" || pathname === "/sign-in/" ? "/" : path;
+}

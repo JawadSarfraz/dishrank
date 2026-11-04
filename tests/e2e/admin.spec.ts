@@ -31,6 +31,24 @@ test("admin and owner pages refuse visitors without the role", async ({
   }
 });
 
+// /sign-in while signed in: straight on to a same-site callbackUrl, else home; never another site.
+test("a signed-in visitor on /sign-in goes on to the callbackUrl", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await page.goto("/sign-in?callbackUrl=%2Fme");
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  const { cookie }: E2EFixture = JSON.parse(readFileSync(E2E.fixtureFile, "utf8"));
+  await context.addCookies([{ ...cookie, url: baseURL! }]);
+  await page.goto("/sign-in?callbackUrl=%2Fme");
+  await expect(page).toHaveURL(`${baseURL}/me`);
+  await page.goto("/sign-in?callbackUrl=https%3A%2F%2Fevil.example%2F");
+  await expect(page).toHaveURL(`${baseURL}/`);
+  await page.goto("/sign-in");
+  await expect(page).toHaveURL(`${baseURL}/`);
+});
+
 // Phase 5 acceptance: an unmatched menu item is assigned in one tap, and the upload is done when
 // every item is decided.
 test("an admin assigns a menu item's suggested dish in one tap", async ({

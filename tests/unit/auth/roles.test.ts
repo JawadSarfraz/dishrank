@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { AppError } from "@/server/errors";
-import { assertRole, hasRole, safeCallbackPath, toRole, type SessionUser } from "@/server/roles";
+import {
+  assertRole,
+  hasRole,
+  safeCallbackPath,
+  signedInRedirectPath,
+  toRole,
+  type SessionUser,
+} from "@/server/roles";
 import { getAdminOverview } from "@/server/services/admin.service";
 
 const user = (role: SessionUser["role"]): SessionUser => ({
@@ -68,5 +75,18 @@ describe("helpers", () => {
     expect(safeCallbackPath("/%2F%2Fevil.example")).toBe("/");
     expect(safeCallbackPath("/x%5cy")).toBe("/");
     expect(safeCallbackPath("/me?next=%2F%2Fok")).toBe("/me?next=%2F%2Fok"); // only the path is checked
+  });
+
+  it("sends a signed-in visitor of /sign-in on to a same-site callbackUrl, else home, never back", () => {
+    expect(signedInRedirectPath("/rate?city=islamabad")).toBe("/rate?city=islamabad");
+    expect(signedInRedirectPath("/admin/import")).toBe("/admin/import");
+    expect(signedInRedirectPath("https://evil.example/x")).toBe("/");
+    expect(signedInRedirectPath("//evil.example")).toBe("/");
+    expect(signedInRedirectPath("/\\evil.example")).toBe("/");
+    expect(signedInRedirectPath(["/me", "/rate"])).toBe("/"); // a repeated parameter
+    expect(signedInRedirectPath(undefined)).toBe("/");
+    expect(signedInRedirectPath("/sign-in?callbackUrl=%2Fme")).toBe("/");
+    expect(signedInRedirectPath("/sign-in/")).toBe("/");
+    expect(signedInRedirectPath("/sign-in-help")).toBe("/sign-in-help");
   });
 });

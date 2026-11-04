@@ -221,7 +221,7 @@ dishrank/
 │   │   ├── (app)/                           # layout.tsx: the same footer
 │   │   │   ├── rate/page.tsx                    # rating flow
 │   │   │   ├── me/page.tsx
-│   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=)
+│   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=); a signed-in visitor goes straight on to it (same-site paths only) or home
 │   │   ├── owner/  (layout.tsx and every page call requirePageRole)  page.tsx (your restaurants)  restaurants/[id]/ (dishes, menu upload, weekly report); claims are filed on the restaurant page
 │   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  menus/ (menus/[id]: photo + items)  restaurants/  users/  rankings/
 │   │   ├── api/

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { SignInButton } from "@/components/auth/SignInButton";
-import { googleSignInEnabled } from "@/server/auth";
-import { safeCallbackPath } from "@/server/roles";
+import { getSessionUser, googleSignInEnabled } from "@/server/auth";
+import { safeCallbackPath, signedInRedirectPath } from "@/server/roles";
 
 export const metadata: Metadata = { title: "Sign in · DishRank", robots: { index: false } };
 
@@ -16,6 +17,8 @@ function errorText(code: string | string[] | undefined): string | null {
 
 export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   const { callbackUrl, error } = await searchParams;
+  // Signed in already: straight on to where sign-in would have led (a path on this site, or home).
+  if (await getSessionUser()) redirect(signedInRedirectPath(callbackUrl));
   const callbackURL = safeCallbackPath(callbackUrl);
   const problem = errorText(error);
 
