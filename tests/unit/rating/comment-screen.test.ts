@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { screenComment } from "@/server/services/comment-screen";
+import { hasBlockedWords, screenComment } from "@/server/services/comment-screen";
 
 describe("comment screening (docs/04 abuse control 5)", () => {
   it("holds phone numbers in any common format, Urdu digits included", () => {
@@ -125,5 +126,38 @@ describe("comment screening (docs/04 abuse control 5)", () => {
       expect(screenComment(c), c).toBeNull();
     }
     expect(screenComment(null)).toBeNull();
+  });
+
+  it("holds comments with blocklisted words or phrases, however they are spelt (config/comment-blocklist.json)", () => {
+    for (const comment of [
+      "Fuuuck, so slow",
+      "fuck1ng cold naan",
+      "The waiter was a BASTARD",
+      "Bhen-chod service",
+      "ullu ka pattha manager",
+      "Khana tatti tha",
+      "S.o.n of a bitch",
+    ]) {
+      expect(screenComment(comment), comment).toBe("BLOCKLIST");
+    }
+    for (const comment of [
+      "Maa ki daal was great",
+      "Shitake mushroom soup was fine",
+      "Class act, glass of lassi",
+      "Kuttay wali gali mein hai", // a phrase entry needs every word
+      "Good karahi, good price",
+      "Assessment: 9/10",
+    ]) {
+      expect(screenComment(comment), comment).toBeNull();
+    }
+  });
+
+  it("no blocklist entry is a dish name or one of its spellings", () => {
+    const dishes = JSON.parse(readFileSync("seed/dishes.json", "utf8")) as {
+      name: string;
+      aliases: string[];
+    }[];
+    const spellings = dishes.flatMap((d) => [d.name, ...d.aliases]);
+    expect(spellings.filter((s) => hasBlockedWords(s))).toEqual([]);
   });
 });

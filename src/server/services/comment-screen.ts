@@ -1,9 +1,43 @@
 // docs/04 abuse control 5: a comment with a phone number, a link or an email address (or a word on
 // the blocklist) holds its rating for review. Pure; RatingService applies it.
+import blocklist from "../../../config/comment-blocklist.json";
 
-/** Words that hold a comment for review. */
-// DECISION-PENDING: docs/04 mentions a blocklist but defines no words; empty until the owner adds some.
-export const COMMENT_BLOCKLIST: readonly string[] = [];
+/**
+ * Words for blocklist matching: lowercase, accents dropped, look-alike digits and symbols folded
+ * (0→o, 1→i, 3→e, 4→a, 5→s, 7→t, @→a, $→s) and letters repeated in a row counted once, so one
+ * spelling covers "Fuuuck", "f0ck" and "bullshit"/"bulshit". Split on anything that is not a letter.
+ */
+export function blocklistTokens(text: string): string[] {
+  const folded = text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .replace(
+      /[013457@$]/g,
+      (c) => ({ "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", $: "s" })[c]!,
+    )
+    .replace(/(\p{L})\1+/gu, "$1");
+  return folded.split(/[^\p{L}]+/u).filter(Boolean);
+}
+
+/**
+ * Words and phrases that hold a comment for review (owner, 2026-11-04): config/comment-blocklist.json,
+ * which the owner edits (redeploy to apply). Each entry as tokens, matched as whole words in a row.
+ */
+export const COMMENT_BLOCKLIST: readonly (readonly string[])[] = [
+  ...blocklist.words,
+  ...blocklist.phrases,
+]
+  .map(blocklistTokens)
+  .filter((tokens) => tokens.length > 0);
+
+/** Whether the text contains a blocklist entry as whole words in a row. */
+export function hasBlockedWords(text: string): boolean {
+  const words = blocklistTokens(text);
+  return COMMENT_BLOCKLIST.some((entry) =>
+    words.some((_, i) => entry.every((token, j) => words[i + j] === token)),
+  );
+}
 
 export type CommentFlag = "PHONE" | "LINK" | "EMAIL" | "BLOCKLIST";
 
@@ -150,7 +184,6 @@ export function screenComment(comment: string | null | undefined): CommentFlag |
   if (SCHEME_OR_WWW.test(text) || DOMAIN_WITH_PATH.test(text) || BARE_DOMAIN.test(text)) {
     return "LINK";
   }
-  const words = text.toLowerCase().split(/[^\p{L}\p{N}]+/u);
-  if (COMMENT_BLOCKLIST.some((w) => words.includes(w.toLowerCase()))) return "BLOCKLIST";
+  if (hasBlockedWords(text)) return "BLOCKLIST";
   return null;
 }

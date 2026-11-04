@@ -193,7 +193,9 @@ dishrank/
 │   ├── migrations/
 │   └── seed.ts                      # loads seed/*.json
 ├── seed/
-│   ├── cities.json  areas.json  dishes.json  dish-categories.json  variant-tags.json  meat-words.json
+│   ├── cities.json  areas.json (with radiusKm)  dishes.json  dish-categories.json  variant-tags.json  meat-words.json
+├── config/
+│   └── comment-blocklist.json       # abusive words and phrases that hold a comment for review; the owner edits it
 ├── docs/                            # the planning kit (specs, plans, prompts)
 ├── scripts/
 │   ├── overture-sync.ts             # stage Overture places as OvertureCandidate rows (docs/07 §1)
