@@ -1,5 +1,6 @@
 // pnpm dev:demo writes demo data only into a database on this machine. Pure checks, with no
 // database import, so scripts/dev-demo.ts runs them before anything connects.
+import { devOnlyRefusal } from "@/lib/dev-only";
 import { AppError } from "@/server/errors";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -15,8 +16,8 @@ function refuse(reason: string): never {
  * the log line: host and database name, never credentials.
  */
 export function assertLocalDatabase(env: Readonly<Record<string, string | undefined>>) {
-  if (env.NODE_ENV === "production") refuse("NODE_ENV is production");
-  if (env.VERCEL || env.VERCEL_ENV) refuse("this is a Vercel environment");
+  const devOnly = devOnlyRefusal(env);
+  if (devOnly) refuse(devOnly);
   if (!env.DATABASE_URL) refuse("DATABASE_URL is not set (or src/env.ts rejected it)");
   let target: { host: string; database: string } | null = null;
   for (const name of ["DATABASE_URL", "DIRECT_URL"] as const) {

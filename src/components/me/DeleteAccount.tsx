@@ -18,7 +18,7 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
       try {
         const res = await deleteAccountAction({ confirm });
         if (res.error) setError(describeActionError(res.error));
-        else window.location.assign("/");
+        else window.location.replace(window.location.origin);
       } catch {
         setError("The request did not reach us. Try again.");
       }

@@ -8,6 +8,7 @@ import { resolve } from "node:path";
 import areas from "../../seed/areas.json";
 import dishes from "../../seed/dishes.json";
 import { cleanText, indexOfPhrase, tokenize } from "@/server/services/matching/normalize";
+import { devOnlyRefusal } from "@/lib/dev-only";
 import { RELEASE_PATTERN } from "@/server/services/overture/places";
 import {
   KM_PER_DEGREE,
@@ -813,6 +814,8 @@ async function analyse(
 }
 
 async function main() {
+  const refused = devOnlyRefusal(process.env);
+  if (refused) throw new Error(`research:overture is dev-only and refused: ${refused}`);
   const release = arg("release") ?? (await latestRelease());
   if (!RELEASE_PATTERN.test(release)) throw new Error(`bad release: ${release}`);
   const marginKm = Number(arg("margin-km") ?? 3);

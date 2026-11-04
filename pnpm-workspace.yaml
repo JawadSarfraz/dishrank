@@ -5,3 +5,10 @@ allowBuilds:
   esbuild: true # native binary used by tsx and Vitest
   sharp: false # prebuilt binaries come from optional deps
   unrs-resolver: false # prebuilt binaries come from optional deps
+
+# Security pass (Phase 6): patched versions of dependencies of build-time tools (shadcn's CLI
+# brings express and minimatch; nothing at runtime uses them). Drop an entry once the parent
+# package ships the patched version itself.
+overrides:
+  body-parser: ">=2.4.0"
+  minimatch@<11.0.1: ">=11.0.1"

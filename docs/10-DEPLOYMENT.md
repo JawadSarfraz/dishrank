@@ -209,6 +209,13 @@ script refuses two URLs that point at different projects or databases, and URL p
 would connect elsewhere (`user=`, `port=`, `host=` and the like). It never creates demo or fake
 data, and every step is safe to run again.
 
+## Dependency audit
+
+`pnpm audit` must show no high or critical advisory (docs/11). On 2026-11-04 it showed one high
+(body-parser) and one moderate (minimatch), both pulled in only by the `shadcn` CLI's tooling;
+`overrides` in `pnpm-workspace.yaml` pins their patched versions (drop each entry once the parent
+ships it). One low remains (deepmerge, no patched version, also via `shadcn`).
+
 ## Crons (`vercel.json`)
 
 `0 21 * * *` is in UTC: 21:00 UTC = 02:00 PKT (Pakistan has no daylight saving). On Hobby a daily

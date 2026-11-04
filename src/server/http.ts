@@ -31,9 +31,19 @@ export async function readJson(request: Request): Promise<unknown> {
   if (!/^application\/json\b/i.test(type)) {
     throw new AppError("UNSUPPORTED_MEDIA_TYPE", "Send JSON (Content-Type: application/json)", 415);
   }
+  // Every JSON body of this API is a small form; a bigger one is refused before it is parsed.
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_JSON_BYTES) throw tooLarge();
+  const text = await request.text();
+  if (Buffer.byteLength(text) > MAX_JSON_BYTES) throw tooLarge();
   try {
-    return await request.json();
+    return JSON.parse(text);
   } catch {
     throw new AppError("INVALID_JSON", "The body is not valid JSON", 400);
   }
 }
+
+/** The largest JSON body a write accepts (Phase 6 security pass). */
+export const MAX_JSON_BYTES = 32 * 1024;
+
+const tooLarge = () => new AppError("PAYLOAD_TOO_LARGE", "The body is too large", 413);

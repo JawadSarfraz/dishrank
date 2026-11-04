@@ -32,9 +32,12 @@ describe("SITE_MODE (private beta)", () => {
   it("next.config.ts sends X-Robots-Tag on every path in a production build unless SITE_MODE=live", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("SITE_MODE", "");
-    expect(await nextConfig.headers!()).toEqual(siteModeHeaders("beta"));
+    // Security headers come first on every path (security-surface.test.ts); here only the robots one.
+    const robots = async () =>
+      (await nextConfig.headers!()).filter((h) => h.headers.some((x) => x.key === "X-Robots-Tag"));
+    expect(await robots()).toEqual(siteModeHeaders("beta"));
     vi.stubEnv("SITE_MODE", "live");
-    expect(await nextConfig.headers!()).toEqual([]);
+    expect(await robots()).toEqual([]);
   });
 
   it("beta: only verified, invited Google accounts and the admin get an account; live: anyone", () => {
