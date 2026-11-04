@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   mergeRestaurantAction,
+  removeRestaurantOwnerAction,
   setRestaurantStatusAction,
   updateRestaurantAction,
 } from "@/server/actions/admin-restaurants";
@@ -276,6 +277,74 @@ export function MergeRestaurantDialog({
             {error}
           </p>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** "Remove owner" (/admin/restaurants): the restaurant is unclaimed; the reason is required and logged. */
+export function RemoveOwnerDialog({
+  restaurant,
+  owner,
+}: {
+  restaurant: { id: string; name: string };
+  owner: { id: string; name: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reason = String(new FormData(event.currentTarget).get("reason") ?? "");
+    startTransition(async () => {
+      const res = await removeRestaurantOwnerAction(restaurant.id, { ownerId: owner.id, reason });
+      if (res.error) {
+        setError(describeActionError(res.error));
+        return;
+      }
+      setOpen(false);
+    });
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setError(null);
+      }}
+    >
+      <DialogTrigger render={<Button variant="outline" />}>Remove owner</DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Remove {owner.name} as owner</DialogTitle>
+          <DialogDescription>
+            {restaurant.name} will have no owner. {owner.name} loses the owner area unless they
+            manage another restaurant, may rate {restaurant.name} again, and their earlier ratings
+            there count again.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            Reason (required, logged)
+            <textarea
+              name="reason"
+              required
+              maxLength={500}
+              rows={3}
+              className="rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+            />
+          </label>
+          <Button type="submit" variant="destructive" disabled={pending} className="self-start">
+            {pending ? "Removing…" : "Remove owner"}
+          </Button>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </form>
       </DialogContent>
     </Dialog>
   );

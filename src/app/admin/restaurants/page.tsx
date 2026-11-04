@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RemoveOwnerDialog } from "@/components/admin/RestaurantForms";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,17 @@ export default async function AdminRestaurantsPage({
               {r.source === "OVERTURE" ? "from Overture" : "added by hand"} ·{" "}
               {r.lat === null ? "no location" : "location set"} · {r.slug}
             </span>
+            {r.claimedBy && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span>
+                  Owner: {r.claimedBy.name} ({r.claimedBy.email})
+                </span>
+                <RemoveOwnerDialog
+                  restaurant={{ id: r.id, name: r.name }}
+                  owner={{ id: r.claimedBy.id, name: r.claimedBy.name }}
+                />
+              </div>
+            )}
           </li>
         ))}
         {items.length === 0 && <li className="p-3 text-sm">No restaurants match.</li>}

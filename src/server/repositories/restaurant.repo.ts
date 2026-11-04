@@ -171,6 +171,7 @@ export async function listRestaurantsPage(input: {
         lat: true,
         city: { select: { slug: true, name: true } },
         area: { select: { name: true } },
+        claimedBy: { select: { id: true, name: true, email: true } },
         _count: { select: { dishes: true } },
       },
     }),

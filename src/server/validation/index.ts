@@ -12,6 +12,7 @@ import {
 } from "@/generated/prisma/enums";
 import {
   blankToNull,
+  blankToUndefined,
   id,
   latitude,
   longitude,
@@ -358,6 +359,19 @@ export const restaurantStatusInput = z.strictObject({
   status: z.enum(["ACTIVE", "CLOSED", "HIDDEN"]),
 });
 export type RestaurantStatusInput = z.infer<typeof restaurantStatusInput>;
+
+/**
+ * "Remove owner" on /admin/restaurants: `ownerId` is the owner the page showed (another one by now
+ * answers ITEM_CHANGED), and the reason is required (it is logged).
+ */
+export const ownerRemoveInput = z.strictObject({
+  ownerId: id,
+  reason: z.preprocess(
+    blankToUndefined,
+    z.string({ error: "Say why the owner is removed" }).trim().min(1).max(500),
+  ),
+});
+export type OwnerRemoveInput = z.infer<typeof ownerRemoveInput>;
 
 /** PATCH /api/v1/admin/restaurants/:id { mergeIntoId }: this restaurant becomes a duplicate of that one. */
 export const restaurantMergeInput = z.strictObject({ mergeIntoId: id });

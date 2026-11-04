@@ -2,7 +2,8 @@
 // note → OwnerClaim PENDING + ReviewItem OWNER_CLAIM. An admin checks by phone, then approves
 // (claimedByUserId set, role OWNER for a USER; the owner can no longer rate there and their earlier
 // ratings there stop counting) or rejects with a reason the claimant sees on /me. Decisions run in
-// review.service (decideOwnerClaimTx below) under the restaurant's row lock.
+// review.service (decideOwnerClaimTx below) under the restaurant's row lock. Later an admin may
+// remove the owner again (removeRestaurantOwner, /admin/restaurants).
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
@@ -14,11 +15,19 @@ import {
   listClaimsOfUser,
   updateOwnerClaim,
 } from "@/server/repositories/moderation.repo";
-import { findRestaurantById, updateRestaurantById } from "@/server/repositories/restaurant.repo";
+import { countRestaurantsManagedBy } from "@/server/repositories/owner.repo";
+import { listRowsRatedByUserAt } from "@/server/repositories/rating.repo";
+import { listDishPagesOfRows } from "@/server/repositories/restaurant-dish.repo";
+import {
+  findRestaurantById,
+  lockRestaurants,
+  updateRestaurantById,
+} from "@/server/repositories/restaurant.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
-import { findRater, findUserRole, updateUserById } from "@/server/repositories/user.repo";
+import { findRater, findUserRole, lockUser, updateUserById } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
-import type { ClaimInput } from "@/server/validation";
+import type { ClaimInput, OwnerRemoveInput } from "@/server/validation";
+import { recomputeEach } from "./ranking.service";
 
 export type ClaimPayload = { claimId: string; phone: string; proofNote: string | null };
 
@@ -77,10 +86,18 @@ export async function submitClaim(
   return { id: claim.id, status: claim.status, duplicate: false };
 }
 
-/** /me: the user's claims with their status and, for a rejection, the admin's reason. */
+/**
+ * /me: the user's claims with their status and, for a rejection, the admin's reason. `managing`:
+ * approved, and the restaurant is still theirs (an admin may have removed them as its owner).
+ */
 export async function listMyClaims(actor: SessionUser | null) {
   const user = assertRole(actor, ["USER", "OWNER", "ADMIN"]);
-  return listClaimsOfUser(user.id);
+  const claims = await listClaimsOfUser(user.id);
+  return claims.map(({ restaurant: { claimedByUserId, ...restaurant }, ...claim }) => ({
+    ...claim,
+    restaurant,
+    managing: claim.status === "APPROVED" && claimedByUserId === user.id,
+  }));
 }
 
 /**
@@ -127,9 +144,78 @@ export async function decideOwnerClaimTx(
   }
   await updateRestaurantById(restaurant.id, { claimedByUserId: claim.userId, claimedAt: now }, tx);
   await updateOwnerClaim(claim.id, { status: "APPROVED", ...reviewed }, tx);
-  // A USER becomes OWNER; an ADMIN keeps the admin role (it includes the owner area).
+  // A USER becomes OWNER; an ADMIN keeps the admin role (it includes the owner area). The claimant's
+  // row is locked before the role is read, as a removal locks it (removeRestaurantOwner): one of
+  // the two waits for the other, so a user who manages a restaurant never ends up without the role.
+  await lockUser(claim.userId, tx);
   if ((await findUserRole(claim.userId, tx)) === "USER") {
     await updateUserById(claim.userId, { role: "OWNER" }, tx);
   }
   return { approved: true, userId: claim.userId, restaurant, reason: null };
+}
+
+/**
+ * "Remove owner" on /admin/restaurants (2026-11-04): the restaurant has no owner any more. Its
+ * owner loses the OWNER role unless they manage another restaurant (an ADMIN keeps ADMIN), and the
+ * normal rating rules apply to them again: they may rate it, and their earlier ratings there count
+ * again (those dish rows are recomputed after commit). The reason is required and logged.
+ * `input.ownerId` is the owner the admin saw: anyone else by now answers ITEM_CHANGED.
+ */
+export async function removeRestaurantOwner(
+  actor: SessionUser | null,
+  restaurantId: string,
+  input: OwnerRemoveInput,
+  now: Date = new Date(),
+) {
+  const admin = assertRole(actor, "ADMIN");
+  const removed = await inTransaction(async (tx) => {
+    // The restaurant first, then the owner: the order an approval takes (decideOwnerClaimTx). A
+    // rating in flight finishes before, and every later one sees no owner.
+    await lockRestaurants([restaurantId], tx);
+    const restaurant = await findRestaurantById(restaurantId, tx);
+    if (!restaurant || restaurant.status === "DUPLICATE") {
+      throw new AppError("NOT_FOUND", "Restaurant not found", 404);
+    }
+    if (!restaurant.claimedByUserId) {
+      throw new AppError("NOT_CLAIMED", "Nobody manages this restaurant any more", 409);
+    }
+    if (restaurant.claimedByUserId !== input.ownerId) {
+      throw new AppError(
+        "ITEM_CHANGED",
+        "The owner changed after you opened the page. Reload it.",
+        409,
+      );
+    }
+    const ownerId = restaurant.claimedByUserId;
+    await lockUser(ownerId, tx);
+    await updateRestaurantById(restaurant.id, { claimedByUserId: null, claimedAt: null }, tx);
+    // DECISION-PENDING: their approved claim stays APPROVED as history, dish rows they confirmed stay
+    // OWNER_VERIFIED, and the reason goes only to the log (the removed owner is not told it).
+    const roleRemoved =
+      (await findUserRole(ownerId, tx)) === "OWNER" &&
+      (await countRestaurantsManagedBy(ownerId, tx)) === 0;
+    if (roleRemoved) await updateUserById(ownerId, { role: "USER" }, tx);
+    const rows = await listRowsRatedByUserAt(ownerId, restaurant.id, tx);
+    return { restaurant, ownerId, roleRemoved, rows };
+  });
+
+  // Committed: their ratings there count again (a failure is only logged; the nightly run repeats it).
+  await recomputeEach(removed.rows, now);
+  logEvent("admin.restaurant.owner_remove", {
+    userId: admin.id,
+    entityId: restaurantId,
+    ownerId: removed.ownerId,
+    roleRemoved: removed.roleRemoved,
+    recomputedRows: removed.rows.length,
+    // The owner asked for the reason to be logged: the one free-text field in a log line.
+    reason: input.reason,
+  });
+  return {
+    id: restaurantId,
+    slug: removed.restaurant.slug,
+    citySlug: removed.restaurant.city.slug,
+    ownerRoleRemoved: removed.roleRemoved,
+    /** Ranking and restaurant pages whose scores may have changed. */
+    dishPages: await listDishPagesOfRows(removed.rows),
+  };
 }

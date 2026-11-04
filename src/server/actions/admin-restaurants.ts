@@ -4,6 +4,8 @@ import { refresh, revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
+import { revalidateDishPages } from "@/server/revalidate";
+import { removeRestaurantOwner } from "@/server/services/claim.service";
 import {
   createRestaurant,
   mergeRestaurants,
@@ -14,6 +16,7 @@ import {
 import {
   adminRestaurantInput,
   adminRestaurantUpdateInput,
+  ownerRemoveInput,
   parseInput,
   restaurantMergeInput,
   restaurantStatusInput,
@@ -82,6 +85,24 @@ export async function mergeRestaurantAction(restaurantId: unknown, input: unknow
       movedRatings: result.movedRatings.length,
       mergedRatings: result.mergedRatings.length,
     };
+  });
+}
+
+/** "Remove owner" on /admin/restaurants: `{ ownerId, reason }`; the reason is required and logged. */
+export async function removeRestaurantOwnerAction(restaurantId: unknown, input: unknown) {
+  return runAction("restaurant.owner_remove", async () => {
+    const actor = await adminWriter();
+    const result = await removeRestaurantOwner(
+      actor,
+      parseInput(id, restaurantId),
+      parseInput(ownerRemoveInput, input),
+    );
+    // The restaurant page offers "Is this your restaurant?" again, and ratings that count again
+    // change scores and ranks.
+    revalidatePath(restaurantPage(result.citySlug, result.slug));
+    for (const page of result.dishPages) revalidateDishPages(page);
+    refresh();
+    return { ownerRoleRemoved: result.ownerRoleRemoved };
   });
 }
 

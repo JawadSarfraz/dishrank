@@ -333,7 +333,13 @@ export async function listClaimsOfUser(userId: string) {
       createdAt: true,
       reviewedAt: true,
       restaurant: {
-        select: { name: true, slug: true, status: true, city: { select: { slug: true } } },
+        select: {
+          name: true,
+          slug: true,
+          status: true,
+          claimedByUserId: true,
+          city: { select: { slug: true } },
+        },
       },
     },
   });

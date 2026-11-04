@@ -20,6 +20,13 @@ export async function listRestaurantsManagedBy(userId: string) {
   });
 }
 
+/** How many restaurants this user manages (claimedByUserId), not merged away. */
+export async function countRestaurantsManagedBy(userId: string, client: Client = db) {
+  return client.restaurant.count({
+    where: { claimedByUserId: userId, status: { not: "DUPLICATE" } },
+  });
+}
+
 /** One restaurant as its owner sees it. */
 export async function findRestaurantForOwner(id: string, client: Client = db) {
   return client.restaurant.findUnique({

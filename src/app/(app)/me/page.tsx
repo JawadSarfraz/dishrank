@@ -112,10 +112,12 @@ export default async function MyRatingsPage({ searchParams }: PageProps<"/me">) 
                   {c.status === "PENDING"
                     ? `Waiting for our call (sent ${date.format(c.createdAt)})`
                     : c.status === "APPROVED"
-                      ? "Approved: you manage this restaurant"
+                      ? c.managing
+                        ? "Approved: you manage this restaurant"
+                        : "Approved earlier; you no longer manage this restaurant"
                       : `Not approved: ${c.rejectReason ?? "no reason given"}`}
                 </span>
-                {c.status === "APPROVED" && (
+                {c.managing && (
                   <Link href="/owner" className="min-h-11 py-2 underline">
                     Open your restaurants
                   </Link>
