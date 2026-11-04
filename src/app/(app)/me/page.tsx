@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { DeleteAccount } from "@/components/me/DeleteAccount";
 import { DeleteRatingButton } from "@/components/me/DeleteRatingButton";
 import { getSessionUser } from "@/server/auth";
 import { listMyClaims } from "@/server/services/claim.service";
@@ -124,6 +125,20 @@ export default async function MyRatingsPage({ searchParams }: PageProps<"/me">) 
           </ul>
         </section>
       )}
+
+      <section aria-labelledby="account" className="flex flex-col gap-2">
+        <h2 id="account" className="text-lg font-semibold">
+          Your account
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Signed in as {user.email}. What we keep and why:{" "}
+          <Link href="/privacy" className="underline">
+            privacy
+          </Link>
+          .
+        </p>
+        <DeleteAccount isAdmin={user.role === "ADMIN"} />
+      </section>
     </main>
   );
 }

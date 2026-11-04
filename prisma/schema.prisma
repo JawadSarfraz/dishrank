@@ -467,7 +467,7 @@ model PairwiseVote {
 model MenuUpload {
   id               String           @id @default(cuid())
   restaurantId     String
-  uploadedByUserId String
+  uploadedByUserId String? // null once the uploader deleted their account (the menu stays)
   filePath         String           @unique // menus/<restaurantId>/<uploaderId>/<random>.(jpg|webp)
   status           MenuUploadStatus @default(PENDING)
   rawJson          Json?
@@ -476,7 +476,7 @@ model MenuUpload {
   parsedAt         DateTime?
 
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  uploadedBy User        @relation(fields: [uploadedByUserId], references: [id])
+  uploadedBy User?       @relation(fields: [uploadedByUserId], references: [id], onDelete: SetNull)
   items      MenuItem[]
   parses     MenuParse[]
 
@@ -561,7 +561,7 @@ model Flag {
   upheld           Boolean?
   createdAt        DateTime       @default(now())
   restaurantDish   RestaurantDish @relation(fields: [restaurantDishId], references: [id], onDelete: Cascade)
-  user             User           @relation(fields: [userId], references: [id])
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([restaurantDishId, userId, reason])
 }
@@ -578,7 +578,7 @@ model OwnerClaim {
   reviewedByUserId String?
   rejectReason     String? // shown to the claimant on /me
   restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
-  user             User        @relation(fields: [userId], references: [id])
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   reviewedBy       User?       @relation("claimReviewer", fields: [reviewedByUserId], references: [id])
 
   @@index([status])

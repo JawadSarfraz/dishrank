@@ -232,7 +232,7 @@ hand if needed. To run the recompute now: "Recompute now" on /admin/rankings.
 ## Backups and safety
 
 - Supabase daily backups (Pro) or weekly `pg_dump` via a GitHub Action to a private bucket (Free has none).
-- Admin "merge" and "remove" actions are soft (status changes, history kept). Hard deletes only for GDPR-style user deletion requests.
+- Admin "merge" and "remove" actions are soft (status changes, history kept). Hard deletes for a user's own requests: deleting a rating, and "Delete my account" on /me (Phase 6; what goes and what stays: docs/06, /privacy).
 - Keep `tmp/` out of git; menu photos are in Storage, not the repo.
 
 ## Cost estimate (first 6 months)

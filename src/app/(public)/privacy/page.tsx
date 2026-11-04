@@ -44,7 +44,8 @@ export default function PrivacyPage() {
         abuse. Your scores count toward the public rankings without your name. Comments and photos
         are checked by our team and may be shown on public pages; your e-mail address is never
         shown. Before a photo is uploaded, the app re-saves it in your browser, which removes the
-        location and camera details stored inside the file.
+        location and camera details stored inside the file. A photo is stored under a random name
+        that says nothing about you; a photo you upload but never use is deleted after a day.
       </p>
 
       <h2 className="text-lg font-semibold">Locations</h2>
@@ -56,6 +57,20 @@ export default function PrivacyPage() {
         Panel members (trusted raters chosen by our team) can choose to share their location while
         they are at a restaurant. We keep that location with the restaurant, not with the rating,
         and use it only to correct where the restaurant is on the map.
+      </p>
+
+      <h2 className="text-lg font-semibold">Restaurant owners</h2>
+      <p>
+        If you claim a restaurant, we keep the phone number and note you send so our team can call
+        to check it. An owner sees how their dishes score and rank, never who rated them.
+      </p>
+
+      <h2 className="text-lg font-semibold">Counting visits</h2>
+      <p>
+        To see which pages are useful we count, per day, ratings saved, searches and views of
+        ranking pages, with only the city and dish. These counts hold nothing about you: no account,
+        no IP address, no search words, no time of day. We use no third-party tracking or
+        advertising cookies.
       </p>
 
       <h2 className="text-lg font-semibold">Reports and disputes</h2>
@@ -76,7 +91,8 @@ export default function PrivacyPage() {
       <h2 className="text-lg font-semibold">How long we keep it</h2>
       <p>
         Your account, ratings and photos stay until you delete them or ask us to. Counters that
-        enforce daily limits are deleted after two days.
+        enforce daily limits are deleted after two days. The scrambled IP addresses that protect
+        those limits use their own secret key.
       </p>
 
       <h2 className="text-lg font-semibold">Deleting your data</h2>
@@ -86,12 +102,19 @@ export default function PrivacyPage() {
           My ratings
         </Link>
         ; its comment, photo and earlier versions go with it (a copy of the photo can stay in a
-        browser or network cache for a short while). To delete your whole account, write to{" "}
-        <ContactEmail /> from the e-mail address you sign in with, or use the{" "}
-        <Link href="/dispute" className="underline">
-          dispute page
-        </Link>
-        .
+        browser or network cache for a short while).
+      </p>
+      <p>
+        To delete your whole account, open{" "}
+        <Link href="/me" className="underline">
+          My ratings
+        </Link>{" "}
+        and choose &quot;Delete my account&quot;. This deletes your account and sign-in, all your
+        ratings, comments and photos (the rankings are recomputed without them), your restaurant
+        claims, and the reports and suggestions our team has not looked at yet. Menu photos you sent
+        stay with their restaurant without your name, and a decision our team already made on
+        something you reported stays on record without your name. If you cannot sign in any more,
+        write to <ContactEmail /> from the e-mail address you used.
       </p>
     </main>
   );

@@ -60,7 +60,7 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
         <p className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant="outline">{upload.status.toLowerCase()}</Badge>
           <span className="text-muted-foreground">
-            {dateTime.format(upload.createdAt)} by {upload.uploadedBy.email}
+            {dateTime.format(upload.createdAt)} by {upload.uploadedBy?.email ?? "a deleted account"}
           </span>
           <Link href={`/admin/restaurants/${r.id}`} className="underline">
             restaurant

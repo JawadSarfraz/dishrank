@@ -139,6 +139,10 @@ export const uploadSignInput = z
   });
 export type UploadSignInput = z.infer<typeof uploadSignInput>;
 
+/** "Delete my account" on /me: the user types DELETE to confirm (Phase 6). */
+export const accountDeleteInput = z.strictObject({ confirm: z.literal("DELETE") });
+export type AccountDeleteInput = z.infer<typeof accountDeleteInput>;
+
 /** An owner's change to one dish row of their restaurant (docs/07 §4, Phase 6). */
 export const ownerDishInput = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("confirm") }),

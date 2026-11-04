@@ -64,7 +64,7 @@ export default async function AdminMenusPage({ searchParams }: PageProps<"/admin
                 </span>
               </span>
               <span className="text-sm text-muted-foreground">
-                {dateTime.format(u.createdAt)} by {u.uploadedBy.email}
+                {dateTime.format(u.createdAt)} by {u.uploadedBy?.email ?? "a deleted account"}
                 {u._count.items > 0
                   ? ` · ${u.matched} matched, ${u.needsReview} to review, ${u.ignored} ignored`
                   : ""}
