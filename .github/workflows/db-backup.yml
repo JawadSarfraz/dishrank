@@ -33,6 +33,7 @@ jobs:
           sudo apt-get install -y -qq postgresql-client-17
       # GitHub hides each secret's exact value in logs. This also hides the URL's parts (host, user,
       # project ref, password, also percent-decoded), in case an error message prints one of them.
+      # Workflow-command data is escaped as @actions/core does (%, CR, LF), so a % stays a %.
       - name: Hide the parts of the database URL in logs
         env:
           PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
@@ -49,7 +50,8 @@ jobs:
           for part in sorted(p for p in parts if p):
               for line in part.splitlines():
                   if len(line) >= 4:
-                      print(f"::add-mask::{line}")
+                      data = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                      print(f"::add-mask::{data}")
           PY
       - name: Dump, check and encrypt
         id: backup

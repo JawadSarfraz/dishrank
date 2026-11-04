@@ -71,10 +71,11 @@ pnpm prod:bootstrap
 4. Import `dishrank`. Framework: Next.js (detected), Root Directory `./`. Leave the build settings
    alone: `vercel.json` sets them (build, Mumbai region, daily cron, only `main` deploys).
 5. Environment Variables (in the import screen): add every row marked **now** in step 6, all
-   for **Production**. Deploy.
-6. When the deployment is done: Settings → **Domains** shows your production domain, for example
-   `dishrank.vercel.app` (Vercel adds a suffix if the name is taken). That is `<domain>`.
-   Until step 8 most pages answer with an error: expected, the sign-in settings are not there yet.
+   for **Production**. Deploy. The build stops at its environment check, naming
+   `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as missing: expected, they come
+   in step 8, and a failed build never goes live.
+6. Settings → **Domains** shows your production domain, for example `dishrank.vercel.app` (Vercel
+   adds a suffix if the name is taken). That is `<domain>`.
 
 ## 6. Environment variables (Vercel → Settings → Environment Variables)
 
@@ -132,9 +133,10 @@ each).
 
 1. Vercel → Settings → Environment Variables: add `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL`,
    `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (Production).
-2. Deployments → the latest one → ⋯ → **Redeploy**.
-3. In the build log, check: pnpm `12.14.0`, Node `24.x`, `prisma migrate deploy` → "No pending
-   migrations to apply", then the Next.js build.
+2. Deployments → the latest one (the failed build from step 5) → ⋯ → **Redeploy**.
+3. In the build log, check: pnpm `12.14.0`, Node `24.x`, no "stopped before migrations" line (the
+   environment check passed), `prisma migrate deploy` → "No pending migrations to apply", then the
+   Next.js build.
 
 ## 9. First admin sign-in
 

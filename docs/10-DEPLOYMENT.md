@@ -257,8 +257,10 @@ pages, sign-in or the crons (their record is the JobRun list on /admin/rankings)
 ## Backups and restore
 
 Supabase Free has no automatic backups, so the GitHub Actions workflow
-`.github/workflows/db-backup.yml` takes one every day at 22:00 UTC (03:00 PKT; GitHub may start a
-scheduled run a little late), and on demand. It runs `scripts/db-backup.sh`:
+`.github/workflows/db-backup.yml` takes one every day at 22:00 UTC (03:00 PKT), and on demand. The
+start of an hour is GitHub's busiest time: a scheduled run may start late, and under heavy load
+GitHub may drop it, which sends no e-mail; a cron a few minutes past the hour (`13 22 * * *`) makes
+that less likely. It runs `scripts/db-backup.sh`:
 
 1. `pg_dump` 17 (the server's major version, from the PostgreSQL apt repository) through the
    session pooler (`PROD_DIRECT_URL`; the transaction pooler cannot serve a dump): the `public`
