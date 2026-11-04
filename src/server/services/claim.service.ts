@@ -142,12 +142,15 @@ export async function decideOwnerClaimTx(
   if (restaurant.claimedByUserId && restaurant.claimedByUserId !== claim.userId) {
     throw new AppError("RESTAURANT_CLAIMED", "Another owner manages this restaurant already", 409);
   }
+  // The claimant's row is locked before anything is written, as a removal locks it
+  // (removeRestaurantOwner): one of the two waits for the other, so a user who manages a restaurant
+  // never ends up without the role. Before the write, because setting claimedByUserId takes a
+  // key-share lock on that row (its foreign key), and two approvals for one claimant that upgraded
+  // that lock afterwards would deadlock.
+  await lockUser(claim.userId, tx);
   await updateRestaurantById(restaurant.id, { claimedByUserId: claim.userId, claimedAt: now }, tx);
   await updateOwnerClaim(claim.id, { status: "APPROVED", ...reviewed }, tx);
-  // A USER becomes OWNER; an ADMIN keeps the admin role (it includes the owner area). The claimant's
-  // row is locked before the role is read, as a removal locks it (removeRestaurantOwner): one of
-  // the two waits for the other, so a user who manages a restaurant never ends up without the role.
-  await lockUser(claim.userId, tx);
+  // A USER becomes OWNER; an ADMIN keeps the admin role (it includes the owner area).
   if ((await findUserRole(claim.userId, tx)) === "USER") {
     await updateUserById(claim.userId, { role: "OWNER" }, tx);
   }
