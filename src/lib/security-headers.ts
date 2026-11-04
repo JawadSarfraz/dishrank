@@ -4,6 +4,7 @@
 // browser talks only to this site and to the Supabase Storage S3 endpoint (signed PUT uploads, and
 // signed GET links for admins); Google sign-in is a top-level redirect.
 
+// DECISION-PENDING: 'unsafe-inline' for scripts until pages can carry a nonce (they are static now).
 export function securityHeaders(source: {
   NODE_ENV?: string;
   SUPABASE_S3_ENDPOINT?: string;

@@ -60,6 +60,8 @@ export type AreaSummary = Record<
 >;
 
 /** What a newer release writes on a NEW candidate (the fields the review form is prefilled from). */
+// DECISION-PENDING: confidence and sources are refreshed too (the owner listed name, address, phone,
+// website, location and categories), so ordering and the data credit stay right.
 function refreshedData(d: CandidateDraft) {
   return {
     name: d.name,

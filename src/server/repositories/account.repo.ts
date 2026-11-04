@@ -12,6 +12,7 @@ export async function listRatingsForDeletion(userId: string, client: Client = db
 }
 
 /** Review items the user filed that nobody has decided yet: they go with the account. */
+// DECISION-PENDING: decided items stay (the record of an admin's decision), without the name.
 const FILED_BY_USER: ReviewItemType[] = [
   "FLAG",
   "DISH_PROPOSAL",

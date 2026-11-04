@@ -24,6 +24,8 @@ export function pakistanDay(now: Date): Date {
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()));
 }
 
+// DECISION-PENDING: every dish or restaurant search request with text counts (the browser searches as
+// you type, after a pause), with its city only.
 /** Counts one event; a failure is logged, never thrown. */
 export async function recordEvent(
   name: AnalyticsEventName,

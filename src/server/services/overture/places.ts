@@ -168,6 +168,7 @@ export type SeedArea = {
  * (the smallest distance as a share of the radius), so a sector's 1.5 km and Bahria Town's 3.5 km
  * can sit side by side. Ties: the first in `areas`. None covers it → null.
  */
+// DECISION-PENDING: overlapping radii go to the area the point is deepest inside; radii are estimates.
 export function coveringArea(point: LatLng, areas: readonly SeedArea[]) {
   let best: { area: SeedArea; km: number; depth: number } | null = null;
   for (const area of areas) {

@@ -8,6 +8,7 @@ import { revalidateDishPages } from "@/server/revalidate";
 import { parsePendingMenus } from "@/server/services/menu.service";
 import { cleanupUnusedUploads } from "@/server/services/upload.service";
 
+// DECISION-PENDING: the upload clean-up shares this cron (Hobby allows few daily crons).
 export const maxDuration = 300;
 
 export async function GET(request: Request) {

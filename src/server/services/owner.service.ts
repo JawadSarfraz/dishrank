@@ -132,6 +132,7 @@ export async function updateOwnerDish(
     } else if (input.action === "confirm") {
       data = { status: "OWNER_VERIFIED", lastVerifiedAt: now };
     } else {
+      // DECISION-PENDING: fixing a name or price also confirms the dish (a menu photo never overwrites it).
       data = {
         status: "OWNER_VERIFIED",
         lastVerifiedAt: now,

@@ -32,6 +32,7 @@ export async function lockRestaurantDish(id: string, tx: Tx) {
  * Active ratings of one dish row from users who are not banned, with the rater's current trust.
  * The restaurant's owner never counts (docs/04 control 1), also for ratings given before the claim.
  */
+// DECISION-PENDING: an owner's earlier ratings are kept but not counted (not hidden: no trust penalty).
 export async function listCountedRatings(
   restaurantDishId: string,
   tx: Tx,
