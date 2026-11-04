@@ -225,3 +225,17 @@ export async function listRatingsOfUsers(userIds: readonly string[], tx: Tx) {
     select: { id: true, restaurantDishId: true, status: true },
   });
 }
+
+/** The dish rows of one restaurant this user has a rating on (any status). */
+export async function listRowsRatedByUserAt(
+  userId: string,
+  restaurantId: string,
+  client: Client = db,
+) {
+  const rows = await client.rating.findMany({
+    where: { userId, restaurantDish: { restaurantId } },
+    select: { restaurantDishId: true },
+    distinct: ["restaurantDishId"],
+  });
+  return rows.map((r) => r.restaurantDishId);
+}

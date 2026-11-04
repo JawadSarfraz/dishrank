@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DeleteRatingButton } from "@/components/me/DeleteRatingButton";
 import { getSessionUser } from "@/server/auth";
+import { listMyClaims } from "@/server/services/claim.service";
 import { listMyRatings } from "@/server/services/rating.service";
 import { meRatingsQuery } from "@/server/validation";
 
@@ -20,10 +21,10 @@ export default async function MyRatingsPage({ searchParams }: PageProps<"/me">) 
   const user = await getSessionUser();
   if (!user) redirect("/sign-in?callbackUrl=%2Fme");
   const parsed = meRatingsQuery.safeParse(await searchParams);
-  const { data: ratings, nextCursor } = await listMyRatings(
-    user,
-    parsed.success ? parsed.data : { limit: 50 },
-  );
+  const [{ data: ratings, nextCursor }, claims] = await Promise.all([
+    listMyRatings(user, parsed.success ? parsed.data : { limit: 50 }),
+    listMyClaims(user),
+  ]);
 
   return (
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-4 py-6">
@@ -95,6 +96,33 @@ export default async function MyRatingsPage({ searchParams }: PageProps<"/me">) 
         <Link href={`/me?cursor=${nextCursor}`} className="min-h-11 py-2 underline">
           Older ratings
         </Link>
+      )}
+
+      {claims.length > 0 && (
+        <section aria-labelledby="claims" className="flex flex-col gap-2">
+          <h2 id="claims" className="text-lg font-semibold">
+            Restaurant claims
+          </h2>
+          <ul className="flex flex-col divide-y rounded-lg border">
+            {claims.map((c) => (
+              <li key={c.id} className="flex flex-col gap-1 p-3 text-sm">
+                <span className="font-medium">{c.restaurant.name}</span>
+                <span>
+                  {c.status === "PENDING"
+                    ? `Waiting for our call (sent ${date.format(c.createdAt)})`
+                    : c.status === "APPROVED"
+                      ? "Approved: you manage this restaurant"
+                      : `Not approved: ${c.rejectReason ?? "no reason given"}`}
+                </span>
+                {c.status === "APPROVED" && (
+                  <Link href="/owner" className="min-h-11 py-2 underline">
+                    Open your restaurants
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );

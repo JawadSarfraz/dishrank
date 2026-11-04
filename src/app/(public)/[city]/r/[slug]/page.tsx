@@ -7,6 +7,7 @@ import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 import { JsonLd } from "@/components/layout/JsonLd";
+import { ClaimRestaurant } from "@/components/restaurant/ClaimRestaurant";
 import { MenuUploadButton } from "@/components/restaurant/MenuUploadButton";
 import { ReportProblem } from "@/components/restaurant/ReportProblem";
 import { formatPrice, formatScore, formatVotes } from "@/lib/format";
@@ -163,6 +164,8 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
         dishes={dishes.map((d) => ({ id: d.dish.id, name: d.dish.name }))}
         returnPath={path}
       />
+
+      {!claimed && <ClaimRestaurant restaurantId={restaurant.id} returnPath={path} />}
 
       <JsonLd
         data={{

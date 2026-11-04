@@ -25,6 +25,14 @@ export const RATE_LIMITS = {
   /** `user:{id}:menu-upload`: menu photos sent for parsing (docs/07 §3). */
   // Decided 2026-11-04: docs/06 has no menu key; the owner's Phase 5 default, 10 a day.
   menuUpload: { limit: 10, windowSeconds: 86_400 },
+  /** `user:{id}:claim`: owner claims (docs/07 §4, Phase 6). */
+  // DECISION-PENDING: 3 a day; a real owner claims one or two restaurants.
+  claim: { limit: 3, windowSeconds: 86_400 },
+  /** `user:{id}:owner-write`: an owner's dish edits (Phase 6). */
+  // DECISION-PENDING: 200 an hour, room for a whole menu in one sitting.
+  ownerWrite: { limit: 200, windowSeconds: 3600 },
+  /** `user:{id}:account-delete`: deleting one's own account (Phase 6). */
+  accountDelete: { limit: 3, windowSeconds: 86_400 },
   /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
   flag: { limit: 10, windowSeconds: 86_400 },
   /** `ip:{hash}:event`: ranking-page views the browser reports (light analytics, Phase 6). */

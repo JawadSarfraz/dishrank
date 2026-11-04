@@ -308,9 +308,11 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
     ).rejects.toMatchObject({
       code: "ACTION_NOT_ALLOWED",
     });
-    const claim = await db.reviewItem.create({ data: { type: "OWNER_CLAIM", payload: {} } });
+    const duplicate = await db.reviewItem.create({
+      data: { type: "DUPLICATE_RESTAURANT", payload: {} },
+    });
     await expect(
-      resolveReviewItem(admin, claim.id, { action: "reject" }, NOW),
+      resolveReviewItem(admin, duplicate.id, { action: "keep_both" }, NOW),
     ).rejects.toMatchObject({
       code: "NOT_AVAILABLE",
     });

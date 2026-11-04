@@ -279,6 +279,7 @@ model User {
   ratings              Rating[]
   flags                Flag[]
   claims               OwnerClaim[]
+  reviewedClaims       OwnerClaim[]          @relation("claimReviewer")
   menuUploads          MenuUpload[]
   resolvedItems        ReviewItem[]          @relation("resolver")
   createdItems         ReviewItem[]          @relation("creator")
@@ -688,18 +689,22 @@ model Flag {
 }
 
 model OwnerClaim {
-  id           String      @id @default(cuid())
-  restaurantId String
-  userId       String
-  phone        String
-  proofNote    String?
-  status       ClaimStatus @default(PENDING)
-  createdAt    DateTime    @default(now())
-  reviewedAt   DateTime?
-  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
-  user         User        @relation(fields: [userId], references: [id])
+  id               String      @id @default(cuid())
+  restaurantId     String
+  userId           String
+  phone            String
+  proofNote        String?
+  status           ClaimStatus @default(PENDING)
+  createdAt        DateTime    @default(now())
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  rejectReason     String? // shown to the claimant on /me
+  restaurant       Restaurant  @relation(fields: [restaurantId], references: [id])
+  user             User        @relation(fields: [userId], references: [id])
+  reviewedBy       User?       @relation("claimReviewer", fields: [reviewedByUserId], references: [id])
 
   @@index([status])
+  @@index([userId, restaurantId])
 }
 
 // ---------- Stats & ops ----------

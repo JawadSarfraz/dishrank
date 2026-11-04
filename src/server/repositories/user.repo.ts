@@ -11,6 +11,11 @@ export async function countUsersByRole(): Promise<Record<Role, number>> {
   return counts;
 }
 
+/** The user's role as stored (never from the session or the client). */
+export async function findUserRole(id: string, client: Client = db) {
+  return (await client.user.findUnique({ where: { id }, select: { role: true } }))?.role ?? null;
+}
+
 /** What the rating rules need about a rater, always read from the database. */
 export async function findRater(id: string, client: Client = db) {
   return client.user.findUnique({

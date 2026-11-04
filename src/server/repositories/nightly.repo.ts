@@ -45,7 +45,10 @@ export async function upsertDishStats(now: Date, halfLifeDays: number) {
             / 86400.0 / ${halfLifeDays}::float8) AS w
       FROM "Rating" rt
       JOIN "User" u ON u.id = rt."userId" AND u."bannedAt" IS NULL
-      WHERE rt.status = 'ACTIVE'
+      JOIN "RestaurantDish" ord ON ord.id = rt."restaurantDishId"
+      JOIN "Restaurant" own ON own.id = ord."restaurantId"
+      -- an owner's ratings of their own restaurant never count (docs/04 control 1)
+      WHERE rt.status = 'ACTIVE' AND own."claimedByUserId" IS DISTINCT FROM rt."userId"
     ) w
     JOIN "RestaurantDish" rd ON rd.id = w."restaurantDishId"
     GROUP BY rd."cityId", rd."dishId"

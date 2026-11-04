@@ -283,3 +283,58 @@ export async function countOpenReviewItems(types: readonly ReviewItemType[]) {
     Record<ReviewItemType, number>
   >;
 }
+
+// ---------- owner claims (docs/07 §4) ----------
+
+export async function insertOwnerClaim(
+  data: { restaurantId: string; userId: string; phone: string; proofNote: string | null },
+  tx: Tx,
+) {
+  return tx.ownerClaim.create({ data, select: { id: true, status: true, createdAt: true } });
+}
+
+/** This user's PENDING claim of this restaurant, if any (one at a time). */
+export async function findPendingClaim(userId: string, restaurantId: string, client: Client = db) {
+  return client.ownerClaim.findFirst({
+    where: { userId, restaurantId, status: "PENDING" },
+    select: { id: true, status: true, createdAt: true },
+  });
+}
+
+export async function findClaimById(id: string, client: Client = db) {
+  return client.ownerClaim.findUnique({
+    where: { id },
+    select: { id: true, restaurantId: true, userId: true, status: true },
+  });
+}
+
+export async function updateOwnerClaim(
+  id: string,
+  data: {
+    status: "APPROVED" | "REJECTED";
+    reviewedAt: Date;
+    reviewedByUserId: string;
+    rejectReason?: string | null;
+  },
+  tx: Tx,
+) {
+  return tx.ownerClaim.update({ where: { id }, data, select: { id: true } });
+}
+
+/** /me: the user's own claims, newest first, with the reason of a rejection. */
+export async function listClaimsOfUser(userId: string) {
+  return db.ownerClaim.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      rejectReason: true,
+      createdAt: true,
+      reviewedAt: true,
+      restaurant: {
+        select: { name: true, slug: true, status: true, city: { select: { slug: true } } },
+      },
+    },
+  });
+}

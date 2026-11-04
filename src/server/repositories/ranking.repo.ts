@@ -8,7 +8,10 @@ export async function findRestaurantDishList(id: string, tx: Tx) {
 }
 
 export async function findRestaurantStatus(restaurantId: string, tx: Tx) {
-  return tx.restaurant.findUnique({ where: { id: restaurantId }, select: { status: true } });
+  return tx.restaurant.findUnique({
+    where: { id: restaurantId },
+    select: { status: true, claimedByUserId: true },
+  });
 }
 
 export async function findRankInCity(id: string, tx: Tx) {
@@ -25,10 +28,22 @@ export async function lockRestaurantDish(id: string, tx: Tx) {
   return rows[0] ?? null;
 }
 
-/** Active ratings of one dish row from users who are not banned, with the rater's current trust. */
-export async function listCountedRatings(restaurantDishId: string, tx: Tx) {
+/**
+ * Active ratings of one dish row from users who are not banned, with the rater's current trust.
+ * The restaurant's owner never counts (docs/04 control 1), also for ratings given before the claim.
+ */
+export async function listCountedRatings(
+  restaurantDishId: string,
+  tx: Tx,
+  ownerId: string | null = null,
+) {
   const rows = await tx.rating.findMany({
-    where: { restaurantDishId, status: "ACTIVE", user: { bannedAt: null } },
+    where: {
+      restaurantDishId,
+      status: "ACTIVE",
+      user: { bannedAt: null },
+      ...(ownerId ? { userId: { not: ownerId } } : {}),
+    },
     select: { userId: true, score: true, updatedAt: true, user: { select: { trustScore: true } } },
   });
   return rows.map((r) => ({

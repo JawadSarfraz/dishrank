@@ -219,10 +219,10 @@ export async function recomputeOne(
     const rd = await lockRestaurantDish(restaurantDishId, tx);
     if (!rd) return null;
     // One after another: a transaction is one connection, and pg refuses overlapping queries on it.
-    const ratings = await listCountedRatings(rd.id, tx);
+    const restaurant = await findRestaurantStatus(rd.restaurantId, tx);
+    const ratings = await listCountedRatings(rd.id, tx, restaurant?.claimedByUserId ?? null);
     const stat = await findDishStat(rd.cityId, rd.dishId, tx);
     const city = await findCityLaunch(rd.cityId, tx);
-    const restaurant = await findRestaurantStatus(rd.restaurantId, tx);
     const agg = aggregateRatings(ratings, now);
     const score =
       agg.rawMean === null ? null : round3(bayesScore(agg.weightSum, agg.rawMean, cityPrior(stat)));

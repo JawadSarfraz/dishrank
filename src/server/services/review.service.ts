@@ -25,6 +25,7 @@ import {
 import {
   listRatingsForReview,
   listRatingsOfUsers,
+  listRowsRatedByUserAt,
   setRatingStatus,
 } from "@/server/repositories/rating.repo";
 import {
@@ -51,6 +52,7 @@ import {
 } from "@/server/validation";
 import { refreshUserTrust } from "./admin-users.service";
 import { reviewFingerprint } from "./review-fingerprint";
+import { decideOwnerClaimTx } from "./claim.service";
 import { invalidateAliasIndex } from "./matching/aliases";
 import { decideMenuItemTx, lockMenuItemParents } from "./menu.service";
 import { normalize } from "./matching/normalize";
@@ -60,8 +62,9 @@ import type { SuggestionPayload } from "./location.service";
 
 export { reviewFingerprint } from "./review-fingerprint";
 
-/** The item types /admin/review handles (claims and duplicates arrive later). */
+/** The item types /admin/review handles (duplicates arrive later). */
 export const REVIEW_PAGE_TYPES = [
+  "OWNER_CLAIM",
   "UNMATCHED_MENU_ITEM",
   "SUSPICIOUS_RATINGS",
   "DISH_PROPOSAL",
@@ -419,6 +422,42 @@ function decideFlag(input: ReviewResolveInput): Decision {
     : { status: "REJECTED", resolution: "dismissed", ...closed };
 }
 
+/**
+ * An owner claim (docs/07 §4): approve after checking by phone, or reject with a reason the
+ * claimant sees. Approving makes the claimant's earlier ratings there stop counting: their rows are
+ * recomputed after commit.
+ */
+async function decideClaim(
+  item: { payload: unknown; restaurantId: string | null },
+  input: ReviewResolveInput,
+  adminId: string,
+  now: Date,
+  tx: Tx,
+): Promise<Decision> {
+  if (input.action !== "approve" && input.action !== "reject") {
+    throw new AppError("ACTION_NOT_ALLOWED", "That action does not fit this item", 400);
+  }
+  const reason = input.action === "reject" ? (input.payload?.reason ?? null) : null;
+  const d = await decideOwnerClaimTx({ item, action: input.action, reason, adminId }, now, tx);
+  const page = [{ citySlug: d.restaurant.city.slug, slug: d.restaurant.slug }];
+  if (!d.approved) {
+    return {
+      status: "REJECTED",
+      resolution: `rejected: ${d.reason}`,
+      recompute: [],
+      trustUsers: [],
+      restaurantSlugs: [],
+    };
+  }
+  return {
+    status: "RESOLVED",
+    resolution: "owner approved",
+    recompute: await listRowsRatedByUserAt(d.userId, d.restaurant.id, tx),
+    trustUsers: [],
+    restaurantSlugs: page,
+  };
+}
+
 async function decideLocation(
   item: { restaurantId: string | null; payload: unknown },
   input: ReviewResolveInput,
@@ -480,7 +519,9 @@ async function lockItemParents(
     await lockRestaurantDishes(rows, tx);
     return { rows: new Set(rows), restaurantId: null };
   }
-  if (item.type === "LOCATION_SUGGESTION" && item.restaurantId) {
+  // A location or an owner changes the restaurant row: its lock waits for ratings in flight (they
+  // share-lock it) and every later rating sees the new owner.
+  if ((item.type === "LOCATION_SUGGESTION" || item.type === "OWNER_CLAIM") && item.restaurantId) {
     await lockRestaurants([item.restaurantId], tx);
     return { rows: new Set<string>(), restaurantId: item.restaurantId };
   }
@@ -533,7 +574,9 @@ export async function resolveReviewItem(
           (item.payload as HeldPayload).restaurantDishId,
           ...ratings.map((r) => r.restaurantDishId),
         ].every((row) => locked.rows.has(row))) ||
-      ((item.type === "LOCATION_SUGGESTION" || item.type === "UNMATCHED_MENU_ITEM") &&
+      ((item.type === "LOCATION_SUGGESTION" ||
+        item.type === "UNMATCHED_MENU_ITEM" ||
+        item.type === "OWNER_CLAIM") &&
         item.restaurantId !== locked.restaurantId)
     ) {
       throw itemChanged();
@@ -556,7 +599,9 @@ export async function resolveReviewItem(
               ? decideFlag(input)
               : item.type === "UNMATCHED_MENU_ITEM"
                 ? await decideMenuItem(item, input, now, tx)
-                : await decideLocation(item, input, tx);
+                : item.type === "OWNER_CLAIM"
+                  ? await decideClaim(item, input, admin.id, now, tx)
+                  : await decideLocation(item, input, tx);
     await closeReviewItem(
       item.id,
       {

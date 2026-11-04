@@ -164,6 +164,23 @@ export function ReviewItemCard({
         <LocationDetails payload={p} restaurant={item.restaurant} />
       )}
 
+      {item.type === "OWNER_CLAIM" && (
+        <div className="flex flex-col gap-1">
+          <p>
+            Claims to own it: <span className="font-medium">{item.createdBy?.email ?? "?"}</span>
+            {" · "}
+            <a href={`tel:${String(p.phone)}`} className="underline">
+              {String(p.phone)}
+            </a>
+          </p>
+          {p.proofNote ? <p className="whitespace-pre-wrap">“{String(p.proofNote)}”</p> : null}
+          <p className="text-muted-foreground">
+            Check it before approving: call the restaurant&apos;s own number (signboard, official
+            page), not only the one given here.
+          </p>
+        </div>
+      )}
+
       {item.type === "FLAG" && p.kind === "report" && (
         <p>
           Problem:{" "}
@@ -249,6 +266,21 @@ export function ReviewItemCard({
               Approve location
             </Button>
           )}
+          {item.type === "OWNER_CLAIM" && (
+            <>
+              <Button size="sm" disabled={pending} onClick={() => resolve({ action: "approve" })}>
+                Approve owner
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => setMode(mode === "create" ? "idle" : "create")}
+              >
+                Reject…
+              </Button>
+            </>
+          )}
           {item.type === "FLAG" && (
             <>
               <Button size="sm" disabled={pending} onClick={() => resolve({ action: "uphold" })}>
@@ -266,7 +298,8 @@ export function ReviewItemCard({
           )}
           {item.type !== "SUSPICIOUS_RATINGS" &&
             item.type !== "FLAG" &&
-            item.type !== "UNMATCHED_MENU_ITEM" && (
+            item.type !== "UNMATCHED_MENU_ITEM" &&
+            item.type !== "OWNER_CLAIM" && (
               <Button
                 size="sm"
                 variant="ghost"
@@ -279,6 +312,36 @@ export function ReviewItemCard({
         </div>
       )}
 
+      {open && item.type === "OWNER_CLAIM" && mode === "create" && (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const reason = String(new FormData(e.currentTarget).get("reason") ?? "").trim();
+            if (reason) resolve({ action: "reject", payload: { reason } });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            Reason (the claimant sees it on their page)
+            <textarea
+              name="reason"
+              required
+              maxLength={500}
+              rows={2}
+              className="rounded-lg border border-input bg-transparent px-2 py-1 text-sm"
+            />
+          </label>
+          <Button
+            size="sm"
+            type="submit"
+            variant="destructive"
+            disabled={pending}
+            className="self-start"
+          >
+            Reject claim
+          </Button>
+        </form>
+      )}
       {open && item.type === "UNMATCHED_MENU_ITEM" && (
         <MenuItemActions
           defaultName={String(p.rawName ?? "")}
