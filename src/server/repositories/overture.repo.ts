@@ -145,6 +145,45 @@ export async function listLocatedCandidates(cityId: string) {
   });
 }
 
+/** Every NEW candidate of every city: the Auto-list's dry run (docs/07 §2a). */
+export async function listNewCandidatesForAutoList() {
+  return db.overtureCandidate.findMany({
+    where: { status: "NEW" },
+    orderBy: { id: "asc" },
+    select: {
+      id: true,
+      overtureId: true,
+      name: true,
+      address: true,
+      phone: true,
+      website: true,
+      category: true,
+      confidence: true,
+      lat: true,
+      lng: true,
+      lastSeenRelease: true,
+      cityId: true,
+      suggestedAreaId: true,
+    },
+  });
+}
+
+/** Located candidates already decided on: their neighbours are not listed without a person. */
+export async function listReviewedLocatedCandidates() {
+  return db.overtureCandidate.findMany({
+    where: { status: { not: "NEW" }, lat: { not: null }, lng: { not: null } },
+    select: { id: true, name: true, lat: true, lng: true },
+  });
+}
+
+/** The candidate an auto-listed restaurant came from: its `name` is Overture's original, kept for audit. */
+export async function findAutoListedCandidateOf(restaurantId: string) {
+  return db.overtureCandidate.findFirst({
+    where: { restaurantId, autoListedAt: { not: null } },
+    select: { name: true, category: true, confidence: true },
+  });
+}
+
 /** Locks one candidate row for a review action (released at commit or rollback). */
 export async function lockCandidate(id: string, tx: Tx) {
   await tx.$queryRaw`SELECT id FROM "OvertureCandidate" WHERE id = ${id} FOR UPDATE`;

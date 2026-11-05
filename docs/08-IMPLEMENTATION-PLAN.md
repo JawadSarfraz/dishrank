@@ -34,7 +34,7 @@ Google Places was dropped on 2026-10-25 (ADR-13); this replaces the first Phase 
 
 Tasks
 - `pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]`: Overture Maps food and drink places from Meta and Microsoft only, Google links stripped, placeholder points = location unknown, city and suggested area from our seed areas, staged in `OvertureCandidate`; a newer release only adds new GERS ids (docs/07 §1)
-- `/admin/import`: review one area at a time by confidence; Create (form prefilled from Overture, launch dishes pre-ticked) / Link / Skip with a reason / Reopen; likely duplicates within 50 m; RD CANDIDATE (source ADMIN, 0.4) per ticked dish (docs/07 §2)
+- (Since 2026-11-06 the Auto-list, docs/07 §2a, creates the clear candidates first.) `/admin/import`: review one area at a time by confidence; Create (form prefilled from Overture, launch dishes pre-ticked) / Link / Skip with a reason / Reopen; likely duplicates within 50 m; RD CANDIDATE (source ADMIN, 0.4) per ticked dish (docs/07 §2)
 - `/admin/restaurants`: list/search/edit/merge/status, "Add restaurant" by hand (`/admin/restaurants/new`, optional location); merge per docs/07 §2 with redirect of merged URLs
 - `Restaurant.source` (OVERTURE | MANUAL), `overtureId`, `locationSource` (OVERTURE | ADMIN), `website`
 - Public `/about/data` with Overture's credit lines and the CDLA Permissive 2.0 link, linked from the footer

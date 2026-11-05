@@ -28,8 +28,9 @@ export default function AboutPage() {
           all end up in the same ranking.
         </p>
         <p>
-          Rankings come only from ratings given on {BRAND.name}. Each restaurant listing is checked
-          by a person before it appears. Read{" "}
+          Rankings come only from ratings given on {BRAND.name}. Restaurant listings start from open
+          map data, and many are added automatically and spot-checked later, so one may be out of
+          date: each page has a way to report that. Read{" "}
           <Link href="/how-rankings-work">how rankings work</Link> and{" "}
           <Link href="/about/data">where our data comes from</Link>.
         </p>

@@ -60,7 +60,7 @@ pnpm icons:build                                              # app icons, favic
 ## Non-negotiable rules
 
 1. **No scraping.** Never scrape Google Maps, foodpanda, Instagram, or any site, and never import a scraped dataset (Overture's AllThePlaces records are left out). Restaurant candidates come only from Overture Maps Places (Meta and Microsoft records), staged by `pnpm overture:sync` (`scripts/overture-sync.ts`, `src/server/services/overture/*`).
-2. **Human review.** Every restaurant is reviewed by a human before it goes public. We never use Google Places. Overture data (Meta, Microsoft) may prefill the form; we credit it on a data sources page.
+2. **Listings.** A restaurant goes public through an admin's review on `/admin/import`, or through the admin-run Auto-list (`docs/07` §2a, owner 2026-11-06): fixed rules, a dry run first, spot-checked afterwards, and its page says so until an admin has looked at it. Public copy never claims a person checked every listing. The Auto-list only creates; it never changes a restaurant that exists. We never use Google Places. Overture data (Meta, Microsoft) may prefill the form; we credit it on a data sources page.
 3. **Rankings use only our own ratings.** No imported scores from anywhere.
 4. **Thin data never ranks.** Eligibility rules in `docs/04-RANKING.md` are enforced in the query, not just in the UI.
 5. **No free-text dish creation by users.** Users pick from `dishes`. Unknown names become a `ReviewItem` for admin.
@@ -110,4 +110,6 @@ Do not invent product behavior. Pick the simplest safe default, mark it with
 - **Ranking**: the ordered list of eligible RestaurantDish rows for a (city, dish) by `score`.
 - **Panel**: trusted early raters (admin-only `isPanel` flag, trust fixed at 1.3), used to seed the first ratings.
 - **Review queue**: `ReviewItem` rows an admin resolves (unmatched menu items, dish proposals, flags, suspicious bursts, owner claims).
-- **Candidate**: an Overture place staged in `OvertureCandidate` (`NEW → CREATED / LINKED / SKIPPED`) for an admin to review on `/admin/import`; it is never public itself.
+- **Candidate**: an Overture place staged in `OvertureCandidate` (`NEW → CREATED / LINKED / SKIPPED`) for an admin to review on `/admin/import` or for the Auto-list to create; it is never public itself.
+- **Auto-list**: `/admin/import/auto-list`: creates restaurants from the clear NEW candidates by fixed rules; "Auto-listed, not checked" on `/admin/restaurants` is the spot-check.
+- **Places to try**: dish rows without votes on a ranking page, marked "Not ranked yet"; they never have a rank or a score.

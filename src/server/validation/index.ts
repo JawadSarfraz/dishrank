@@ -330,6 +330,10 @@ export type CandidateSkipInput = z.infer<typeof candidateSkipInput>;
 /** /admin/import Reopen: a skipped candidate goes back to the list. */
 export const candidateReopenInput = z.strictObject({ candidateId: id });
 
+/** /admin/import/auto-list Apply: how many restaurants this request may create. */
+export const autoListApplyInput = z.strictObject({ limit: z.int().min(1).max(200).optional() });
+export type AutoListApplyInput = z.infer<typeof autoListApplyInput>;
+
 /** /admin/import query string: city, area ("none" = no suggested area) and which candidates. */
 export const importQueueQuery = z.object({
   city: optionalQuery(slug),
@@ -382,6 +386,7 @@ export const adminRestaurantListQuery = z.object({
   q: optionalQuery(z.string().trim().max(80)),
   city: optionalQuery(slug),
   status: optionalQuery(z.enum(RestaurantStatus)),
+  check: optionalQuery(z.literal("auto-unchecked")),
   page: z.preprocess(
     (v) => (v === "" || v == null ? undefined : v),
     z.coerce.number().int().min(1).max(10_000).default(1),

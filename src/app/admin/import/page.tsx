@@ -2,6 +2,7 @@ import { AdminHeader, AdminTabs } from "@/components/admin/AdminPage";
 import { ImportQueue } from "@/components/admin/ImportQueue";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { requirePageRole } from "@/server/auth";
 import { QUEUE_LIMIT, getImportQueue } from "@/server/services/import.service";
 import { importQueueQuery } from "@/server/validation";
@@ -18,13 +19,19 @@ export default async function AdminImportPage({ searchParams }: PageProps<"/admi
     <main className="flex flex-col gap-5">
       <AdminHeader
         title="Import"
+        actions={
+          <ButtonLink href="/admin/import/auto-list" size="sm">
+            Auto-list
+          </ButtonLink>
+        }
         help={
           <>
             Places from Overture Maps (Meta and Microsoft records
             {queue.release ? `, release ${queue.release}` : ""}), one area at a time, most likely to
-            exist first. For each: Create a restaurant (the form is prefilled; fix the name to the
-            signboard spelling and tick its dishes), Link it to one we have, or Skip it. Nothing is
-            public until you create it. Load new places with{" "}
+            exist first. Auto-list creates the clear ones in one go, after a preview. For the rest:
+            Create a restaurant (the form is prefilled; fix the name to the signboard spelling and
+            tick its dishes), Link it to one we have, or Skip it. Nothing is public until it is
+            created. Load new places with{" "}
             <code className="rounded bg-muted px-1">pnpm overture:sync -- --city=all</code>.
           </>
         }

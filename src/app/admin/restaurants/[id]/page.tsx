@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import {
+  MarkCheckedButton,
   MergeRestaurantDialog,
   RestaurantEditForm,
   RestaurantStatusForm,
@@ -23,7 +24,7 @@ export default async function AdminRestaurantPage({
 
   const found = await getRestaurantForAdmin(user, id);
   if (!found) notFound();
-  const { restaurant: r, areas, dishes, mergedInto } = found;
+  const { restaurant: r, areas, dishes, mergedInto, overture } = found;
   const merged = r.status === "DUPLICATE";
 
   return (
@@ -79,6 +80,21 @@ export default async function AdminRestaurantPage({
             : "Added by hand (not from Overture)"}
           {r.overtureId ? ` · Overture id ${r.overtureId}` : ""}
         </p>
+        {r.autoListedAt && (
+          <div className="flex flex-col items-start gap-2">
+            <p>
+              Auto-listed
+              {overture
+                ? ` from "${overture.name}" (${overture.category}, confidence ${overture.confidence.toFixed(2)})`
+                : ""}
+              .{" "}
+              {r.checkedAt
+                ? "Checked or edited by an admin since."
+                : "Not checked yet: its public page says so."}
+            </p>
+            {!r.checkedAt && !merged && <MarkCheckedButton restaurantId={r.id} name={r.name} />}
+          </div>
+        )}
         <p>
           {r.lat !== null && r.lng !== null ? (
             <>

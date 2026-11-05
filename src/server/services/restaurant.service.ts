@@ -56,7 +56,10 @@ import {
 } from "@/server/repositories/moderation.repo";
 import { listDishGroupsOfRestaurant, lockCityDishLists } from "@/server/repositories/ranking.repo";
 import { adjustRatingCounters } from "@/server/repositories/user.repo";
-import { moveCandidatesToRestaurant } from "@/server/repositories/overture.repo";
+import {
+  findAutoListedCandidateOf,
+  moveCandidatesToRestaurant,
+} from "@/server/repositories/overture.repo";
 import { findDishesBySlugs } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
@@ -131,7 +134,7 @@ export const ADMIN_DISH = { source: "ADMIN", confidence: 0.4 } as const;
 export type NewRestaurant = {
   name: string;
   areaId: string;
-  address: string;
+  address: string | null;
   phone?: string | null;
   website?: string | null;
   priceBand?: number | null;
@@ -139,6 +142,8 @@ export type NewRestaurant = {
   source: RestaurantSource;
   overtureId?: string | null;
   location: { lat: number; lng: number; source: LocationSource } | null;
+  /** Set by the Auto-list only (docs/07 §2a). */
+  autoListedAt?: Date;
 };
 
 /** Inside a transaction: checks the area, picks a unique slug, inserts. The city is the area's. */
@@ -166,6 +171,7 @@ export async function insertRestaurantTx(input: NewRestaurant, tx: Tx) {
       overtureId: input.overtureId ?? null,
       aliases,
       searchText: buildSearchText(input.name, aliases),
+      autoListedAt: input.autoListedAt ?? null,
     },
     tx,
   );
@@ -265,6 +271,31 @@ async function loadEditable(id: string, tx?: Tx) {
   return restaurant;
 }
 
+/** An admin's hand on an auto-listed restaurant ends its "not checked" state (docs/07 §2a). */
+const checkedBy = (restaurant: { autoListedAt: Date | null; checkedAt: Date | null }, now: Date) =>
+  restaurant.autoListedAt && !restaurant.checkedAt ? { checkedAt: now } : {};
+
+/** "Looks right" on /admin/restaurants: the spot-check of an auto-listed restaurant. */
+export async function markRestaurantChecked(
+  actor: SessionUser | null,
+  id: string,
+  now: Date = new Date(),
+) {
+  const admin = assertRole(actor, "ADMIN");
+  const restaurant = await inTransaction(async (tx) => {
+    await lockRestaurants([id], tx);
+    const live = await loadEditable(id, tx);
+    if (!live.autoListedAt) {
+      throw new AppError("NOT_AUTO_LISTED", "This restaurant was not auto-listed", 409);
+    }
+    const update = checkedBy(live, now);
+    if (update.checkedAt) await updateRestaurantById(id, update, tx);
+    return live;
+  });
+  logEvent("restaurant.checked", { userId: admin.id, entityId: id });
+  return { id, slug: restaurant.slug, citySlug: restaurant.city.slug };
+}
+
 /** Edit. The slug never changes (URLs stay stable). */
 export async function updateRestaurant(
   actor: SessionUser | null,
@@ -302,6 +333,7 @@ export async function updateRestaurant(
       id,
       {
         ...data,
+        ...checkedBy(restaurant, new Date()),
         name: input.name,
         areaId: input.areaId,
         address: input.address,
@@ -316,7 +348,13 @@ export async function updateRestaurant(
     // The ranking, city and home pages show its dish rows with the name, area and location: the
     // caller revalidates them (audit 2026-11, B-05).
     const rows = await listDishesOfRestaurant(id, tx);
-    return { ...saved, dishPages: await listDishPagesOfRows(rows.map((r) => r.id), tx) };
+    return {
+      ...saved,
+      dishPages: await listDishPagesOfRows(
+        rows.map((r) => r.id),
+        tx,
+      ),
+    };
   });
   logEvent("restaurant.update", { userId: admin.id, entityId: id });
   return { id, slug: updated.slug, citySlug: updated.city.slug, dishPages: updated.dishPages };
@@ -332,7 +370,9 @@ export async function setRestaurantStatus(
   const restaurant = await inTransaction(async (tx) => {
     await lockRestaurants([id], tx);
     const live = await loadEditable(id, tx);
-    if (live.status !== status) await updateRestaurantById(id, { status }, tx);
+    if (live.status !== status) {
+      await updateRestaurantById(id, { status, ...checkedBy(live, new Date()) }, tx);
+    }
     return live;
   });
   let dishPages: Awaited<ReturnType<typeof listDishPagesOfRows>> = [];
@@ -444,6 +484,8 @@ export type RestaurantLookup =
       restaurant: PublicRestaurant;
       dishes: PublicRestaurantDish[];
       claimed: boolean;
+      /** Auto-listed from open map data, and nobody on our team has looked at it yet. */
+      unchecked: boolean;
     }
   | { kind: "redirect"; slug: string; citySlug: string }
   | { kind: "not_found" };
@@ -502,6 +544,7 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
     },
     dishes,
     claimed: Boolean(restaurant.claimedByUserId),
+    unchecked: Boolean(restaurant.autoListedAt && !restaurant.checkedAt),
   };
 }
 
@@ -516,6 +559,7 @@ export async function listRestaurantsForAdmin(
   const { items, total } = await listRestaurantsPage({
     cityId: city?.id,
     status: query.status,
+    autoUnchecked: query.check === "auto-unchecked",
     text: query.q ? cleanText(query.q) || undefined : undefined,
     skip: (query.page - 1) * ADMIN_PAGE_SIZE,
     take: ADMIN_PAGE_SIZE,
@@ -532,15 +576,17 @@ export async function getRestaurantForAdmin(actor: SessionUser | null, id: strin
   assertRole(actor, "ADMIN");
   const restaurant = await findRestaurantById(id);
   if (!restaurant) return null;
-  const [city, dishes, mergedInto] = await Promise.all([
+  const [city, dishes, mergedInto, overture] = await Promise.all([
     findCityWithAreasBySlug(restaurant.city.slug),
     listDishesOfRestaurant(restaurant.id),
     restaurant.mergedIntoId ? findRestaurantById(restaurant.mergedIntoId) : null,
+    restaurant.autoListedAt ? findAutoListedCandidateOf(restaurant.id) : null,
   ]);
   return {
     restaurant,
     areas: city?.areas ?? [],
     dishes,
+    overture,
     mergedInto: mergedInto
       ? { id: mergedInto.id, slug: mergedInto.slug, name: mergedInto.name }
       : null,
@@ -828,7 +874,9 @@ export async function mergeRestaurants(
       claimedByUserId: null,
       claimedAt: null,
     };
-    const targetUpdate: Prisma.RestaurantUncheckedUpdateInput = {};
+    const targetUpdate: Prisma.RestaurantUncheckedUpdateInput = {
+      ...checkedBy(target, new Date()),
+    };
     if (source.overtureId && !target.overtureId) {
       sourceUpdate.overtureId = null;
       targetUpdate.overtureId = source.overtureId;

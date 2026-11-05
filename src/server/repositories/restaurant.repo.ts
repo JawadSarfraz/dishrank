@@ -41,6 +41,28 @@ export async function listRestaurantsForDedupe(cityId: string, client: Client = 
   return rows.map(({ area, ...r }) => ({ ...r, areaName: area?.name ?? null }));
 }
 
+/**
+ * Every restaurant of every city and status, for the Auto-list: one an admin closed, hid or merged
+ * away must not come back as a new one.
+ */
+export async function listRestaurantsForAutoList(client: Client = db) {
+  const rows = await client.restaurant.findMany({
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      aliases: true,
+      lat: true,
+      lng: true,
+      areaId: true,
+      status: true,
+      overtureId: true,
+      area: { select: { name: true } },
+    },
+  });
+  return rows.map(({ area, ...r }) => ({ ...r, areaName: area?.name ?? null }));
+}
+
 /** Slugs equal to `base` or starting with it, to pick a free `base-N`. */
 export async function listSlugsStartingWith(base: string, client: Client = db) {
   const rows = await client.restaurant.findMany({
@@ -141,12 +163,21 @@ export async function listRestaurantsPage(input: {
   cityId?: string;
   status?: RestaurantStatus;
   text?: string;
+  /** Auto-listed restaurants nobody has looked at yet (docs/07 §2a), merged ones left out. */
+  autoUnchecked?: boolean;
   skip: number;
   take: number;
 }) {
   const where: Prisma.RestaurantWhereInput = {
     ...(input.cityId ? { cityId: input.cityId } : {}),
     ...(input.status ? { status: input.status } : {}),
+    ...(input.autoUnchecked
+      ? {
+          autoListedAt: { not: null },
+          checkedAt: null,
+          status: input.status ?? { not: "DUPLICATE" },
+        }
+      : {}),
     ...(input.text
       ? {
           OR: [
@@ -169,9 +200,16 @@ export async function listRestaurantsPage(input: {
         status: true,
         source: true,
         lat: true,
+        autoListedAt: true,
+        checkedAt: true,
         city: { select: { slug: true, name: true } },
         area: { select: { name: true } },
         claimedBy: { select: { id: true, name: true, email: true } },
+        candidates: {
+          where: { autoListedAt: { not: null } },
+          take: 1,
+          select: { name: true, confidence: true, category: true },
+        },
         _count: { select: { dishes: true } },
       },
     }),

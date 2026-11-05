@@ -68,7 +68,8 @@ who ate there." Internal identifiers stay `dishrank`.
 - O3. I can see my dish ranks and vote counts (basic report). Paid report comes later.
 
 ### Admin
-- A1. I can review Overture Maps candidates one area at a time and create restaurants from a prefilled form (fixing the name, address and area and ticking the dishes they serve), link them to restaurants we have, or skip them; and add a restaurant by hand when Overture misses it. Nothing is public until I create it.
+- A1. I can review Overture Maps candidates one area at a time and create restaurants from a prefilled form (fixing the name, address and area and ticking the dishes they serve), link them to restaurants we have, or skip them; and add a restaurant by hand when Overture misses it. Nothing is public until it is created.
+- A1a. I can run Auto-list on /admin/import: a dry run with counts per city, area and category, then Apply creates the clear candidates in one go, safe to run again, never touching a restaurant that exists. On /admin/restaurants, "Auto-listed, not checked" lets me spot-check them (docs/07 §2a).
 - A2. I can resolve the review queue: unmatched menu items, dish proposals, flags, suspicious bursts, claims.
 - A3. I can set user trust, hide ratings, merge duplicate restaurants, mark closed.
 - A4. I can trigger a full ranking recompute.

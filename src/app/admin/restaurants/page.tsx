@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import { AdminPagination } from "@/components/admin/AdminPagination";
-import { RemoveOwnerDialog } from "@/components/admin/RestaurantForms";
+import { MarkCheckedButton, RemoveOwnerDialog } from "@/components/admin/RestaurantForms";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ export default async function AdminRestaurantsPage({
     if (query.q) params.set("q", query.q);
     if (query.city) params.set("city", query.city);
     if (query.status) params.set("status", query.status);
+    if (query.check) params.set("check", query.check);
     if (p > 1) params.set("page", String(p));
     const qs = params.toString();
     return qs ? `/admin/restaurants?${qs}` : "/admin/restaurants";
@@ -80,6 +81,17 @@ export default async function AdminRestaurantsPage({
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Listing
+          <select
+            name="check"
+            defaultValue={query.check ?? ""}
+            className="field field-select h-10 w-auto text-sm"
+          >
+            <option value="">All</option>
+            <option value="auto-unchecked">Auto-listed, not checked</option>
+          </select>
+        </label>
         <Button type="submit" variant="outline" size="sm">
           Filter
         </Button>
@@ -99,12 +111,22 @@ export default async function AdminRestaurantsPage({
                 {r.name}
               </Link>
               {r.status !== "ACTIVE" && <Badge variant="outline">{r.status}</Badge>}
+              {r.autoListedAt && !r.checkedAt && <Badge variant="outline">Not checked</Badge>}
             </div>
             <span className="text-muted-foreground">
               {r.area?.name ?? "no area"}, {r.city.name} · {r._count.dishes} dishes ·{" "}
               {r.source === "OVERTURE" ? "from Overture" : "added by hand"} ·{" "}
               {r.lat === null ? "no location" : "location set"} · {r.slug}
             </span>
+            {r.candidates[0] && (
+              <span className="text-muted-foreground">
+                Overture: &ldquo;{r.candidates[0].name}&rdquo; · {r.candidates[0].category} ·
+                confidence {r.candidates[0].confidence.toFixed(2)}
+              </span>
+            )}
+            {r.autoListedAt && !r.checkedAt && r.status !== "DUPLICATE" && (
+              <MarkCheckedButton restaurantId={r.id} name={r.name} />
+            )}
             {r.claimedBy && (
               <div className="flex flex-wrap items-center gap-2">
                 <span>

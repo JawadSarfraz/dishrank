@@ -8,6 +8,7 @@ import { revalidateDishPages } from "@/server/revalidate";
 import { removeRestaurantOwner } from "@/server/services/claim.service";
 import {
   createRestaurant,
+  markRestaurantChecked,
   mergeRestaurants,
   searchRestaurantsForAdmin,
   setRestaurantStatus,
@@ -67,6 +68,17 @@ export async function setRestaurantStatusAction(restaurantId: unknown, input: un
     for (const page of result.dishPages) revalidateDishPages(page);
     refresh();
     return { id: result.id, slug: result.slug, citySlug: result.citySlug, status: result.status };
+  });
+}
+
+/** "Looks right": an admin checked this auto-listed restaurant; its public page stops saying it is unchecked. */
+export async function markRestaurantCheckedAction(restaurantId: unknown) {
+  return runAction("restaurant.checked", async () => {
+    const actor = await adminWriter();
+    const result = await markRestaurantChecked(actor, parseInput(id, restaurantId));
+    revalidatePath(restaurantPage(result.citySlug, result.slug));
+    refresh();
+    return { id: result.id };
   });
 }
 

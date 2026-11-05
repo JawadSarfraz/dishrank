@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  markRestaurantCheckedAction,
   mergeRestaurantAction,
   removeRestaurantOwnerAction,
   setRestaurantStatusAction,
@@ -279,6 +280,40 @@ export function MergeRestaurantDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** "Looks right": the spot-check of an auto-listed restaurant (editing it counts too). */
+export function MarkCheckedButton({ restaurantId, name }: { restaurantId: string; name: string }) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={pending}
+        aria-label={`${name} looks right`}
+        onClick={() =>
+          startTransition(async () => {
+            try {
+              const res = await markRestaurantCheckedAction(restaurantId);
+              setError(res.error ? describeActionError(res.error) : null);
+            } catch {
+              setError("The request did not reach the server. Try again.");
+            }
+          })
+        }
+      >
+        {pending ? "Saving…" : "Looks right"}
+      </Button>
+      {error && (
+        <span role="alert" className="text-xs text-destructive">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }
 

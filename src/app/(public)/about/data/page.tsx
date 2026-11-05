@@ -23,9 +23,13 @@ export default async function DataSourcesPage() {
           anywhere.
         </p>
         <p className="text-sm">
-          Many restaurant listings start from Overture Maps places. Our team reviews each one before
-          it is published, correcting the name, address and area; some restaurants are added by
-          hand. A listing&apos;s phone number, website and map location may come from Overture.
+          Most restaurant listings come from Overture Maps places. Many are added automatically,
+          with simple rules that tidy the name and drop places that look like duplicates or are not
+          places to eat. Our team spot-checks them afterwards, and a page says so until it has been
+          checked, so some listings may be out of date or wrong. Others are reviewed one by one or
+          added by hand. A listing&apos;s phone number, website and map location may come from
+          Overture. Which dishes a place from map data is shown under comes from its name or
+          category, until diners rate them; those places are marked &ldquo;Not ranked yet&rdquo;.
         </p>
         <h2>Credits</h2>
         <OvertureCredit release={credit.release} accessedOn={credit.accessedOn} />

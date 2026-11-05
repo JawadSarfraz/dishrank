@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
+import { applyAutoListBatch } from "@/server/services/auto-list.service";
 import {
   createFromCandidate,
   linkCandidate,
@@ -10,6 +11,7 @@ import {
   skipCandidate,
 } from "@/server/services/import.service";
 import {
+  autoListApplyInput,
   candidateCreateInput,
   candidateLinkInput,
   candidateReopenInput,
@@ -51,6 +53,19 @@ export async function skipCandidateAction(input: unknown) {
   return runAction("import.skip", async () => {
     const actor = await adminWriter();
     return skipCandidate(actor, parseInput(candidateSkipInput, input));
+  });
+}
+
+/** Auto-list: one batch; the page calls this until nothing is left. */
+export async function applyAutoListAction(input: unknown) {
+  return runAction("autolist.apply", async () => {
+    const actor = await adminWriter();
+    const { paths, ...result } = await applyAutoListBatch(
+      actor,
+      parseInput(autoListApplyInput, input),
+    );
+    for (const path of paths) revalidatePath(path);
+    return result;
   });
 }
 

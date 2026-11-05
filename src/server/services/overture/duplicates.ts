@@ -96,8 +96,10 @@ export class NearbyIndex<T extends LatLng> {
   near(at: LatLng, metres: number = DUPLICATE_RULES.metres): { point: T; metres: number }[] {
     const [y, x] = cellOf(at);
     const out: { point: T; metres: number }[] = [];
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
+    // A cell is at least ~90 m wide at these latitudes (0.001° of longitude at 33°N).
+    const span = Math.max(1, Math.ceil(metres / 90));
+    for (let dy = -span; dy <= span; dy++) {
+      for (let dx = -span; dx <= span; dx++) {
         for (const point of this.cells.get(`${y + dy}:${x + dx}`) ?? []) {
           const m = metresBetween(at, point);
           if (m <= metres) out.push({ point, metres: m });

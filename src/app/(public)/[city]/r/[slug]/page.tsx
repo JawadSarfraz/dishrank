@@ -70,7 +70,7 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
   const result = await load(slug);
   if (result.kind === "not_found") notFound();
   if (result.kind === "redirect") permanentRedirect(`/${result.citySlug}/r/${result.slug}`);
-  const { restaurant, dishes, claimed } = result;
+  const { restaurant, dishes, claimed, unchecked } = result;
   if (restaurant.city.slug !== city) {
     permanentRedirect(`/${restaurant.city.slug}/r/${restaurant.slug}`);
   }
@@ -133,6 +133,15 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
               </ButtonLink>
             )}
           </div>
+        )}
+        {unchecked && (
+          <p className="text-sm text-muted-foreground">
+            Listed from{" "}
+            <Link href="/about/data" className="underline underline-offset-2">
+              open map data
+            </Link>
+            ; our team has not checked it yet. If something is wrong, report it below.
+          </p>
         )}
       </header>
 

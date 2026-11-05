@@ -2,11 +2,11 @@
 
 How restaurants and (restaurant, dish) links get into the system.
 
-Restaurants come from two sources, and an admin confirms every one before it is public (CLAUDE.md rule 2, ADR-13):
-- Overture Maps places, staged by `pnpm overture:sync` (§1) and reviewed on /admin/import (§2);
+Restaurants come from two sources (CLAUDE.md rule 2, ADR-13):
+- Overture Maps places, staged by `pnpm overture:sync` (§1), then reviewed on /admin/import (§2) or created by the Auto-list (§2a);
 - restaurants added by hand on /admin/restaurants/new for places Overture misses.
 
-(restaurant, dish) links come from four sources, in order of trust:
+(restaurant, dish) links come from five sources, in order of trust:
 
 | Source | Creates | Confidence | Status |
 |---|---|---|---|
@@ -14,15 +14,16 @@ Restaurants come from two sources, and an admin confirms every one before it is 
 | Menu photo → vision → matching | RestaurantDish | 0.85–1.0 auto, else review | MENU_VERIFIED |
 | User rating / "add dish" | RestaurantDish | 0.5 | CANDIDATE → USER_CONFIRMED at 3 raters |
 | Admin ticks a dish (/admin/import Create, /admin/restaurants/new) | RestaurantDish, source ADMIN | 0.4 | CANDIDATE |
+| Auto-list reads the name or category (§2a) | RestaurantDish, source AUTO_LIST | 0.3 | CANDIDATE |
 
 ## 1. Restaurant candidates from Overture Maps (`pnpm overture:sync`)
 
-**Purpose**: a starting list of restaurants per area for an admin to review, so the panel knows where to go and the rate flow has restaurants to pick. It never ranks anything.
+**Purpose**: a starting list of restaurants per area, so diners have places to try and the rate flow has restaurants to pick. It never ranks anything.
 
 **Rules** (owner decision 2026-10-25, ADR-13; coverage and quality in `docs/research/overture-coverage.md`):
 - No Google Places, ever: Google's Maps Platform Terms 3.2.3(d)(iii) forbid the Places API "in a listings or directory service". The only Google service left is the sign-in (OAuth).
 - Only Overture records whose every whole-record source is Meta or Microsoft, licence CDLA Permissive 2.0. AllThePlaces records are left out (scraped data, CLAUDE.md rule 1), and so are Foursquare's (Apache 2.0 notice duties).
-- The sync fills only the staging table `OvertureCandidate`. A restaurant exists only after an admin creates it on /admin/import (§2), where the form may be prefilled from Overture.
+- The sync fills only the staging table `OvertureCandidate`. A restaurant exists only after an admin creates it on /admin/import (§2), where the form may be prefilled from Overture, or runs the Auto-list (§2a).
 - Credit: the public page /about/data, linked from the footer, shows Overture's credit lines word for word with the licence text linked (https://cdla.dev/permissive-2-0/):
   > Overture Maps Foundation, overturemaps.org (release 2026-10-21.0, accessed 2026-10-25).
   > Data from Meta. Available under CDLA Permissive 2.0.
@@ -58,7 +59,7 @@ Rerun it after each monthly Overture release. Overture's confidence and categori
 
 ## 2. Admin review (`/admin/import`)
 
-1. Pick a city (links), an area and a view. Each area shows the number of places left to review; there is also "No area suggested". The views are To review, Skipped, and Created or linked. The default area is the one with the most places left. Candidates are listed by Overture's confidence, highest first, at most 300 at a time. Overture recommends no threshold, so none is applied.
+1. Pick a city (links), an area and a view. Each area shows the number of places left to review; there is also "No area suggested". The views are To review, Skipped, and Created or linked. The default area is the one with the most places left. Candidates are listed by Overture's confidence, highest first, at most 300 at a time. Overture recommends no threshold, so none is applied here (the Auto-list has its own, §2a).
 2. Each row shows:
    - name, confidence and categories; address, phone and website;
    - Overture's coordinates, or "location unknown", and the suggested area;
@@ -92,6 +93,59 @@ Goal: about 40 places reviewed in 15 minutes.
 **Places Overture misses**: /admin/restaurants/new ("Add restaurant") is the same form, empty, with an optional latitude and longitude (`locationSource ADMIN`). It sets `source MANUAL`.
 
 **Coordinates later**: on /admin/restaurants/[id] an admin can type or clear the coordinates at any time. Changed coordinates become `locationSource ADMIN`, unchanged ones keep their source, and cleared ones mean location unknown. A restaurant's own coordinates (Overture or admin) are public data and drive the distance features (docs/04, docs/06).
+
+## 2a. Auto-list (`/admin/import/auto-list`)
+
+Owner, 2026-11-06: public launch within days and no panel phase; reviewing every place by hand is too slow for one person. An admin runs this; nothing runs it on a schedule. Pure rules in `src/server/services/overture/auto-list.ts`, the writes in `auto-list.service.ts`.
+
+**It never** imports a rating, score or review, gives a rank, or changes a restaurant that exists. Rule 3 stands: a place ranks only from ratings on Kahan Khayen.
+
+**Who is listed.** A `NEW` candidate is created when all of these hold; otherwise it stays `NEW` on /admin/import, and the preview counts it under its reason:
+
+1. A real location (not a placeholder point) and a suggested area.
+2. Overture confidence ≥ **0.6** (`AUTO_LIST.minConfidence`). From the data on 2026-11-06 (2,784 candidates, 2,160 with an area and location). Overture says the score is relative and recommends no threshold, and we checked no place on the ground, so this is a judgement: junk thins out only gradually. What decided it is that the records get visibly fuller at 0.6 and the places just above it are the ones the dish pages need:
+
+   | Confidence | With area and location | Phone | Website | Address |
+   |---|--:|--:|--:|--:|
+   | 0.3–0.4 | 146 | 80% | 20% | 89% |
+   | 0.4–0.5 | 210 | 81% | 16% | 89% |
+   | 0.5–0.6 | 309 | 79% | 15% | 89% |
+   | **0.6–0.7** | **274** | **87%** | **26%** | **92%** |
+   | 0.7–0.8 | 373 | 84% | 24% | 92% |
+   | 0.8–0.9 | 379 | 91% | 35% | 96% |
+   | 0.9–1.0 | 336 | 99% | 47% | 98% |
+
+   Reading samples: 0.6–0.7 holds Waris Nihari House, Muhammadi Nihari House, Desi Butt Karahi and Pizza Max with few strays; 0.5–0.6 has real places too (Subway, Lazat Murgh Pulao) next to more strays ("Reload-Car Detailing"), and those can be found with search, suggested, or created on /admin/import. To change the floor, change the constant.
+3. A category on the allow-list `AUTO_LIST_CATEGORIES`. The bare `food_and_drink` is out (it held a flour mill and an HR consultant next to real places), and so are `internet_cafe`, `candy_store`, `chocolatier` and `cupcake_shop`. A category new in a later release stays `NEW` until someone adds it.
+4. Seen in the newest synced release.
+5. A usable name (below), and it does not read as something else: "village", "traders", "apartments", "marriage hall", "net cafe", "chowk" and similar words, unless the name also says it serves food. A name of generic words only ("Food Court", "The Refreshment Centre") or of a seed area only ("Saddar") stays `NEW`.
+6. Not a likely duplicate (below).
+
+**Names** (`cleanPlaceName`). Only shortened or re-cased, never made up; every word comes from Overture's name. Fancy Unicode to plain letters, emojis and symbols out, a translation in another script at either end out ("Niaz Café - نیاز کیفے"), anything after a "|" out (a tagline or address), then in a loop trailing city names ("Islamabad", "Rawalpindi", "Pindi", "Isb", "Rwp", "Pakistan", also "in Rawalpindi") and "Official" / "Pvt Ltd" / "Private Limited" and the like. A city stays when the rest would say nothing ("Cake Shop Islamabad"). All-caps is fixed ("PIZZA KING" → "Pizza King"), initials stay ("SFK Food", "KFC", "OPTP"), a single short word stays as written, an all-lowercase name gets capitals. A name left without Latin letters, mostly in another script, or over 80 characters stays `NEW` for a person. The candidate's `name` is never changed, so Overture's original stays there for audit (/admin/restaurants shows it).
+
+**Likely duplicates.** Among candidates that pass, strongest first (confidence, then the fuller record): one is held when a stronger pick has a similar name within 300 m (the §2 name rule) or the same name within 1 km. Wider than the 50 m hint on /admin/import because no person looks first, and a real second branch that close simply stays `NEW`. The same test runs against our restaurants of every status and city (one an admin closed, hid or merged away must not come back), their other names, restaurants with no location (the §2 rule), and every candidate already `CREATED`, `LINKED` or `SKIPPED`.
+
+**Dish links** (`autoListDishes`). Only where the name or category clearly says so, as whole words, `RestaurantDish CANDIDATE, source AUTO_LIST, confidence 0.3`. They never rank without ratings.
+
+| Name says | Links |
+|---|---|
+| pizza, pizzeria (or category `pizza_restaurant`) | Pizza |
+| burger (or `burger_restaurant`) | Beef Burger and Zinger Burger; only one after "beef", or "chicken"/"zinger" (DECISION-PENDING) |
+| zinger | Zinger Burger |
+| broast | Broast |
+| shawarma, shwarma, shawerma | Chicken Shawarma, not after "beef" or "mutton" |
+| chai, chaye, chaaye, chaiwala, tea (or `tea_room`) | Chai, not "bubble tea", "green tea", "high tea", "Tea Leaf" and the like |
+| biryani and spellings | Chicken Biryani, not after "beef", "mutton", "sindhi" |
+| karahi, karhai, kadai… | Chicken Karahi and Mutton Karahi; one after "chicken" or "mutton"; none after "beef", "fish" or "namkeen" |
+| nihari, nehari, nahari | Beef Nihari, not after "chicken" |
+| tikka | Chicken Tikka, not after "beef", "mutton", "fish", "paneer" |
+| kabab, kebab | Beef Seekh Kabab; Chapli Kabab after "chapli"; none after "chicken", "reshmi", "doner", "shami", "bun" |
+
+**Running it.** /admin/import → **Auto-list** shows the dry run: counts per city, area, category and dish, why the others stay `NEW`, the confidence bands, sample name clean-ups. Apply creates restaurants strongest first, one transaction each, 100 per request (the page calls until none are left, under `user:{id}:admin-write`), and each request writes a `JobRun` named `auto-list`. Restaurants get `source OVERTURE`, `status ACTIVE`, `overtureId`, Overture's address, phone, website and coordinates, `locationSource OVERTURE` and `autoListedAt`; candidates become `CREATED` with `autoListedAt`, `reviewedByUserId` (who pressed Apply) and `reviewedAt`.
+
+**Safe to re-run.** It reads only `NEW` candidates, inserts only; the plan is worked out again on every call, so a stopped run carries on and a finished one finds nothing. A candidate an admin decided on meanwhile is skipped under its row lock.
+
+**Spot-check.** /admin/restaurants → Listing **Auto-listed, not checked** lists what nobody has looked at, each with Overture's original name, category and confidence. **Looks right** sets `checkedAt`; so does editing the restaurant, changing its status, or merging into it. Until then its public page says "Listed from open map data; our team has not checked it yet", and /about/data says how listings are made.
 
 ### Merging duplicate restaurants (`RestaurantService.merge(sourceId, targetId)`)
 
