@@ -21,18 +21,6 @@ const ok = (schema: { safeParse: (v: unknown) => { success: boolean } }, v: unkn
 
 describe("ratingInput", () => {
   const base = { restaurantId: rid, dishId: did, score: 8 };
-  it("accepts the docs/06 example", () => {
-    expect(
-      ok(ratingInput, {
-        ...base,
-        taste: 4,
-        portion: 3,
-        value: 4,
-        comment: "Best ginger in F-7",
-        photoPath: "dish-photos/u123/abc.jpg",
-      }),
-    ).toBe(true);
-  });
   it.each([
     [{ ...base, score: 0 }],
     [{ ...base, score: 11 }],

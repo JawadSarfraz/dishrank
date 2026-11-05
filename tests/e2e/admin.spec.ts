@@ -10,6 +10,10 @@ const PAGES = [
   "/admin/menus",
   "/admin/users",
   "/admin/import",
+  "/admin/restaurants",
+  "/admin/restaurants/new",
+  "/admin/rankings",
+  "/admin/analytics",
   "/owner",
 ];
 

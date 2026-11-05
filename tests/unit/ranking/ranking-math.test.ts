@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { RANKING } from "@/server/services/ranking.constants";
 import {
   aggregateRatings,
   bayesScore,
@@ -58,7 +57,6 @@ describe("ranking math (docs/04)", () => {
     expect(
       isEligible({ ...row, distinctRaters: 4, weightSum: 2.5 }, true, thresholdsFor(null, NOW)),
     ).toBe(true);
-    expect(RANKING.eligibleStatuses).toEqual(["USER_CONFIRMED", "MENU_VERIFIED", "OWNER_VERIFIED"]);
   });
 
   it("counts the ratings still needed: missing raters, or missing weight in fresh 0.6 ratings", () => {

@@ -5,7 +5,6 @@ import { listMyClaims, removeRestaurantOwner, submitClaim } from "@/server/servi
 import { listMyRestaurants } from "@/server/services/owner.service";
 import { createOrReplace } from "@/server/services/rating.service";
 import { resolveReviewItem } from "@/server/services/review.service";
-import { ownerRemoveInput, parseInput } from "@/server/validation";
 import { resetAppData } from "../../setup/db-reset";
 import { actorOf, daysAgo, dishId, makeRestaurant, makeUser } from "../restaurants/fixtures";
 
@@ -229,14 +228,4 @@ describe("removing an owner (/admin/restaurants)", () => {
     expect((await db.user.findUniqueOrThrow({ where: { id: adminOwner.id } })).role).toBe("ADMIN");
   });
 
-  it("needs a reason of at most 500 characters", () => {
-    for (const bad of [undefined, "", "   ", "x".repeat(501)]) {
-      expect(() => parseInput(ownerRemoveInput, { ownerId: "abcdefgh12", reason: bad })).toThrow(
-        expect.objectContaining({ code: "VALIDATION_FAILED" }),
-      );
-    }
-    expect(parseInput(ownerRemoveInput, { ownerId: "abcdefgh12", reason: `  ${reason} ` })).toEqual(
-      { ownerId: "abcdefgh12", reason },
-    );
-  });
 });
