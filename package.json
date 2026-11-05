@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "format": "prettier --write .",
+    "icons:build": "tsx scripts/make-icons.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",

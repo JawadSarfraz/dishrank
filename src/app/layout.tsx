@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, Geist } from "next/font/google";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { PwaRegister } from "@/components/pwa/PwaRegister";
 import { Toaster } from "@/components/ui/toast";
 import { BRAND } from "@/lib/brand";
 import { SITE_URL, isBeta } from "@/server/site";
@@ -32,6 +34,7 @@ export const metadata: Metadata = {
   title: { default: BRAND.name, template: `%s · ${BRAND.name}` },
   description: BRAND.description,
   applicationName: BRAND.name,
+  manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: BRAND.shortName, statusBarStyle: "default" },
   // Beta (SITE_MODE, docs/10): no page is indexed. Pages that set robots themselves only ever set
   // noindex, and next.config.ts adds an X-Robots-Tag header to every response as well.
@@ -52,6 +55,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Toaster>
           <SiteHeader beta={isBeta} />
           {children}
+          <PwaRegister />
+          <InstallPrompt />
         </Toaster>
       </body>
     </html>
