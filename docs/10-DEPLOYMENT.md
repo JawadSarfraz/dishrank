@@ -14,7 +14,7 @@ Prisma 7 docs on 2026-10-26.
 | Google Cloud | OAuth client (sign-in only) | Google Auth Platform. No Places API: Google Places is not used (ADR-13) |
 | Overture Maps | restaurant candidates (open data) | No account or key: `pnpm overture:sync` reads the public S3 bucket from the admin's machine (DuckDB) and writes the staging table of the database `DATABASE_URL` points at. `pnpm prod:bootstrap` runs it once; run it by hand after each monthly release |
 | Anthropic Console | API key for vision + matcher | Not needed for the beta: no code calls it yet (menu parsing is Phase 5). Set a monthly spend limit when it is |
-| Domain | e.g. dishrank.pk / .com | Later. The beta runs on `<project>.vercel.app` |
+| Domain | kahankhayen.com | On Vercel; `www` and the old `*.vercel.app` address redirect there at the domain level (docs/DEPLOY-CHECKLIST.md, Go live) |
 
 ## Environment variables (`.env.example`)
 
@@ -32,10 +32,10 @@ the code that needs it. Where each production value comes from is in `docs/DEPLO
 | `DATABASE_URL` | Supabase transaction pooler, port 6543, `?pgbouncer=true`, **no** `sslmode` |
 | `DIRECT_URL` | Supabase session pooler, port 5432, `?sslmode=require` |
 | `BETTER_AUTH_SECRET` | `openssl rand -base64 32`; changing it later signs everyone out |
-| `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL` | the production origin, e.g. `https://dishrank.vercel.app` (no path, no trailing slash) |
+| `BETTER_AUTH_URL`, `NEXT_PUBLIC_SITE_URL` | the production origin, `https://kahankhayen.com` (no path, no trailing slash) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | the Google OAuth web client |
 | `CRON_SECRET` | `openssl rand -hex 32` |
-| `IP_HASH_SECRET` | `openssl rand -hex 32`; keys the hash of client IPs in rate-limit keys (never the raw IP). Changing it only resets the per-IP limits |
+| `IP_HASH_SECRET` | `openssl rand -hex 32`; keys the hash of client IPs in rate-limit keys (never the raw IP) and, with its own label, the hash of banned e-mail addresses. Changing it resets the per-IP limits **and empties the ban list in effect** (old hashes stop matching), so a banned account could sign up again |
 | `ADMIN_EMAIL` | the owner's Gmail: that account becomes ADMIN on its first sign-in |
 | `SITE_MODE` | `beta` (also the production default while unset), `live` at launch |
 | `BETA_ALLOWED_EMAILS` | the panel's Gmail addresses, comma-separated (beta only) |

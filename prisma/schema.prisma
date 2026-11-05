@@ -169,8 +169,8 @@ model User {
   panelInviteUses      PanelInviteUse[]
 }
 
-/// Banned Google accounts, as one-way hashes of their e-mail address (sha256 of the trimmed,
-/// lowercased address, src/server/email-hash.ts). Written when an admin bans a user and when a
+/// Banned Google accounts, as one-way hashes of their e-mail address (an HMAC of the trimmed,
+/// lowercased address, keyed from IP_HASH_SECRET, src/server/email-hash.ts). Written when an admin bans a user and when a
 /// banned user deletes the account; checked at sign-up, so the same account cannot come back
 /// (audit 2026-11, A-01). The hash cannot be turned back into the address.
 model BannedEmail {
