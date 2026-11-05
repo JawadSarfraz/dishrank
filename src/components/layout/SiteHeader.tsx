@@ -62,7 +62,9 @@ export function SiteHeader({ beta }: { beta: boolean }) {
         <div className="ml-auto flex items-center gap-1.5">
           {pathname !== "/rate" && (
             <ButtonLink href="/rate" size="sm" className="h-11 px-3.5 text-base">
-              Rate<span className="hidden min-[430px]:inline"> a dish</span>
+              <span>
+                Rate<span className="hidden min-[430px]:inline"> a dish</span>
+              </span>
             </ButtonLink>
           )}
           <span className="inline-flex min-w-11 justify-end">
