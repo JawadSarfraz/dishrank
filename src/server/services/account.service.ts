@@ -12,12 +12,12 @@ import {
 } from "@/server/repositories/restaurant-dish.repo";
 import { inTransaction } from "@/server/repositories/transaction";
 import { listUploadsOfUser } from "@/server/repositories/upload.repo";
-import { lockUser } from "@/server/repositories/user.repo";
+import { findRater, lockUser } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { AccountDeleteInput } from "@/server/validation";
 import { recomputeEach } from "./ranking.service";
-import { deleteUnusedPhotos } from "./upload.service";
+import { deleteUnfiledMenuUploads, deleteUnusedPhotos } from "./upload.service";
 
 /**
  * Deletes the signed-in user's account. The dish rows of their ratings are locked first (their
@@ -43,8 +43,22 @@ export async function deleteMyAccount(
       409,
     );
   }
+  // A banned account cannot delete itself (audit 2026-11, A-01): the ban and the hidden ratings
+  // would go with it, and the same Google account could sign in again as a new, clean user.
+  const rater = await findRater(user.id);
+  if (!rater) throw new AppError("UNAUTHENTICATED", "Sign in required", 401);
+  if (rater.bannedAt) {
+    throw new AppError(
+      "USER_BANNED",
+      "This account is banned, so it cannot be deleted here. Write to the contact address on the privacy page.",
+      403,
+    );
+  }
   await assertRateLimit(`user:${user.id}:account-delete`, RATE_LIMITS.accountDelete, now);
   const uploads = await listUploadsOfUser(user.id);
+  // Menu photos signed but never filed would lose their row with the account and stay in the
+  // private bucket for good (audit 2026-11, A-12): their files go first.
+  const unfiledMenus = await deleteUnfiledMenuUploads(user.id, storage);
   const result = await inTransaction(async (tx) => {
     const before = await listRatingsForDeletion(user.id, tx);
     const rows = [...new Set(before.map((r) => r.restaurantDishId))];
@@ -70,6 +84,8 @@ export async function deleteMyAccount(
     entityId: user.id,
     ratings: result.ratings,
     reviewItems: result.reviewItems,
+    redactedItems: result.redactedItems,
+    unfiledMenus,
     rows: result.rows.length,
   });
   return { deleted: true, dishPages: await listDishPagesOfRows(result.rows) };

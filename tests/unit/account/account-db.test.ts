@@ -55,6 +55,24 @@ describe("delete my account (Phase 6)", () => {
     const menu = await db.menuUpload.create({
       data: { restaurantId: restaurant.id, uploadedByUserId: user.id, filePath: "menus/x/y.webp" },
     });
+    // A claim the admin decided earlier: its item stays as the record, without the phone number.
+    const decided = await db.reviewItem.create({
+      data: {
+        type: "OWNER_CLAIM",
+        status: "REJECTED",
+        resolution: "rejected: not the owner",
+        restaurantId: restaurant.id,
+        createdByUserId: user.id,
+        payload: { claimId: "gone", phone: "03009998877", proofNote: "Ask for me" },
+      },
+    });
+    // A menu photo of their own restaurant, signed but never filed: its file goes with the account.
+    const unfiled = await signPhotoUpload(
+      actor,
+      { kind: "menu", restaurantId: owned.id, contentType: "image/webp", sizeBytes: 3 },
+      storage.adapter,
+    );
+    storage.objects[unfiled.path.slice("menus/".length)] = { size: 3, contentType: "image/webp" };
 
     await expect(
       deleteMyAccount(actor, { confirm: "delete" as never }, storage.adapter),
@@ -68,17 +86,28 @@ describe("delete my account (Phase 6)", () => {
     expect(await db.rating.count({ where: { userId: user.id } })).toBe(0);
     expect(await db.session.count({ where: { userId: user.id } })).toBe(0);
     expect(await db.ownerClaim.count()).toBe(0);
+    // Their open claim and suggestion are gone; the decided claim item stays (checked below).
     expect(
-      await db.reviewItem.count({ where: { type: { in: ["OWNER_CLAIM", "DISH_PROPOSAL"] } } }),
+      await db.reviewItem.count({
+        where: { status: "OPEN", type: { in: ["OWNER_CLAIM", "DISH_PROPOSAL"] } },
+      }),
     ).toBe(0);
     expect(await db.upload.count()).toBe(0);
     expect(
       await db.rateLimitBucket.count({ where: { key: { startsWith: `user:${user.id}:` } } }),
     ).toBe(0);
-    // The photo file is gone; the menu stays without its uploader; their restaurant is unclaimed.
-    expect(storage.removed).toEqual([photo.path.slice("dish-photos/".length)]);
+    // The photo files are gone (the unfiled menu photo first); the menu stays without its uploader;
+    // their restaurant is unclaimed; the decided claim keeps no contact details.
+    expect(storage.removed).toEqual([
+      unfiled.path.slice("menus/".length),
+      photo.path.slice("dish-photos/".length),
+    ]);
     expect(await db.menuUpload.findUniqueOrThrow({ where: { id: menu.id } })).toMatchObject({
       uploadedByUserId: null,
+    });
+    expect(await db.reviewItem.findUniqueOrThrow({ where: { id: decided.id } })).toMatchObject({
+      createdByUserId: null,
+      payload: { claimId: "gone", phone: null, proofNote: null, redacted: true },
     });
     expect(
       (await db.restaurant.findUniqueOrThrow({ where: { id: owned.id } })).claimedByUserId,
@@ -87,6 +116,29 @@ describe("delete my account (Phase 6)", () => {
     expect(
       await db.restaurantDish.findUniqueOrThrow({ where: { id: mine.restaurantDishId } }),
     ).toMatchObject({ distinctRaters: 1, ratingCount: 1 });
+  });
+
+  it("a banned account cannot delete itself (the ban and the hidden ratings would go with it)", async () => {
+    const banned = await makeUser("Banned", { bannedAt: NOW, createdAt: daysAgo(30, NOW) });
+    const restaurant = await makeRestaurant("Ban Karahi");
+    const row = await db.restaurantDish.create({
+      data: {
+        restaurantId: restaurant.id,
+        dishId: await dishId("chicken-karahi"),
+        cityId: restaurant.cityId,
+        source: "USER",
+      },
+    });
+    await db.rating.create({
+      data: { restaurantDishId: row.id, userId: banned.id, score: 10, status: "HIDDEN" },
+    });
+    await expect(
+      deleteMyAccount(actorOf(banned), { confirm: "DELETE" }, null),
+    ).rejects.toMatchObject({ code: "USER_BANNED", status: 403 });
+    expect(await db.user.findUnique({ where: { id: banned.id } })).toMatchObject({
+      bannedAt: NOW,
+    });
+    expect(await db.rating.count({ where: { userId: banned.id, status: "HIDDEN" } })).toBe(1);
   });
 
   it("an admin cannot delete their own account here", async () => {

@@ -1,5 +1,5 @@
 // Deleting one's own account (Phase 6). What goes and what stays is listed in deleteAccountTx.
-import type { ReviewItemType } from "@/generated/prisma/client";
+import type { Prisma, ReviewItemType } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Client, Tx } from "./transaction";
 
@@ -20,6 +20,9 @@ const FILED_BY_USER: ReviewItemType[] = [
   "OWNER_CLAIM",
 ];
 
+/** Payload fields with contact details that a decided item must not keep after the account is gone. */
+const CONTACT_FIELDS = ["phone", "proofNote", "contact"] as const;
+
 /**
  * Deletes the account and everything that is only theirs, in one transaction (the caller holds the
  * locks of their dish rows and their user row):
@@ -28,15 +31,39 @@ const FILED_BY_USER: ReviewItemType[] = [
  * - the User row, which takes sessions, Google accounts, panel locations, claims, flags and upload
  *   rows with it (onDelete Cascade).
  * Kept without the name (SET NULL): menu photos they uploaded (a restaurant's menu), review items
- * already decided, and the restaurants they managed (no longer claimed).
+ * already decided (a claim's phone number and proof note and a dispute's contact are blanked, audit
+ * 2026-11 A-02), and the restaurants they managed (no longer claimed).
  */
 export async function deleteAccountTx(userId: string, tx: Tx) {
   const ratings = await tx.rating.deleteMany({ where: { userId } });
   const items = await tx.reviewItem.deleteMany({
     where: { createdByUserId: userId, status: "OPEN", type: { in: FILED_BY_USER } },
   });
+  const decided = await tx.reviewItem.findMany({
+    where: { createdByUserId: userId, status: { not: "OPEN" }, type: { in: ["OWNER_CLAIM", "FLAG"] } },
+    select: { id: true, payload: true },
+  });
+  let redacted = 0;
+  for (const item of decided) {
+    const payload = item.payload as Record<string, unknown>;
+    if (!CONTACT_FIELDS.some((field) => payload[field] != null)) continue;
+    await tx.reviewItem.update({
+      where: { id: item.id },
+      data: {
+        payload: {
+          ...payload,
+          phone: null,
+          proofNote: null,
+          contact: null,
+          redacted: true,
+        } as Prisma.InputJsonValue,
+      },
+      select: { id: true },
+    });
+    redacted++;
+  }
   await tx.pairwiseVote.deleteMany({ where: { userId } });
   await tx.rateLimitBucket.deleteMany({ where: { key: { startsWith: `user:${userId}:` } } });
   await tx.user.delete({ where: { id: userId }, select: { id: true } });
-  return { ratings: ratings.count, reviewItems: items.count };
+  return { ratings: ratings.count, reviewItems: items.count, redactedItems: redacted };
 }

@@ -15,6 +15,7 @@ import {
   deleteUploadsByPath,
   findUploadByPath,
   insertUpload,
+  listUnfiledMenuUploadsOfUser,
   listUnusedUploads,
 } from "@/server/repositories/upload.repo";
 import { findRater } from "@/server/repositories/user.repo";
@@ -177,6 +178,42 @@ function locate(path: string) {
 }
 
 /**
+ * Deletes one upload's row, in the statement that re-checks that nothing uses its path, and then
+ * its file. False when the row was in use or gone by then.
+ */
+async function removeUnusedUpload(
+  upload: { id: string; path: string },
+  storage: StorageAdapter,
+): Promise<boolean> {
+  if (!(await deleteUploadIfUnused(upload.id))) return false;
+  await storage.remove(locate(upload.path));
+  return true;
+}
+
+/**
+ * Menu photos a user signed but never filed (the submit failed or was abandoned): their rows go
+ * with the account, so their files would stay in the private bucket for good. Deleted before the
+ * account is (audit 2026-11, A-12); a photo a menu upload uses by now is kept. Best effort: a
+ * failure is logged with the path.
+ */
+export async function deleteUnfiledMenuUploads(userId: string, storage: StorageAdapter | null) {
+  if (!storage) return 0;
+  let deleted = 0;
+  for (const upload of await listUnfiledMenuUploadsOfUser(userId)) {
+    try {
+      if (await removeUnusedUpload(upload, storage)) deleted++;
+    } catch (error) {
+      logEvent(
+        "upload.cleanup_failed",
+        { path: upload.path, error: error instanceof Error ? error.message : String(error) },
+        "error",
+      );
+    }
+  }
+  return deleted;
+}
+
+/**
  * The nightly clean-up (/api/cron/parse-menus runs it after the parses): uploads that no rating and
  * no menu upload has used for 24 hours lose their row and their file. The row goes first, in one
  * statement that re-checks "unused" after any rating or menu being saved with it has committed
@@ -196,9 +233,7 @@ export async function cleanupUnusedUploads(
   for (const upload of unused) {
     summary.checked++;
     try {
-      if (!(await deleteUploadIfUnused(upload.id))) continue;
-      await storage.remove(locate(upload.path));
-      summary.deleted++;
+      if (await removeUnusedUpload(upload, storage)) summary.deleted++;
     } catch (error) {
       summary.failed++;
       // The row may be gone already: the path is logged for a manual clean-up.

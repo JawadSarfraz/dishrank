@@ -34,7 +34,8 @@ export default function PrivacyPage() {
       <p>
         You sign in with Google. Google tells us your name, e-mail address and profile picture; we
         never see your Google password. A cookie keeps you signed in. With each sign-in we keep the
-        IP address and browser it came from, to protect your account.
+        IP address and browser it came from, to protect your account; that record is deleted when
+        the sign-in expires, after a week without use.
       </p>
 
       <h2 className="text-lg font-semibold">Your ratings, comments and photos</h2>
@@ -43,9 +44,10 @@ export default function PrivacyPage() {
         comment and your photo, with a scrambled (hashed) form of your IP address that helps us spot
         abuse. Your scores count toward the public rankings without your name. Comments and photos
         are checked by our team and may be shown on public pages; your e-mail address is never
-        shown. Before a photo is uploaded, the app re-saves it in your browser, which removes the
-        location and camera details stored inside the file. A photo is stored under a random name
-        that says nothing about you; a photo you upload but never use is deleted after a day.
+        shown. When you upload a photo on DishRank, the app re-saves it in your browser first, which
+        removes the location and camera details stored inside the file. A photo is stored under a
+        random name that says nothing about you; a photo you upload but never use is deleted after a
+        day.
       </p>
 
       <h2 className="text-lg font-semibold">Locations</h2>
@@ -113,8 +115,13 @@ export default function PrivacyPage() {
         ratings, comments and photos (the rankings are recomputed without them), your restaurant
         claims, and the reports and suggestions our team has not looked at yet. Menu photos you sent
         stay with their restaurant without your name, and a decision our team already made on
-        something you reported stays on record without your name. If you cannot sign in any more,
-        write to <ContactEmail /> from the e-mail address you used.
+        something you reported or claimed stays on record without your name, phone number or
+        contact details. If you cannot sign in any more, write to <ContactEmail /> from the e-mail
+        address you used.
+      </p>
+      <p>
+        An account our team has banned cannot delete itself on the site, so that the ban stays.
+        Write to <ContactEmail /> and we delete it by hand.
       </p>
     </main>
   );

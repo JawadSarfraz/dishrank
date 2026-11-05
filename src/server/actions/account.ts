@@ -17,7 +17,17 @@ export async function deleteAccountAction(input: unknown) {
     const result = await deleteMyAccount(actor, parseInput(accountDeleteInput, input));
     for (const page of result.dishPages) revalidateDishPages(page);
     const jar = await cookies();
-    for (const name of SESSION_COOKIES) jar.delete(name);
+    // Expired with the attributes Better Auth set: a __Secure- cookie is only cleared by a
+    // Set-Cookie that carries Secure (audit 2026-11, A-04).
+    for (const name of SESSION_COOKIES) {
+      jar.set(name, "", {
+        path: "/",
+        expires: new Date(0),
+        httpOnly: true,
+        sameSite: "lax",
+        secure: name.startsWith("__Secure-"),
+      });
+    }
     return { deleted: true };
   });
 }

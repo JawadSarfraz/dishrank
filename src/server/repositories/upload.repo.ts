@@ -65,3 +65,11 @@ export async function deleteUploadsByPath(paths: readonly string[], client: Clie
 export async function listUploadsOfUser(userId: string, client: Client = db) {
   return client.upload.findMany({ where: { userId }, select: { path: true, kind: true } });
 }
+
+/** A user's menu photos that no menu upload uses (signed, never filed), for account deletion. */
+export async function listUnfiledMenuUploadsOfUser(userId: string) {
+  return db.$queryRaw<{ id: string; path: string }[]>`
+    SELECT u.id, u.path FROM "Upload" u
+    WHERE u."userId" = ${userId} AND u.kind = 'MENU'
+      AND NOT EXISTS (SELECT 1 FROM "MenuUpload" m WHERE m."filePath" = u.path)`;
+}
