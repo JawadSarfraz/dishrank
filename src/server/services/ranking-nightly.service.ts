@@ -15,7 +15,11 @@ import {
   startExclusiveJobRun,
   upsertDishStats,
 } from "@/server/repositories/nightly.repo";
-import { deleteRateLimitBucketsBefore, finishJobRun } from "@/server/repositories/ops.repo";
+import {
+  deleteExpiredSessionsBefore,
+  deleteRateLimitBucketsBefore,
+  finishJobRun,
+} from "@/server/repositories/ops.repo";
 import { lockCityDish } from "@/server/repositories/ranking.repo";
 import { inTransaction } from "@/server/repositories/transaction";
 import {
@@ -44,6 +48,8 @@ export type RecomputeSummary = {
   lists: number;
   snapshots: number;
   rateLimitBuckets: number;
+  /** Expired sessions deleted (their sign-in IP address and browser go with them). */
+  sessions: number;
   durationMs: number;
 };
 
@@ -163,7 +169,7 @@ const BUCKET_KEEP_MS =
 
 /**
  * docs/04 recomputeAll, steps in order: trust → DishStat → every rated row (decay at `now`) →
- * stale marking and re-rank per list → weekly snapshot → rate-limit cleanup. A row that fails is
+ * stale marking and re-rank per list → weekly snapshot → rate-limit and expired-session cleanup. A row that fails is
  * logged and the run goes on (ok: false at the end); any other failure stops the run, which is
  * recorded in its JobRun and thrown (the next night retries). Refuses to start while another run
  * is going (409 JOB_RUNNING).
@@ -181,6 +187,7 @@ export async function recomputeAll(options: { trigger: RecomputeTrigger; now?: D
     lists: 0,
     snapshots: 0,
     rateLimitBuckets: 0,
+    sessions: 0,
     durationMs: 0,
   };
   try {
@@ -204,6 +211,7 @@ export async function recomputeAll(options: { trigger: RecomputeTrigger; now?: D
     summary.rateLimitBuckets = await deleteRateLimitBucketsBefore(
       new Date(now.getTime() - BUCKET_KEEP_MS),
     );
+    summary.sessions = await deleteExpiredSessionsBefore(now);
   } catch (error) {
     summary.durationMs = Date.now() - started;
     await finishJobRun(job.id, {

@@ -70,3 +70,13 @@ export async function deleteRateLimitBucketsBefore(before: Date) {
   const { count } = await db.rateLimitBucket.deleteMany({ where: { windowStart: { lt: before } } });
   return count;
 }
+
+/**
+ * Sessions that expired before `before` (nightly cleanup): Better Auth drops an expired session
+ * only when its cookie comes back, so abandoned ones would keep their sign-in IP address and
+ * browser for good (audit 2026-11, A-13). Returns how many were deleted.
+ */
+export async function deleteExpiredSessionsBefore(before: Date) {
+  const { count } = await db.session.deleteMany({ where: { expiresAt: { lt: before } } });
+  return count;
+}

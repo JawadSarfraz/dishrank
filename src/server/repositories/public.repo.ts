@@ -19,9 +19,35 @@ export async function findCityBySlug(slug: string, client: Client = db) {
   });
 }
 
+const rankingRowSelect = {
+  id: true,
+  status: true,
+  score: true,
+  rawMean: true,
+  distinctRaters: true,
+  ratingCount: true,
+  weightSum: true,
+  rankInCity: true,
+  lastRatedAt: true,
+  price: true,
+  variantTags: true,
+  restaurant: {
+    select: {
+      slug: true,
+      name: true,
+      priceBand: true,
+      lat: true,
+      lng: true,
+      area: { select: { slug: true, name: true } },
+    },
+  },
+} as const;
+
 /**
- * docs/04 "Query for a ranking page": one (city, dish) list of ACTIVE restaurants, best first. Uses
- * the (cityId, dishId, status, score) index.
+ * docs/04 "Query for a ranking page": one (city, dish) list of ACTIVE restaurants. The ranked rows
+ * come first, in rank order, then up to `take` rows without a rank by votes: two reads, so a
+ * ranked row with a low score is never pushed out by rows still collecting votes (audit 2026-11,
+ * B-12). Both use the (cityId, dishId, status, score) index.
  */
 export async function listRankingRows(
   cityId: string,
@@ -29,45 +55,31 @@ export async function listRankingRows(
   take: number,
   client: Client = db,
 ) {
-  return client.restaurantDish.findMany({
-    where: {
-      cityId,
-      dishId,
-      status: { in: LISTED_STATUSES },
-      restaurant: { status: "ACTIVE" },
-    },
+  const where = {
+    cityId,
+    dishId,
+    status: { in: LISTED_STATUSES },
+    restaurant: { status: "ACTIVE" as const },
+  };
+  // One after another: a transaction client is one connection.
+  const ranked = await client.restaurantDish.findMany({
+    where: { ...where, rankInCity: { not: null } },
+    orderBy: [{ rankInCity: "asc" }, { id: "asc" }],
+    take,
+    select: rankingRowSelect,
+  });
+  const waiting = await client.restaurantDish.findMany({
+    where: { ...where, rankInCity: null },
     orderBy: [
-      { score: { sort: "desc", nulls: "last" } },
       { distinctRaters: "desc" },
       { lastRatedAt: { sort: "desc", nulls: "last" } },
       { restaurant: { name: "asc" } },
       { id: "asc" },
     ],
     take,
-    select: {
-      id: true,
-      status: true,
-      score: true,
-      rawMean: true,
-      distinctRaters: true,
-      ratingCount: true,
-      weightSum: true,
-      rankInCity: true,
-      lastRatedAt: true,
-      price: true,
-      variantTags: true,
-      restaurant: {
-        select: {
-          slug: true,
-          name: true,
-          priceBand: true,
-          lat: true,
-          lng: true,
-          area: { select: { slug: true, name: true } },
-        },
-      },
-    },
+    select: rankingRowSelect,
   });
+  return [...ranked, ...waiting];
 }
 
 /** Per dish in a city: how many restaurants rank, and the one ranked first. */

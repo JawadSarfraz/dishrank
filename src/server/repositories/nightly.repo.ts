@@ -15,6 +15,17 @@ const LAST_SIGN = Prisma.sql`EXTRACT(EPOCH FROM GREATEST("lastRatedAt", "lastVer
 export async function startExclusiveJobRun(name: string, startedAt: Date, timeoutMs: number) {
   return inTransaction(async (tx) => {
     await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`job:${name}`}))`;
+    // A run that started more than timeoutMs ago and never finished died (the function was killed
+    // or crashed): closed as failed, so the admin pages stop showing it as running (audit
+    // 2026-11, B-15).
+    await tx.jobRun.updateMany({
+      where: { name, finishedAt: null, startedAt: { lte: new Date(startedAt.getTime() - timeoutMs) } },
+      data: {
+        finishedAt: startedAt,
+        ok: false,
+        summary: { error: "did not finish: the run timed out or crashed" },
+      },
+    });
     const running = await tx.jobRun.findFirst({
       where: {
         name,
