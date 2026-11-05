@@ -25,7 +25,8 @@ export function requireCronSecret(request: Request, secret: string | undefined):
 
 /**
  * docs/06 Cron: a job that threw answers `{ ok: false, error }`: 409 JOB_RUNNING while another run
- * is going, otherwise 500 INTERNAL (the details are in the JobRun and the log).
+ * is going, otherwise 500 INTERNAL. The details stay in the JobRun and the log: an unexpected
+ * error's text (a database host, an SQL fragment) is never sent back (audit 2026-11, A-07).
  */
 export function cronFailure(error: unknown): Response {
   if (error instanceof AppError) {
@@ -34,7 +35,13 @@ export function cronFailure(error: unknown): Response {
       { status: error.status },
     );
   }
-  const message = error instanceof Error ? error.message : String(error);
-  logEvent("cron.failed", { error: message }, "error");
-  return Response.json({ ok: false, error: { code: "INTERNAL", message } }, { status: 500 });
+  logEvent(
+    "cron.failed",
+    { error: error instanceof Error ? error.message : String(error) },
+    "error",
+  );
+  return Response.json(
+    { ok: false, error: { code: "INTERNAL", message: "The job failed; see its JobRun" } },
+    { status: 500 },
+  );
 }

@@ -40,6 +40,8 @@ const schema = z.object({
   // Who runs the site, named on /privacy and /terms (placeholders show when unset).
   OPERATOR_NAME: z.string().trim().min(1).max(120).optional(),
   CONTACT_EMAIL: z.email().optional(),
+  // Set by Vercel itself ("1"): only there is the x-real-ip header the platform's (request-ip.ts).
+  VERCEL: z.string().optional(),
 
   // Needed from later phases; optional until the code that uses them exists.
   SUPABASE_URL: z.url().optional(), // Phase 3

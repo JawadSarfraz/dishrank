@@ -3,10 +3,12 @@ import { env } from "@/env";
 
 /**
  * The client IP. On Vercel the platform sets x-real-ip (and overwrites x-forwarded-for), so a
- * client cannot choose it; elsewhere the last x-forwarded-for hop is the one the nearest proxy saw.
+ * client cannot choose it. Anywhere else x-real-ip is whatever the client sent, so it is ignored
+ * there (audit 2026-11, A-15) and the last x-forwarded-for hop, the one the nearest proxy saw, is
+ * used instead.
  */
-export function clientIp(headers: Headers): string {
-  const real = headers.get("x-real-ip")?.trim();
+export function clientIp(headers: Headers, trustRealIp: boolean = Boolean(env.VERCEL)): string {
+  const real = trustRealIp ? headers.get("x-real-ip")?.trim() : undefined;
   if (real) return real;
   const hops = headers.get("x-forwarded-for")?.split(",") ?? [];
   return hops.at(-1)?.trim() || "unknown";

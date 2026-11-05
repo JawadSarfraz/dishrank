@@ -7,7 +7,8 @@ import { resetAppData } from "../../setup/db-reset";
 import { ADMIN, makeDish, makeRestaurant } from "../restaurants/fixtures";
 
 const get = (path: string, ip = "203.0.113.5") =>
-  new Request(`http://localhost${path}`, { headers: { "x-real-ip": ip } });
+  // Off Vercel the client IP is the last x-forwarded-for hop (src/server/request-ip.ts).
+  new Request(`http://localhost${path}`, { headers: { "x-forwarded-for": ip } });
 const ctx = (slug: string) => ({ params: Promise.resolve({ slug }) });
 
 describe("restaurant API (docs/06, test DB)", () => {

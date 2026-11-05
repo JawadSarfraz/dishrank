@@ -28,11 +28,11 @@ const { actorOf, daysAgo, dishId, makeRestaurant, makeUser } =
 const json = (body: unknown, type = "application/json") =>
   new Request("http://localhost/api", {
     method: "POST",
-    headers: { "content-type": type, "x-real-ip": "203.0.113.9" },
+    headers: { "content-type": type, "x-forwarded-for": "203.0.113.9" },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 const get = (path: string) =>
-  new Request(`http://localhost${path}`, { headers: { "x-real-ip": "203.0.113.10" } });
+  new Request(`http://localhost${path}`, { headers: { "x-forwarded-for": "203.0.113.10" } });
 
 describe("Phase 3 routes (docs/06, test DB)", () => {
   beforeEach(async () => {

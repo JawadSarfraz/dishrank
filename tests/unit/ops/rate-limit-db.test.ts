@@ -31,7 +31,11 @@ describe("rate limits (docs/06, test DB)", () => {
   it("hashes the client IP with a key; the raw IP is never the key", () => {
     const headers = new Headers({ "x-forwarded-for": "198.51.100.7, 10.0.0.1" });
     expect(clientIp(headers)).toBe("10.0.0.1");
-    expect(clientIp(new Headers({ "x-real-ip": "203.0.113.9" }))).toBe("203.0.113.9");
+    // x-real-ip is the platform's on Vercel only; anywhere else a client could have sent it.
+    const both = new Headers({ "x-real-ip": "203.0.113.9", "x-forwarded-for": "10.0.0.2" });
+    expect(clientIp(both, true)).toBe("203.0.113.9");
+    expect(clientIp(both, false)).toBe("10.0.0.2");
+    expect(clientIp(new Headers({ "x-real-ip": "203.0.113.9" }), false)).toBe("unknown");
     expect(clientIp(new Headers())).toBe("unknown");
     const hash = ipHash("203.0.113.9");
     expect(hash).toMatch(/^[0-9a-f]{32}$/);

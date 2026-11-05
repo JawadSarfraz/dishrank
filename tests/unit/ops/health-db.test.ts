@@ -8,7 +8,7 @@ import { checkHealth } from "@/server/services/health.service";
 import { resetAppData } from "../../setup/db-reset";
 
 const get = (ip = "203.0.113.5") =>
-  new Request("http://localhost/api/health", { headers: { "x-real-ip": ip } });
+  new Request("http://localhost/api/health", { headers: { "x-forwarded-for": ip } });
 
 describe("GET /api/health (test DB)", () => {
   beforeEach(resetAppData);

@@ -33,6 +33,9 @@ export const auth = betterAuth({
   },
   // Every check reads the session and role from the database, so role changes apply at once.
   session: { cookieCache: { enabled: false } },
+  // DishRank has no profile editing: Better Auth's own update-user endpoint (an unbounded name and
+  // image for any signed-in user) answers 404 (audit 2026-11, A-09).
+  disabledPaths: ["/update-user"],
   // Ids come from the Prisma defaults, like every other table.
   advanced: { database: { generateId: false } },
   databaseHooks: {
