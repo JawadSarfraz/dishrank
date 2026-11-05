@@ -12,7 +12,7 @@ export async function resetAppData(): Promise<void> {
   await db.$executeRawUnsafe(
     `TRUNCATE "OvertureCandidate", "Restaurant", "RestaurantDish", "Rating", "RatingHistory", "Flag", "MenuUpload", "MenuParse",
       "MenuItem", "OwnerClaim", "ReviewItem", "JobRun", "AnalyticsEvent", "Upload", "RateLimitBucket", "RankingSnapshot",
-      "PairwiseVote", "DishStat", "Session", "Account", "Verification", "User" CASCADE`,
+      "PairwiseVote", "DishStat", "Session", "Account", "Verification", "BannedEmail", "User" CASCADE`,
   );
   // Seeded cities stay; a test that launched one must not change thresholds for the next file.
   await db.city.updateMany({ data: { launchedAt: null } });

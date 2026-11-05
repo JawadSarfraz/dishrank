@@ -1,6 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
+import { emailHash } from "@/server/email-hash";
 import { deleteMyAccount } from "@/server/services/account.service";
+import { isEmailBanned } from "@/server/services/ban-list";
 import { submitClaim } from "@/server/services/claim.service";
 import { propose } from "@/server/services/proposal.service";
 import { createOrReplace } from "@/server/services/rating.service";
@@ -118,8 +120,12 @@ describe("delete my account (Phase 6)", () => {
     ).toMatchObject({ distinctRaters: 1, ratingCount: 1 });
   });
 
-  it("a banned account cannot delete itself (the ban and the hidden ratings would go with it)", async () => {
-    const banned = await makeUser("Banned", { bannedAt: NOW, createdAt: daysAgo(30, NOW) });
+  it("a banned account can delete itself, but its e-mail stays on the ban list", async () => {
+    const banned = await makeUser("Banned", {
+      email: "  Banned.Person@Example.com ",
+      bannedAt: NOW,
+      createdAt: daysAgo(30, NOW),
+    });
     const restaurant = await makeRestaurant("Ban Karahi");
     const row = await db.restaurantDish.create({
       data: {
@@ -132,13 +138,23 @@ describe("delete my account (Phase 6)", () => {
     await db.rating.create({
       data: { restaurantDishId: row.id, userId: banned.id, score: 10, status: "HIDDEN" },
     });
-    await expect(
-      deleteMyAccount(actorOf(banned), { confirm: "DELETE" }, null),
-    ).rejects.toMatchObject({ code: "USER_BANNED", status: 403 });
-    expect(await db.user.findUnique({ where: { id: banned.id } })).toMatchObject({
-      bannedAt: NOW,
+    expect(await deleteMyAccount(actorOf(banned), { confirm: "DELETE" }, null)).toMatchObject({
+      deleted: true,
     });
-    expect(await db.rating.count({ where: { userId: banned.id, status: "HIDDEN" } })).toBe(1);
+    expect(await db.user.findUnique({ where: { id: banned.id } })).toBeNull();
+    // The sign-up hook asks this for the address Google sends, in any spelling of case or spaces.
+    expect(await isEmailBanned("banned.person@example.com")).toBe(true);
+    expect(await isEmailBanned("BANNED.PERSON@EXAMPLE.COM")).toBe(true);
+    expect(await isEmailBanned("someone.else@example.com")).toBe(false);
+    // Only the hash is kept: the address itself is nowhere in the table.
+    const rows = await db.bannedEmail.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.emailHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(rows[0]!.emailHash).toBe(emailHash("banned.person@example.com"));
+    // An account that was not banned leaves nothing on the list.
+    const clean = await makeUser("Clean", { createdAt: daysAgo(30, NOW) });
+    await deleteMyAccount(actorOf(clean), { confirm: "DELETE" }, null);
+    expect(await isEmailBanned(clean.email)).toBe(false);
   });
 
   it("an admin cannot delete their own account here", async () => {

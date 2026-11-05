@@ -60,6 +60,7 @@ import { normalize } from "./matching/normalize";
 import { recomputeEach } from "./ranking.service";
 import { addAdminDishesTx, insertRestaurantTx, resolveDishSlugs } from "./restaurant.service";
 import type { SuggestionPayload } from "./location.service";
+import { recordBannedUsers } from "./ban-list";
 
 export { reviewFingerprint } from "./review-fingerprint";
 
@@ -224,11 +225,7 @@ async function decideHeldRatings(
     // docs/02 lifecycle: a rating that counts revives a STALE row. A rating held at write time left
     // the row STALE; its release is when it starts to count (audit 2026-11, B-03). The rows were
     // locked before the item (lockItemParents).
-    await reviveStaleDishRows(
-      [...new Set(release.map((r) => r.restaurantDishId))],
-      now,
-      tx,
-    );
+    await reviveStaleDishRows([...new Set(release.map((r) => r.restaurantDishId))], now, tx);
     return {
       status: "RESOLVED",
       resolution: `released ${release.length}`,
@@ -270,6 +267,8 @@ async function decideHeldRatings(
     for (const userId of [...users].sort()) {
       await updateUserById(userId, { bannedAt: now }, tx);
     }
+    // Their addresses go on the ban list, so deleting the account never lifts the ban.
+    await recordBannedUsers(users, tx);
     return {
       status: "RESOLVED",
       resolution: `banned ${users.length}`,

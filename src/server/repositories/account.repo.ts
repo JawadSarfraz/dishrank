@@ -1,6 +1,8 @@
 // Deleting one's own account (Phase 6). What goes and what stays is listed in deleteAccountTx.
 import type { Prisma, ReviewItemType } from "@/generated/prisma/client";
 import { db } from "@/server/db";
+import { emailHash } from "@/server/email-hash";
+import { upsertBannedEmails } from "./ban.repo";
 import type { Client, Tx } from "./transaction";
 
 /** Every rating of the user, any status, with its dish row and photo. */
@@ -32,7 +34,9 @@ const CONTACT_FIELDS = ["phone", "proofNote", "contact"] as const;
  *   rows with it (onDelete Cascade).
  * Kept without the name (SET NULL): menu photos they uploaded (a restaurant's menu), review items
  * already decided (a claim's phone number and proof note and a dispute's contact are blanked, audit
- * 2026-11 A-02), and the restaurants they managed (no longer claimed).
+ * 2026-11 A-02), and the restaurants they managed (no longer claimed). A banned account leaves the
+ * one-way hash of its e-mail on the ban list, so the same Google account cannot sign up again
+ * (audit 2026-11 A-01).
  */
 export async function deleteAccountTx(userId: string, tx: Tx) {
   const ratings = await tx.rating.deleteMany({ where: { userId } });
@@ -40,7 +44,11 @@ export async function deleteAccountTx(userId: string, tx: Tx) {
     where: { createdByUserId: userId, status: "OPEN", type: { in: FILED_BY_USER } },
   });
   const decided = await tx.reviewItem.findMany({
-    where: { createdByUserId: userId, status: { not: "OPEN" }, type: { in: ["OWNER_CLAIM", "FLAG"] } },
+    where: {
+      createdByUserId: userId,
+      status: { not: "OPEN" },
+      type: { in: ["OWNER_CLAIM", "FLAG"] },
+    },
     select: { id: true, payload: true },
   });
   let redacted = 0;
@@ -64,6 +72,17 @@ export async function deleteAccountTx(userId: string, tx: Tx) {
   }
   await tx.pairwiseVote.deleteMany({ where: { userId } });
   await tx.rateLimitBucket.deleteMany({ where: { key: { startsWith: `user:${userId}:` } } });
+  const user = await tx.user.findUnique({
+    where: { id: userId },
+    select: { email: true, bannedAt: true },
+  });
+  const bannedKept = Boolean(user?.bannedAt);
+  if (user?.bannedAt) await upsertBannedEmails([emailHash(user.email)], tx);
   await tx.user.delete({ where: { id: userId }, select: { id: true } });
-  return { ratings: ratings.count, reviewItems: items.count, redactedItems: redacted };
+  return {
+    ratings: ratings.count,
+    reviewItems: items.count,
+    redactedItems: redacted,
+    bannedKept,
+  };
 }

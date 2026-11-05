@@ -1,6 +1,7 @@
 // "Delete my account" on /me (Phase 6, owner 2026-11-04): the user's ratings (then their dish rows
 // are recomputed), photos, sessions and account go; what stays without their name is listed in
-// deleteAccountTx (account.repo.ts) and on /privacy.
+// deleteAccountTx (account.repo.ts) and on /privacy. A banned account deletes itself like any
+// other; its e-mail hash stays on the ban list (audit 2026-11, A-01).
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
@@ -12,7 +13,7 @@ import {
 } from "@/server/repositories/restaurant-dish.repo";
 import { inTransaction } from "@/server/repositories/transaction";
 import { listUploadsOfUser } from "@/server/repositories/upload.repo";
-import { findRater, lockUser } from "@/server/repositories/user.repo";
+import { lockUser } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { AccountDeleteInput } from "@/server/validation";
@@ -41,17 +42,6 @@ export async function deleteMyAccount(
       "ADMIN_ACCOUNT",
       "An admin account cannot delete itself. Ask another admin, or remove the role first.",
       409,
-    );
-  }
-  // A banned account cannot delete itself (audit 2026-11, A-01): the ban and the hidden ratings
-  // would go with it, and the same Google account could sign in again as a new, clean user.
-  const rater = await findRater(user.id);
-  if (!rater) throw new AppError("UNAUTHENTICATED", "Sign in required", 401);
-  if (rater.bannedAt) {
-    throw new AppError(
-      "USER_BANNED",
-      "This account is banned, so it cannot be deleted here. Write to the contact address on the privacy page.",
-      403,
     );
   }
   await assertRateLimit(`user:${user.id}:account-delete`, RATE_LIMITS.accountDelete, now);
@@ -85,6 +75,7 @@ export async function deleteMyAccount(
     ratings: result.ratings,
     reviewItems: result.reviewItems,
     redactedItems: result.redactedItems,
+    bannedKept: result.bannedKept,
     unfiledMenus,
     rows: result.rows.length,
   });

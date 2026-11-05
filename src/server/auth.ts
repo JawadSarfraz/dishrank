@@ -9,6 +9,7 @@ import { env } from "@/env";
 import { db } from "./db";
 import { logEvent } from "./log";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
+import { isEmailBanned } from "./services/ban-list";
 import { SITE_MODE, newAccountDecision } from "./site";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
@@ -42,6 +43,14 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
+          // A banned account that deleted itself may not come back (ban list, audit 2026-11 A-01).
+          if (await isEmailBanned(user.email)) {
+            logEvent("auth.signup_refused", { reason: "banned" }, "warn");
+            throw new APIError("FORBIDDEN", {
+              code: "ACCOUNT_BANNED",
+              message: "This Google account was banned from DishRank and cannot sign up again.",
+            });
+          }
           // Private beta: only invited Google accounts get an account (BETA_ALLOWED_EMAILS, docs/10);
           // the OAuth callback sends anyone else to /sign-in?error=BETA_INVITE_ONLY. The first
           // admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
