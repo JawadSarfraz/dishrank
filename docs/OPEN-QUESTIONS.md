@@ -91,7 +91,7 @@ Unresolved findings from the kickoff audit (unverified leads, with proposed defa
 - 2026-11-04 (owner review of every open entry; the default taken was accepted unless stated):
   - Islamabad and Rawalpindi stay separate cities, each with its own prior and thresholds.
   - Minimum raters stay 8 (normal) / 4 (early rankings); revisit after 4 weeks of data.
-  - Photos stay optional; a photo raises trust instead.
+  - Photos stay optional; a photo raises trust instead (changed 2026-11-06: only the 1.2 row still asks for photos; 1.0 needs 3 active ratings at 2 restaurants).
   - Google-only sign-in; phone OTP in Phase 7.
   - No owner pricing (report, badge) in v1.
   - Urdu-script menus (changed): the vision model reads them; each item carries an optional Roman-Urdu spelling, the printed text is kept, and matching uses the Roman spelling when the printed name has no Latin letters (docs/07 §3).

@@ -76,6 +76,7 @@ async function recomputeTrust() {
       isPanel: false,
       activeRatings: u.activeRatings,
       activePhotoRatings: u.activePhotoRatings,
+      activeRestaurants: u.activeRestaurants,
       hiddenRatings: u.hiddenRatings,
       upheldFlags: 0,
       recentRatings: u.recentRatings ?? [],

@@ -79,12 +79,10 @@ describe("/admin/users (test DB)", () => {
       (await db.restaurantDish.findUniqueOrThrow({ where: { id: rd.id } })).weightSum,
     ).toBeCloseTo(0.6, 3);
 
-    // 3 active ratings with a photo earn 1.0 at once.
-    for (const slug of ["broast", "chai"]) {
-      const row = await makeDish(r, slug);
-      await makeRating(row.id, rater.id, 8, new Date(), {
-        photoPath: `dish-photos/${rater.id}/${slug}.webp`,
-      });
+    // 3 active ratings at 2 restaurants earn 1.0 at once.
+    const other = await makeRestaurant("Other Place");
+    for (const row of [await makeDish(r, "broast"), await makeDish(other, "chai")]) {
+      await makeRating(row.id, rater.id, 8, new Date());
     }
     await setPanel(ADMIN, rater.id, true);
     expect(await setPanel(ADMIN, rater.id, false)).toMatchObject({ trustScore: 1.0 });

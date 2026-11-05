@@ -98,6 +98,8 @@ export type TrustStats = {
   isPanel: boolean;
   activeRatings: number;
   activePhotoRatings: number;
+  /** Different restaurants among the active ratings. */
+  activeRestaurants: number;
   hiddenRatings: number;
   /** Upheld flags against the user's ratings. */
   upheldFlags: number;
@@ -108,7 +110,7 @@ export type TrustStats = {
 /**
  * docs/04 trust table, in this order: an admin's override → panel 1.3 → ≥ 2 ratings hidden by an
  * admin 0.3 → the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2
- * → ≥ 3 active and ≥ 1 with a photo 1.0 → 0.6.
+ * → ≥ 3 active at ≥ 2 restaurants 1.0 → 0.6.
  */
 // Decided 2026-11-04: docs/04 gives no order for overlapping rows; this one puts the admin's override first, then penalties.
 export function trustFor(s: TrustStats): number {
@@ -124,7 +126,10 @@ export function trustFor(s: TrustStats): number {
   ) {
     return trusted.trust;
   }
-  if (s.activeRatings >= established.minActive && s.activePhotoRatings >= established.minPhotos) {
+  if (
+    s.activeRatings >= established.minActive &&
+    s.activeRestaurants >= established.minRestaurants
+  ) {
     return established.trust;
   }
   return TRUST.newAccount;

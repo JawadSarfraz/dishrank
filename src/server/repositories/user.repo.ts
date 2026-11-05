@@ -60,6 +60,11 @@ export async function findTrustStats(userId: string, client: Client = db) {
   const activePhotoRatings = await client.rating.count({
     where: { userId, status: "ACTIVE", photoPath: { not: null } },
   });
+  const activeRestaurants = await client.restaurantDish.findMany({
+    where: { ratings: { some: { userId, status: "ACTIVE" } } },
+    select: { restaurantId: true },
+    distinct: ["restaurantId"],
+  });
   const last = await client.rating.findMany({
     where: { userId },
     orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -72,6 +77,7 @@ export async function findTrustStats(userId: string, client: Client = db) {
     isPanel: user.isPanel,
     activeRatings: count("ACTIVE"),
     activePhotoRatings,
+    activeRestaurants: activeRestaurants.length,
     hiddenRatings: count("HIDDEN"),
     // Decided 2026-11-04: a Flag points at a dish row, not a rating, so "upheld flags against their
     // ratings" cannot be counted yet; 0 until flags carry the rating they target.
@@ -96,6 +102,7 @@ export async function listTrustSnapshot(client: Client = db) {
       trustOverride: number | null;
       activeRatings: number;
       activePhotoRatings: number;
+      activeRestaurants: number;
       hiddenRatings: number;
       recentRatings: { score: number; restaurantId: string }[] | null;
     }[]
@@ -106,6 +113,10 @@ export async function listTrustSnapshot(client: Client = db) {
         count(*) FILTER (WHERE status = 'ACTIVE' AND "photoPath" IS NOT NULL)::int AS photos,
         count(*) FILTER (WHERE status = 'HIDDEN')::int AS hidden
       FROM "Rating" GROUP BY "userId"
+    ), places AS (
+      SELECT rt."userId", count(DISTINCT rd."restaurantId")::int AS restaurants
+      FROM "Rating" rt JOIN "RestaurantDish" rd ON rd.id = rt."restaurantDishId"
+      WHERE rt.status = 'ACTIVE' GROUP BY rt."userId"
     ), ordered AS (
       SELECT rt."userId", rt.score, rd."restaurantId",
         row_number() OVER (PARTITION BY rt."userId" ORDER BY rt."updatedAt" DESC, rt.id DESC) AS n
@@ -119,10 +130,12 @@ export async function listTrustSnapshot(client: Client = db) {
     SELECT u.id, u."trustScore", u."trustOverride",
       coalesce(c.active, 0) AS "activeRatings",
       coalesce(c.photos, 0) AS "activePhotoRatings",
+      coalesce(p.restaurants, 0) AS "activeRestaurants",
       coalesce(c.hidden, 0) AS "hiddenRatings",
       r.ratings AS "recentRatings"
     FROM "User" u
     LEFT JOIN counts c ON c."userId" = u.id
+    LEFT JOIN places p ON p."userId" = u.id
     LEFT JOIN recent r ON r."userId" = u.id
     WHERE u."isPanel" = false AND u."bannedAt" IS NULL
     ORDER BY u.id`;

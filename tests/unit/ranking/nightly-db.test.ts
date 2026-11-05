@@ -46,12 +46,10 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
     );
     const fresh = daysAgo(1, NOW);
 
-    // Trust inputs (docs/04 table): 3 active ratings with a photo → 1.0; ten 10s at two
+    // Trust inputs (docs/04 table): 3 active ratings at 2 restaurants → 1.0; ten 10s at two
     // restaurants → 0.6 (abuse control 4); 2 hidden ratings → 0.3; panel members keep 1.3.
     const grows = await makeUser("Grows");
-    for (const [i, rd] of aRows.slice(0, 3).entries()) {
-      await makeRating(rd.id, grows.id, 8, fresh, i === 0 ? { photoPath: `p/${grows.id}` } : {});
-    }
+    for (const rd of [aRows[0], aRows[1], bRows[2]]) await makeRating(rd.id, grows.id, 8, fresh);
     const extreme = await makeUser("Extreme", { trustScore: 1 });
     for (const [i, rd] of [...aRows, ...bRows].entries()) {
       await makeRating(rd.id, extreme.id, 10, daysAgo(1 + i / 100, NOW), {
@@ -148,6 +146,30 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
     // Run again the same day: nothing new to change, and no second snapshot.
     const again = await recomputeAll({ trigger: "cli", now: new Date(NOW.getTime() + 60_000) });
     expect(again.summary).toMatchObject({ trust: { changed: 0 }, stale: 0, snapshots: 0 });
+  });
+
+  it("trust 1.0 needs 2 restaurants: 3 ratings at one stay at 0.6, whatever the photos", async () => {
+    const a = await makeRestaurant("Trust A");
+    const b = await makeRestaurant("Trust B");
+    const rater = await makeUser("One place");
+    const fresh = daysAgo(1, NOW);
+    for (const [i, slug] of DISHES.slice(0, 3).entries()) {
+      const row = await makeDish(a, slug);
+      await makeRating(row.id, rater.id, 8, fresh, { photoPath: `p/${rater.id}/${i}` });
+    }
+    await recomputeAll({ trigger: "cli", now: NOW });
+    expect(await trustOf(rater.id)).toBe(0.6);
+
+    // A photo is no longer needed: the second restaurant alone earns it.
+    const noPhoto = await makeUser("No photo");
+    const rows = [
+      await makeDish(a, DISHES[3]),
+      await makeDish(a, DISHES[4]),
+      await makeDish(b, DISHES[0]),
+    ];
+    for (const row of rows) await makeRating(row.id, noPhoto.id, 8, fresh);
+    await recomputeAll({ trigger: "cli", now: new Date(NOW.getTime() + 60_000) });
+    expect(await trustOf(noPhoto.id)).toBe(1);
   });
 
   it("the cron route runs it with the secret, fails closed without it, and never overlaps", async () => {

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 const TRUST_ROWS: [string, string][] = [
   ["New account", TRUST.newAccount.toFixed(1)],
   [
-    `At least ${TRUST.established.minActive} ratings, one of them with a photo`,
+    `At least ${TRUST.established.minActive} ratings, at ${TRUST.established.minRestaurants} or more restaurants`,
     TRUST.established.trust.toFixed(1),
   ],
   [

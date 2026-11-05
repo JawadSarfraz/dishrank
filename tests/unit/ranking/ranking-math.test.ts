@@ -92,18 +92,23 @@ describe("ranking math (docs/04)", () => {
       isPanel: false,
       activeRatings: 0,
       activePhotoRatings: 0,
+      activeRestaurants: 0,
       hiddenRatings: 0,
       upheldFlags: 0,
       recentRatings: [],
     };
     expect(trustFor(base)).toBe(0.6);
-    expect(trustFor({ ...base, activeRatings: 3, activePhotoRatings: 1 })).toBe(1.0);
-    expect(trustFor({ ...base, activeRatings: 3, activePhotoRatings: 0 })).toBe(0.6);
-    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 6 })).toBe(1.2);
-    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 5 })).toBe(1.0); // 25% < 30%
-    expect(trustFor({ ...base, activeRatings: 20, activePhotoRatings: 6, upheldFlags: 1 })).toBe(
-      1.0,
-    );
+    // 1.0: three active ratings at two or more restaurants; a photo plays no part.
+    expect(trustFor({ ...base, activeRatings: 3, activeRestaurants: 2 })).toBe(1.0);
+    expect(trustFor({ ...base, activeRatings: 3, activeRestaurants: 1 })).toBe(0.6);
+    expect(trustFor({ ...base, activeRatings: 2, activeRestaurants: 2 })).toBe(0.6);
+    expect(
+      trustFor({ ...base, activeRatings: 3, activeRestaurants: 1, activePhotoRatings: 3 }),
+    ).toBe(0.6);
+    const many = { ...base, activeRatings: 20, activeRestaurants: 5 };
+    expect(trustFor({ ...many, activePhotoRatings: 6 })).toBe(1.2);
+    expect(trustFor({ ...many, activePhotoRatings: 5 })).toBe(1.0); // 25% < 30%
+    expect(trustFor({ ...many, activePhotoRatings: 6, upheldFlags: 1 })).toBe(1.0);
     expect(trustFor({ ...base, activeRatings: 40, activePhotoRatings: 40, hiddenRatings: 2 })).toBe(
       0.3,
     );
@@ -120,6 +125,7 @@ describe("ranking math (docs/04)", () => {
       isPanel: false,
       activeRatings: 40,
       activePhotoRatings: 40,
+      activeRestaurants: 10,
       hiddenRatings: 0,
       upheldFlags: 0,
     };

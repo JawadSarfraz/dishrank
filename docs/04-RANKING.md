@@ -58,7 +58,7 @@ Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCou
 | Situation | trustScore |
 |---|---|
 | New account | 0.6 |
-| ≥ 3 active ratings AND ≥ 1 with photo | 1.0 |
+| ≥ 3 active ratings at ≥ 2 restaurants (no photo needed; owner, 2026-11-06) | 1.0 |
 | ≥ 20 active ratings, no upheld flags against their ratings, ≥ 30% with photo | 1.2 |
 | Set by hand (`User.trustOverride`, admin only, /admin/users) | that value (0.3 to 1.5), also over the panel; the nightly job keeps it |
 | Panel member (`User.isPanel`, set by admin only) | 1.3, fixed: the nightly job skips panel users |

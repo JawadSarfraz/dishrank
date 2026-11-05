@@ -33,8 +33,8 @@ export const RANKING = {
 /** docs/04 trust table. */
 export const TRUST = {
   newAccount: 0.6,
-  /** ≥ 3 active ratings and ≥ 1 of them with a photo. */
-  established: { trust: 1.0, minActive: 3, minPhotos: 1 },
+  /** ≥ 3 active ratings at ≥ 2 restaurants (owner, 2026-11-06: no photo needed). */
+  established: { trust: 1.0, minActive: 3, minRestaurants: 2 },
   /** ≥ 20 active ratings, no upheld flags against them, ≥ 30% with a photo. */
   trusted: { trust: 1.2, minActive: 20, minPhotoShare: 0.3 },
   /** Panel members: fixed, the nightly job skips them. */
