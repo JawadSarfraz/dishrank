@@ -2,6 +2,7 @@
 
 Read this file fully before any task. Then read `docs/` in this order:
 `01-PRODUCT-SPEC` → `02-ARCHITECTURE` → `03-DATA-MODEL` → `04-RANKING` → `05-DISH-TAXONOMY` → `06-API-SPEC` → `07-DATA-PIPELINES` → `08-IMPLEMENTATION-PLAN`.
+For anything visible in the UI also read `docs/12-DESIGN.md` (tokens, components, per-screen notes).
 Prompts for each phase are in `docs/09-CLAUDE-CODE-PROMPTS.md`. Open questions go in `docs/OPEN-QUESTIONS.md`.
 
 ## What this product is
@@ -48,6 +49,7 @@ pnpm menu:parse  -- --upload=<menuUploadId>                   # parse one menu u
 pnpm rankings:recompute                                       # full recompute (same code as the nightly cron)
 pnpm dev:demo [-- --undo]                                     # local demo data in F-7/F-6/Blue Area/G-9; --undo removes it (local DB only)
 pnpm prod:bootstrap                                           # new production DB: migrate deploy + taxonomy seed + Overture sync, on the shell's DATABASE_URL/DIRECT_URL after typing the host (never .env, never demo data)
+pnpm icons:build                                              # app icons, favicon and apple icon from the logo mark (after changing the mark)
 ```
 
 ## Non-negotiable rules
@@ -72,6 +74,7 @@ pnpm prod:bootstrap                                           # new production D
 - Ratings are integers 1–10. Scores are `Decimal(5,3)`. Prices are PKR integers.
 - Timestamps stored in UTC; display in `Asia/Karachi`.
 - Errors: throw `AppError(code, message, status)` from services; actions/handlers map to `{ error: { code, message } }`.
+- UI: tokens and components from `docs/12-DESIGN.md`; the brand name only from `src/lib/brand.ts`; a score never without its vote count (`ScoreBadge`); gold only for rank 1 and the medals; every empty list gets an `EmptyState` with one action.
 - Tests: pure logic (`matching`, `ranking`, `slug`, `normalize`) must have unit tests. Every migration must have a seed that still runs.
 - Commits per task: `feat(scope): …`, `fix(scope): …`, `chore: …`. Run `pnpm lint && pnpm typecheck` before each commit (see Testing policy).
 

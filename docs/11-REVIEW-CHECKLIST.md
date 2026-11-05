@@ -49,7 +49,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 ## Performance
 - [ ] Ranking query uses the `(cityId, dishId, status, score)` index (EXPLAIN). ⏳ the dev database has no dish rows, so the planner's choice says nothing yet; run `EXPLAIN ANALYZE` of the docs/04 query on production once a city has a few hundred dish rows.
 - [x] Public pages are ISR; `revalidatePath` fires after rating writes. ✅ `revalidate = 3600` on public pages, `src/server/revalidate.ts`.
-- [ ] Lighthouse mobile ≥ 90 on ranking page and restaurant page. ⏳ owner: Chrome DevTools → Lighthouse (mobile) on the live ranking and restaurant pages.
+- [x] Lighthouse mobile ≥ 90 on ranking page and restaurant page. ✅ 2026-11-05, Lighthouse 12.8 (CLI, Moto G Power emulation, simulated slow 4G) on a live-mode production build with the demo data: ranking page performance 94 (LCP 3.1 s, CLS 0.001), restaurant page 93 (LCP 3.2 s, CLS 0.001); accessibility, best practices and SEO 100 on both. Measured with `--only-categories=performance` for the performance score: on this machine an all-category CLI run re-applies the device emulation about 370 ms into the load (a `resize` event in the trace), which the CLI counts as a 0.24 layout shift and scores 76; the saved traces, a performance-only run and a throttled Playwright probe all show 0.001. ⏳ owner: repeat in Chrome DevTools on the live site after launch.
 - [ ] Images resized client-side before upload; served with `next/image`. ✅ resize: `src/lib/image.ts`. N/A `next/image`: no public page shows an uploaded image yet (the only `<img>` is the admin's private menu photo through a signed link).
 - [x] No N+1 on restaurant page (one query with include). ✅ `getPublicRestaurant` in `restaurant.service.ts`: one query for the restaurant and one for all its dish rows, none per dish.
 
@@ -64,7 +64,8 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 ## Accessibility / mobile
 - [x] Usable at 360 px width; tap targets ≥ 44 px on the score input. ✅ `tests/e2e/*` run at 360 px (no sideways scroll, 4 taps to rate).
 - [x] Forms have labels; errors announced; focus management on multi-step rate flow. ✅ `RateFlow.tsx`, forms use `<label>` and `role="alert"` for errors.
-- [x] Color contrast AA on score badges. ✅ the badge is foreground on background (near black on white).
+- [x] Color contrast AA on score badges. ✅ every score band is white on its colour at 4.8:1 or better; the whole palette's ratios are in docs/12 (Tokens).
+- [x] Tap targets ≥ 44 px on every public control, visible keyboard focus, reduced motion respected, no sideways scroll at 360 px on any screen. ✅ docs/12 (Quality bar); `tmp/design/after/_report.json` on 2026-11-05.
 
 ## Ops
 - [x] `JobRun` rows for crons; admin can see last runs and trigger recompute; a second recompute while one runs is refused (`409 JOB_RUNNING`). ✅ `/admin/rankings`, `ranking-nightly.service.ts`, `menu.service.ts` (parse-menus job); `tests/unit/ranking/nightly-db.test.ts`.

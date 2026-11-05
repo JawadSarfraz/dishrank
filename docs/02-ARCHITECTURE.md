@@ -199,7 +199,11 @@ dishrank/
 │   ├── comment-blocklist.json       # abusive words and phrases that hold a comment for review; the owner edits it
 │   └── supabase-root-2021.crt       # Supabase's root CA for the backup's TLS check (the same certificate as src/server/db-ssl.ts)
 ├── docs/                            # the planning kit (specs, plans, prompts)
+├── public/
+│   ├── sw.js                        # the service worker: static files and the offline page only (docs/12)
+│   └── icons/                       # 192, 512 and maskable 512 px app icons (pnpm icons:build)
 ├── scripts/
+│   ├── make-icons.ts                # pnpm icons:build: the icons, favicon and apple icon from the logo mark
 │   ├── overture-sync.ts             # stage Overture places as OvertureCandidate rows (docs/07 §1)
 │   ├── lib/overture.ts              # DuckDB download + reader (shared with research/)
 │   ├── research/overture-coverage.ts # the coverage report in docs/research/
@@ -230,24 +234,28 @@ dishrank/
 │   │   │   ├── cron/ parse-menus/ recompute-rankings/ mark-stale/   # mark-stale: manual only
 │   │   │   ├── health/                  # GET /api/health: uptime monitor (database within 3 s)
 │   │   │   └── auth/[...all]/           # Better Auth handler: toNextJsHandler(auth)
-│   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme tokens (Tailwind 4)
+│   │   ├── layout.tsx  globals.css  not-found.tsx  error.tsx   # globals.css: @import "tailwindcss" + @theme design tokens (docs/12); layout: next/font, the header, the install prompt
+│   │   ├── manifest.ts  icon.svg  apple-icon.png  favicon.ico   # the web app manifest (from src/lib/brand.ts) and the icons built by scripts/make-icons.ts
+│   │   ├── (public)/offline/page.tsx                            # shown by the service worker when a page cannot be reached
 │   │   ├── sitemap.ts  robots.ts  opengraph-image.tsx           # sitemap: indexable pages only
 │   ├── components/
-│   │   ├── ui/            # shadcn
-│   │   ├── ranking/       # RankingBrowser (filter bar + ranked list, client), ShareButton, CityDishGrid, CityPicker, DishSearch
+│   │   ├── ui/            # shadcn (Base UI): button, button-link, badge, card, input, dialog, sheet, dropdown-menu, toast, tabs, table, skeleton, progress, empty-state, disclosure
+│   │   ├── brand/         # Logo (the mark and wordmark), DishIcon (original line icons per dish family)
+│   │   ├── pwa/           # PwaRegister (service worker, install event), InstallPrompt (add to home screen)
+│   │   ├── ranking/       # RankingBrowser (filter sheet + ranked list, client), WaitingList, ScoreBadge, RankDisc, TrustBox, ShareButton, CityDishGrid, CityPicker, DishSearch
 │   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
 │   │   ├── me/            # DeleteRatingButton, DeleteAccount
 │   │   ├── owner/         # OwnerDishActions: confirm, fix name and price, remove
 │   │   ├── restaurant/    # ReportProblem, MenuUploadButton (panel, owner, admin only), ClaimRestaurant
 │   │   ├── trust/         # DisputeForm, LegalDraftNotice
-│   │   ├── layout/        # SiteHeader (every page: home, rate, my ratings, sign in/out), Footer, OvertureCredit, JsonLd
+│   │   ├── layout/        # SiteHeader (wordmark, Rate a dish, the account menu), Footer, Page (Main, PageHeader, SectionHeader), Prose, OvertureCredit, JsonLd
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
 │   │   └── admin/         # import review queue, Create form, restaurant forms, merge dialog, review cards, menu item decisions (admin pages only)
 │   ├── server/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
 │   │   ├── errors.ts               # AppError
-│   │   ├── roles.ts  request-ip.ts  log.ts  db-ssl.ts   # role checks and callbackUrl rules; client IP and its hash; one JSON log line per event; Supabase TLS
+│   │   ├── roles.ts  request-ip.ts  log.ts  db-ssl.ts  email-hash.ts   # role checks and callbackUrl rules; client IP and its hash; one JSON log line per event; Supabase TLS; the ban list's e-mail hash
 │   │   ├── rate-limit.ts           # DB-backed sliding window
 │   │   ├── cron.ts  revalidate.ts  # cron secret guard; pages revalidated after rating writes
 │   │   ├── seo.ts  site.ts         # JSON-LD builders (no aggregateRating); SITE_URL, canonical URLs
@@ -268,11 +276,13 @@ dishrank/
 │   │   │   ├── overture-sync.service.ts  data-credits.ts
 │   │   │   ├── menu.service.ts  menu-access.ts  # menu uploads, parse (vision + matching), nightly parse, upload page; who may upload
 │   │   │   ├── claim.service.ts  owner.service.ts  # claims (any signed-in user) and their decision; the owner area
+│   │   │   ├── ban-list.ts         # banned e-mail hashes: written by the ban decision and a banned account's deletion, read by the sign-up hook
 │   │   │   └── review.service.ts  review-fingerprint.ts
 │   │   ├── repositories/           # *.repo.ts, Prisma only (public.repo: public pages; nightly.repo: recomputeAll SQL)
 │   │   ├── vision/                 # parseMenu.ts (prompt, docs/07 schema, structured output), menu-items.ts (answer → items, prices)
 │   │   └── validation/             # zod schemas shared by actions + API
-│   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts
+│   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts, brand.ts (the name, one place), score-band.ts (score colours), pwa-prompt.ts (when to offer the install)
+│   ├── fonts/                      # TTF copies of the two faces for the share images (next/og); the pages use next/font
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
 │   ├── env.ts  env-schema.ts       # Zod-validated env; production fails fast at startup (the schema, side-effect free, is also the Vercel build's check)
 │   ├── instrumentation.ts          # register() imports env.ts
@@ -302,6 +312,8 @@ dishrank/
 | Concurrency | Writers take locks in one order: restaurant (a rating or a delete takes it shared; an edit, status change, merge or panel location exclusive, so each sees or waits for the others) → the (city, dish) lists' advisory locks, in (city id, dish id) order (re-rank, merge, review decisions) → dish rows in id order (a ban locks the rows of every rating it hides, and refuses with `ITEM_CHANGED` if one appeared since) → the user's rating → review item → user rows last, in id order (counters, ban, trust). Rating writes, deletes, admin decisions, panel locations, merges and trust updates all follow it. If two transactions still collide (a deadlock or serialization failure, reported by Prisma as P2034, or P2010 on raw SQL), `inTransaction` tries once more and then answers `409 CONFLICT` ("try again"). Recomputes after a commit are best effort: a failure is logged and the committed write still succeeds (a rating answers `stale: true`). |
 | Images | Client resizes to ≤ 1600px and re-encodes through canvas before upload, which strips EXIF/GPS metadata. Dish photos go to the public `dish-photos` bucket under `<random>.<ext>`; menu photos go to the private `menus` bucket under `<restaurantId>/<random>.<ext>` (Phase 6: no user id in any path; an `Upload` row records who signed each one, and a rating or menu takes a path only from that user; paths signed before keep `<userId>/` and their old check); the server downloads menu photos for parsing and admins see them through 10-minute GET links. Uploads use presigned S3 `PUT` URLs for Supabase Storage (ADR-14: valid 10 minutes, one object key, content type signed) issued only by `/api/v1/uploads/sign`; a rating accepts a photo only after the server checked that the object exists, is at most 5 MB and is JPEG or WebP. The DB stores the path, not a URL. When no rating uses a photo any more (the rating was deleted, its photo replaced or removed, or the rating merged away), its file is deleted after the commit (presigned `DELETE`, best effort: a failure is logged with the path). Every night (`/api/cron/parse-menus`, after the parses) uploads that no rating and no menu upload has used for 24 hours lose their file and their `Upload` row; a rating or menu being saved share-locks the row, so a file in use is never deleted. Without the `SUPABASE_S3_*` variables uploads are off and the rate flow hides the photo step. |
 | i18n | English only; `lang="en"`; dish aliases carry Roman Urdu. |
+| Design | docs/12: Tailwind 4 tokens in `globals.css` (light now, a `.dark` block ready), Bricolage Grotesque 700/800 and Geist 400/500/700 self-hosted by `next/font` (latin, only those weights), the brand name only from `src/lib/brand.ts`, score colours from `src/lib/score-band.ts` (greens from 7, slate 6–7, grey below; AA on every band), gold only for rank 1 and the medals, every score with its vote count, 44 px tap targets, visible focus, reduced motion respected. |
+| Installable app | A manifest from the brand config, a service worker (`public/sw.js`) that caches only hashed build files, the icons and the offline page (never a page with personal data or an API response), and an "Add to home screen" card after the second rating or visit, dismissed for 30 days (iPhone: the Share steps). No push notifications. The CSP is unchanged. ADR-15. |
 
 ## ADRs (architecture decision records)
 
@@ -321,3 +333,4 @@ dishrank/
 | ADR-12 | Pinned versions: Node.js 24 LTS, Next.js 16 (stable), Prisma ORM 7 (latest stable 7.x, not the 8.0 release candidate that npm `latest` installs) | Node 20 is end-of-life; Next.js 16 is the current stable major; Prisma 7 needs `prisma.config.ts` and a driver adapter (`@prisma/adapter-pg`) | Prisma 8 is GA plus one patch release; Node 26 becomes the Vercel default |
 | ADR-13 | No Google Places at all (2026-10-25). Restaurant candidates come from Overture Maps Places, Meta and Microsoft records only (CDLA Permissive 2.0), staged by `pnpm overture:sync` and reviewed one by one by an admin on /admin/import before anything is public; the Create form may prefill from Overture; restaurants keep Overture's coordinates as our own; /about/data carries the credit and the licence link | Google Maps Platform Terms 3.2.3(d)(iii) forbid using the Places API "in a listings or directory service", which DishRank is; Google also forbids saving names and addresses and caps stored coordinates at 30 days. Overture's open licence allows storing, changing and showing the data with a credit. AllThePlaces is left out (scraped, rule 1) and Foursquare too (Apache 2.0 notice duties); coverage and quality: docs/research/overture-coverage.md | Overture changes its licences or sources, or reviews show its records are too poor (then owner sign-ups and panel visits carry more of the load) |
 | ADR-14 | Photo uploads through Supabase Storage's S3 protocol (2026-10-26): `/api/v1/uploads/sign` returns a SigV4 presigned `PUT` (`src/server/storage`, no AWS SDK) valid 10 minutes, with the content type signed; the server checks the object (HEAD) before a rating accepts it. Storage stays Supabase Storage | The owner asked for upload URLs valid ≤ 10 minutes; Supabase's own signed upload URLs are fixed at 2 hours on hosted projects, while S3 presigned URLs take any expiry. Needs four env vars (endpoint, region, access key id, secret) from the project's Storage settings | Supabase makes its own signed upload URLs' expiry configurable, or uploads move to a server-side proxy |
+| ADR-15 | The site installs as a web app (2026-11-05): manifest + a minimal service worker + an install card, no native app and no push | The owner wants "open like an app" without a store; a worker that caches only static files keeps signed-in and admin pages and API answers out of any cache, so the privacy rules (docs/11) hold | Push notifications or offline rating would need a different worker and a decision on what to cache |

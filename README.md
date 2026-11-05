@@ -58,6 +58,7 @@ pnpm typecheck        # next typegen && tsc --noEmit
 pnpm test             # vitest; DB tests use their own database (see below), never the dev one
 pnpm test:e2e         # playwright, Chromium at 360 px: builds and starts the app on port 3100 against dishrank_test
 pnpm format           # prettier (docs/ and seed/ are excluded)
+pnpm icons:build      # app icons, favicon and apple icon from the logo mark
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
@@ -110,6 +111,7 @@ a `postgres:17` service container, `prisma migrate deploy`, lint, typecheck and 
 10. `docs/09-CLAUDE-CODE-PROMPTS.md` — **the prompts to paste, in order**
 11. `docs/10-DEPLOYMENT.md` — accounts, env vars, crons, costs; `docs/DEPLOY-CHECKLIST.md` — the first deploy (private beta), step by step
 12. `docs/11-REVIEW-CHECKLIST.md` — tick after every phase
+13. `docs/12-DESIGN.md` — brand, design tokens, components, per-screen notes, the installable app
 
 ## 3. Build
 
