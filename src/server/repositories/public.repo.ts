@@ -33,8 +33,10 @@ const rankingRowSelect = {
   variantTags: true,
   restaurant: {
     select: {
+      id: true,
       slug: true,
       name: true,
+      source: true,
       priceBand: true,
       lat: true,
       lng: true,
@@ -82,9 +84,9 @@ export async function listRankingRows(
   return [...ranked, ...waiting];
 }
 
-/** Per dish in a city: how many restaurants rank, and the one ranked first. */
+/** Per dish in a city: how many restaurants rank, the one ranked first, and the places to try. */
 export async function listCityDishSummaries(cityId: string, client: Client = db) {
-  const [counts, tops] = [
+  const [counts, tops, untried] = [
     await client.restaurantDish.groupBy({
       by: ["dishId"],
       where: { cityId, rankInCity: { not: null } },
@@ -99,8 +101,19 @@ export async function listCityDishSummaries(cityId: string, client: Client = db)
         restaurant: { select: { slug: true, name: true } },
       },
     }),
+    await client.restaurantDish.groupBy({
+      by: ["dishId"],
+      where: {
+        cityId,
+        rankInCity: null,
+        distinctRaters: 0,
+        status: { in: LISTED_STATUSES },
+        restaurant: { status: "ACTIVE" },
+      },
+      _count: { _all: true },
+    }),
   ];
-  return { counts, tops };
+  return { counts, tops, untried };
 }
 
 /**

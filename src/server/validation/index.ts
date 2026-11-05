@@ -47,6 +47,9 @@ export const ratingInput = z.strictObject({
 });
 export type RatingInput = z.infer<typeof ratingInput>;
 
+/** "Rate the places you know": the places of one dish in one city. */
+export const quickRatePlacesInput = z.strictObject({ city: slug, dish: slug });
+
 /** POST /api/v1/restaurant-dishes (creates a CANDIDATE if absent). */
 export const restaurantDishInput = z.strictObject({
   restaurantId: id,

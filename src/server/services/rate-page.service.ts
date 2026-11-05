@@ -1,9 +1,12 @@
 // What /rate needs on its first render (docs/01 D4, D5): the cities and their areas, the launch
 // dishes, and — when the URL names them — the restaurant, the dish and the user's own rating, so a
 // deep link, a sign-in return or an edit from /me opens at the right step.
+import { AppError } from "@/server/errors";
+import { findCityBySlug, listRankingRows } from "@/server/repositories/public.repo";
+import { listRatingsOfUserForDish } from "@/server/repositories/rating.repo";
 import { findRater } from "@/server/repositories/user.repo";
 import { findDishBySlug, listLaunchDishes } from "@/server/repositories/taxonomy.repo";
-import type { SessionUser } from "@/server/roles";
+import { assertRole, type SessionUser } from "@/server/roles";
 import { photoUploadsEnabled } from "@/server/storage";
 import { listCities } from "./dish.service";
 import { findMyRating } from "./rating.service";
@@ -79,3 +82,46 @@ export async function getRatePageData(
 }
 
 export type RatePageData = Awaited<ReturnType<typeof getRatePageData>>;
+
+export type QuickRatePlace = {
+  restaurantId: string;
+  slug: string;
+  name: string;
+  area: string | null;
+  /** The user's own rating here, set before this list opened. */
+  mine: { score: number; status: string } | null;
+};
+
+/**
+ * "Rate the places you know" on a dish page (docs/01 D4a): the places of the city linked to the dish,
+ * the ranked ones first, with the user's own ratings. Every score then goes through RatingService.
+ */
+export async function getQuickRatePlaces(
+  actor: SessionUser | null,
+  input: { city: string; dish: string },
+) {
+  const user = assertRole(actor, ["USER", "OWNER", "ADMIN"]);
+  const [city, dish] = await Promise.all([findCityBySlug(input.city), findDishBySlug(input.dish)]);
+  if (!city || !dish) throw new AppError("NOT_FOUND", "City or dish not found", 404);
+  const [rows, mine] = await Promise.all([
+    listRankingRows(city.id, dish.id, 400),
+    listRatingsOfUserForDish(user.id, city.id, dish.id),
+  ]);
+  const mineAt = new Map(mine.map((r) => [r.restaurantDish.restaurantId, r]));
+  return {
+    city: { slug: city.slug, name: city.name },
+    dish: { id: dish.id, slug: dish.slug, name: dish.name },
+    places: rows.map((row): QuickRatePlace => {
+      const own = mineAt.get(row.restaurant.id);
+      return {
+        restaurantId: row.restaurant.id,
+        slug: row.restaurant.slug,
+        name: row.restaurant.name,
+        area: row.restaurant.area?.name ?? null,
+        mine: own ? { score: own.score, status: own.status } : null,
+      };
+    }),
+  };
+}
+
+export type QuickRateData = Awaited<ReturnType<typeof getQuickRatePlaces>>;

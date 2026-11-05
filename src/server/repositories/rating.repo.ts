@@ -160,6 +160,18 @@ export async function setRatingStatus(ids: readonly string[], status: RatingStat
 }
 
 /** /me and GET /api/v1/me/ratings: newest first, cursor = the last rating id of the previous page. */
+/** The user's ratings of one dish in one city, any status (quick rate on a dish page). */
+export async function listRatingsOfUserForDish(userId: string, cityId: string, dishId: string) {
+  return db.rating.findMany({
+    where: { userId, restaurantDish: { cityId, dishId } },
+    select: {
+      score: true,
+      status: true,
+      restaurantDish: { select: { restaurantId: true } },
+    },
+  });
+}
+
 export async function listRatingsOfUser(userId: string, take: number, cursor?: string) {
   return db.rating.findMany({
     where: { userId },

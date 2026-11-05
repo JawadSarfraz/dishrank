@@ -1,5 +1,5 @@
-// docs/08 Phase 4 acceptance: the ranking page shows the ranked list, "Not enough votes yet" and
-// "Early rankings" (Islamabad is not launched), and a new rating shows on it without a redeploy.
+// docs/08 Phase 4 acceptance: the ranking page shows the ranked list, "Places to try" and "Early
+// rankings" (Islamabad is not launched), and a new rating shows on it without a redeploy.
 // Fixtures: tests/e2e/setup/prepare.ts (Pizza: one ranked restaurant, one without votes).
 import { readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
@@ -7,7 +7,7 @@ import { E2E, type E2EFixture } from "./setup/constants";
 
 const fixture = (): E2EFixture => JSON.parse(readFileSync(E2E.fixtureFile, "utf8"));
 
-test("ranking page: ranked list, not-enough-votes list, and a new vote shows up", async ({
+test("ranking page: ranked list, places to try, and a new vote moves one to not-enough-votes", async ({
   page,
   context,
   baseURL,
@@ -26,9 +26,10 @@ test("ranking page: ranked list, not-enough-votes list, and a new vote shows up"
   await expect(ranked).toContainText("5 votes");
   await expect(ranked).toContainText("Rs 1,450");
 
-  const waiting = page.getByRole("region", { name: "Not enough votes yet" });
-  const corner = waiting.getByRole("listitem").filter({ hasText: pizza.unranked.name });
-  await expect(corner).toContainText("No votes yet");
+  const places = page.getByRole("region", { name: "Places to try" });
+  const corner = places.getByRole("listitem").filter({ hasText: pizza.unranked.name });
+  await expect(corner).toBeVisible();
+  await expect(places).toContainText("Not ranked yet");
 
   // Structured data: an ItemList of Restaurants in rank order, never an aggregateRating.
   const jsonLd = JSON.parse(

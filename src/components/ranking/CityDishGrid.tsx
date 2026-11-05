@@ -37,7 +37,11 @@ export function CityDishGrid({ overview }: { overview: CityOverview }) {
               </span>
             ) : (
               <span className="mt-auto flex flex-col gap-1">
-                <span className="text-sm text-muted-foreground">Not enough votes yet</span>
+                <span className="text-sm text-muted-foreground">
+                  {d.placesToTry > 0
+                    ? `${d.placesToTry} ${d.placesToTry === 1 ? "place" : "places"} to try`
+                    : "Not enough votes yet"}
+                </span>
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-brand">
                   Be the first to rate <ArrowRightIcon className="size-4" aria-hidden="true" />
                 </span>

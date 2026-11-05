@@ -13,11 +13,13 @@ import {
   deleteOwn,
   findMyRating,
 } from "@/server/services/rating.service";
+import { getQuickRatePlaces } from "@/server/services/rate-page.service";
 import { signPhotoUpload } from "@/server/services/upload.service";
 import {
   locationObservationInput,
   parseInput,
   proposalInput,
+  quickRatePlacesInput,
   ratingInput,
   restaurantDishInput,
   uploadSignInput,
@@ -76,6 +78,14 @@ export async function signPhotoUploadAction(input: unknown) {
   return runAction("upload.sign", async () => {
     const actor = await requireUser();
     return signPhotoUpload(actor, parseInput(uploadSignInput, input));
+  });
+}
+
+/** "Rate the places you know" on a dish page: the static page asks for the list when it opens. */
+export async function quickRatePlacesAction(input: unknown) {
+  return runAction("rating.quick_places", async () => {
+    const actor = await requireUser();
+    return getQuickRatePlaces(actor, parseInput(quickRatePlacesInput, input));
   });
 }
 

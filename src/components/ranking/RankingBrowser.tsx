@@ -7,7 +7,7 @@
 // and never renumbered.
 import { MapPinIcon, SlidersHorizontalIcon } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { RankDisc } from "@/components/ranking/RankDisc";
 import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { haversineKm } from "@/lib/geo";
 import { formatFromPrice, formatKm } from "@/lib/format";
+import { useNearMe } from "./use-near-me";
 
 export type BrowserRow = {
   rank: number;
@@ -86,8 +87,7 @@ export function RankingBrowser({
   dishSlug: string;
 }) {
   const filters = parse(useSyncExternalStore(subscribe, readSearch, serverSearch));
-  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
-  const [locating, setLocating] = useState<"idle" | "busy" | "failed">("idle");
+  const { here, locating, locate } = useNearMe();
 
   const areas = useMemo(() => {
     const byslug = new Map<string, string>();
@@ -105,23 +105,6 @@ export function RankingBrowser({
     const query = p.toString();
     window.history.replaceState(null, "", query ? `?${query}` : window.location.pathname);
     window.dispatchEvent(new Event(CHANGED));
-  }
-
-  function nearMe() {
-    if (!("geolocation" in navigator)) {
-      setLocating("failed");
-      return;
-    }
-    setLocating("busy");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating("idle");
-        update({ sort: "distance" });
-      },
-      () => setLocating("failed"),
-      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 300_000 },
-    );
   }
 
   const shown = useMemo(() => {
@@ -241,7 +224,7 @@ export function RankingBrowser({
           variant="outline"
           size="sm"
           className="h-11 text-base"
-          onClick={nearMe}
+          onClick={() => locate(() => update({ sort: "distance" }))}
           disabled={locating === "busy"}
           aria-pressed={here !== null}
           aria-label="Near me"

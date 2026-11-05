@@ -9,6 +9,8 @@ import { cache } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { Main } from "@/components/layout/Page";
+import { PlacesToTry } from "@/components/ranking/PlacesToTry";
+import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
 import { ViewBeacon } from "@/components/ranking/ViewBeacon";
@@ -19,7 +21,7 @@ import { BRAND } from "@/lib/brand";
 import { formatScore, formatVotes } from "@/lib/format";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
-import { getRanking, type Ranking } from "@/server/services/ranking.service";
+import { getRankingPage } from "@/server/services/ranking.service";
 import { yearInPakistan } from "@/server/site";
 
 export const revalidate = 3600;
@@ -34,8 +36,10 @@ const PREFIX = "best-";
 const load = cache(async (citySlug: string, slug: string) => {
   const dishSlug = slug.startsWith(PREFIX) ? slug.slice(PREFIX.length) : "";
   if (!SLUG_PATTERN.test(dishSlug) || !SLUG_PATTERN.test(citySlug)) return null;
-  return getRanking({ citySlug, dishSlug });
+  return getRankingPage({ citySlug, dishSlug });
 });
+
+type Ranking = NonNullable<Awaited<ReturnType<typeof load>>>;
 
 const pathOf = (r: Ranking) => `/${r.city.slug}/best-${r.dish.slug}`;
 const titleOf = (r: Ranking) => `Best ${r.dish.name} in ${r.city.name}`;
@@ -43,9 +47,13 @@ const titleOf = (r: Ranking) => `Best ${r.dish.name} in ${r.city.name}`;
 function summaryOf(r: Ranking) {
   const votes = r.eligible.reduce((sum, row) => sum + row.votes, 0);
   const waiting = r.insufficient.length;
+  const places = r.placesToTryTotal;
   if (r.eligible.length === 0) {
-    return waiting > 0
-      ? `${waiting} restaurant${waiting === 1 ? " is" : "s are"} collecting votes. None has enough yet.`
+    if (waiting > 0) {
+      return `${waiting} restaurant${waiting === 1 ? " is" : "s are"} collecting votes. None has enough yet.`;
+    }
+    return places > 0
+      ? `${places} place${places === 1 ? "" : "s"} to try. None has a vote yet.`
       : `No restaurant has votes for ${r.dish.name} in ${r.city.name} yet.`;
   }
   const ranked = `${r.eligible.length} restaurant${r.eligible.length === 1 ? "" : "s"} ranked from ${formatVotes(votes)}`;
@@ -89,7 +97,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const { city, slug } = await params;
   const ranking = await load(city, slug);
   if (!ranking) notFound();
-  const { eligible, insufficient, thresholds, mode } = ranking;
+  const { eligible, insufficient, placesToTry, placesToTryTotal, thresholds, mode } = ranking;
   const shareText =
     eligible.length > 0
       ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
@@ -128,6 +136,8 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </div>
       </header>
 
+      <QuickRate citySlug={ranking.city.slug} dishSlug={ranking.dish.slug} />
+
       {eligible.length > 0 && (
         <RankingBrowser
           citySlug={ranking.city.slug}
@@ -147,7 +157,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         />
       )}
 
-      {eligible.length === 0 && insufficient.length === 0 && (
+      {eligible.length === 0 && insufficient.length === 0 && placesToTry.length === 0 && (
         <EmptyState
           icon={<DishIcon slug={ranking.dish.slug} size={26} />}
           title={`Nobody has rated ${ranking.dish.name} in ${ranking.city.name} yet`}
@@ -171,6 +181,15 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
             votes: row.votes,
             ratingsNeeded: row.ratingsNeeded,
           }))}
+        />
+      )}
+
+      {placesToTry.length > 0 && (
+        <PlacesToTry
+          citySlug={ranking.city.slug}
+          dishSlug={ranking.dish.slug}
+          total={placesToTryTotal}
+          rows={placesToTry}
         />
       )}
 

@@ -402,6 +402,51 @@ export async function getRanking(
   options: RankingOptions,
   now: Date = new Date(),
 ): Promise<Ranking | null> {
+  return (await loadRanking(options, now))?.ranking ?? null;
+}
+
+/** Places to try on one page at most; the area filter and Near me work over these in the browser. */
+export const PLACES_TO_TRY_LIMIT = 200;
+
+export type PlaceToTry = {
+  restaurantDishId: string;
+  slug: string;
+  name: string;
+  area: { slug: string; name: string } | null;
+  lat: number | null;
+  lng: number | null;
+  fromMapData: boolean;
+};
+
+/**
+ * The ranking page: the ranking, plus "Places to try": rows of the list with no votes yet, by name,
+ * so the order never looks like a ranking. They come out of `insufficient` on the page only; the
+ * API's `insufficient` keeps listing them.
+ */
+export async function getRankingPage(options: RankingOptions, now: Date = new Date()) {
+  const loaded = await loadRanking(options, now);
+  if (!loaded) return null;
+  const untried = loaded.rows
+    .filter((r) => r.rankInCity === null && r.distinctRaters === 0)
+    .sort((a, b) => a.restaurant.name.localeCompare(b.restaurant.name));
+  const rounded = (n: number | null) => (n === null ? null : Math.round(n * 100_000) / 100_000);
+  return {
+    ...loaded.ranking,
+    insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
+    placesToTryTotal: untried.length,
+    placesToTry: untried.slice(0, PLACES_TO_TRY_LIMIT).map((r): PlaceToTry => ({
+      restaurantDishId: r.id,
+      slug: r.restaurant.slug,
+      name: r.restaurant.name,
+      area: r.restaurant.area,
+      lat: rounded(r.restaurant.lat),
+      lng: rounded(r.restaurant.lng),
+      fromMapData: r.restaurant.source === "OVERTURE",
+    })),
+  };
+}
+
+async function loadRanking(options: RankingOptions, now: Date) {
   const [city, dish] = await Promise.all([
     findCityBySlug(options.citySlug),
     findDishBySlug(options.dishSlug),
@@ -472,7 +517,7 @@ export async function getRanking(
     )
     .filter(keep);
 
-  return {
+  const ranking: Ranking = {
     city: { slug: city.slug, name: city.name },
     dish: { id: dish.id, slug: dish.slug, name: dish.name },
     mode: t.mode,
@@ -481,4 +526,5 @@ export async function getRanking(
     insufficient: insufficient.slice(0, limit),
     computedAt: now.toISOString(),
   };
+  return { ranking, rows };
 }
