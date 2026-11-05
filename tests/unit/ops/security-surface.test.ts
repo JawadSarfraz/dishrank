@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { devOnlyRefusal } from "@/lib/dev-only";
 import { securityHeaders } from "@/lib/security-headers";
+import { SUPABASE_ROOT_CA_2021 } from "@/server/db-ssl";
 import { MAX_JSON_BYTES, readJson } from "@/server/http";
 
 const ROOT = path.resolve(__dirname, "../../..");
@@ -70,6 +71,12 @@ describe("security surface (Phase 6)", () => {
       if (file.includes("/api/v1/admin/") && !/requireRole\("ADMIN"\)/.test(source)) {
         problems.push(`${file}: admin route without requireRole("ADMIN")`);
       }
+      // A handler written any other way (`export const POST = …`, a re-export) would escape the
+      // checks below, so it is refused here (audit 2026-11, A-08).
+      const other = source.match(
+        /^export\s+(?:(?:const|let|var)\s+(?:GET|POST|PATCH|PUT|DELETE|HEAD|OPTIONS)\b|\{)/m,
+      );
+      if (other) problems.push(`${file}: handler not written as export async function (${other[0]})`);
       for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
         const fn = exportedFunctions(source).find((f) => f.name === method);
         if (!fn) continue;
@@ -91,9 +98,37 @@ describe("security surface (Phase 6)", () => {
     expect(problems).toEqual([]);
   });
 
+  it("every admin and owner page and layout calls requirePageRole before fetching anything", () => {
+    const files = [...walk("src/app/admin"), ...walk("src/app/owner")].filter((f) =>
+      /\/(page|layout)\.tsx$/.test(f),
+    );
+    expect(files.length).toBeGreaterThanOrEqual(14);
+    const problems: string[] = [];
+    for (const file of files) {
+      const source = read(file);
+      const body = source.slice(source.indexOf("export default"));
+      const guard = body.indexOf("requirePageRole(");
+      if (guard === -1) {
+        problems.push(`${file}: no requirePageRole`);
+        continue;
+      }
+      if (!/if \(!user\) return <Forbidden \/>;/.test(body)) {
+        problems.push(`${file}: no Forbidden fallback`);
+      }
+      // Only the route's own params may be awaited before the guard: never data.
+      const early = [...body.slice(0, guard).matchAll(/await\s+([\w.]+)/g)]
+        .map((m) => m[1]!)
+        .filter((name) => name !== "params" && name !== "searchParams");
+      if (early.length > 0) problems.push(`${file}: ${early.join(", ")} before requirePageRole`);
+    }
+    expect(problems).toEqual([]);
+  });
+
   it("client components import no server code except server actions and types, and never env", () => {
     const files = walk("src").filter((f) => /\.(ts|tsx)$/.test(f));
     const problems: string[] = [];
+    const serverDir = path.join("src", "server");
+    const actionsDir = path.join(serverDir, "actions");
     for (const file of files) {
       const source = read(file);
       if (!/^["']use client["']/.test(source)) continue;
@@ -108,8 +143,24 @@ describe("security surface (Phase 6)", () => {
           problems.push(`${file}: imports ${target}`);
         }
       }
+      // Relative imports too (audit 2026-11, A-10): "../../server/db" is the same leak.
+      for (const m of source.matchAll(/^import\s+(type\s+)?[^;]*?from\s+"(\.{1,2}\/[^"]+)";/gm)) {
+        const [, typeOnly, rel] = m;
+        if (typeOnly) continue;
+        const target = path.normalize(path.join(path.dirname(file), rel!));
+        if (target === path.join("src", "env") || target.startsWith(path.join("src", "env."))) {
+          problems.push(`${file}: imports ${rel}`);
+        }
+        if (target.startsWith(serverDir) && !target.startsWith(actionsDir)) {
+          problems.push(`${file}: imports ${rel}`);
+        }
+      }
     }
     expect(problems).toEqual([]);
+  });
+
+  it("the backup verifies Supabase with the same root CA as the app", () => {
+    expect(read("config/supabase-root-2021.crt").trim()).toBe(SUPABASE_ROOT_CA_2021.trim());
   });
 
   it("security headers: a basic CSP, no framing, no sniffing; HSTS on Vercel, no eval in production", () => {

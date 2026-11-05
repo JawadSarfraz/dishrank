@@ -6,11 +6,17 @@
 # printed. Any failure, or a suspiciously small file, exits non-zero: the workflow run fails and
 # GitHub e-mails the owner.
 #
-#   BACKUP_DATABASE_URL  the database to dump: Supabase's session pooler (DIRECT_URL, port 5432)
+#   BACKUP_DATABASE_URL  the database to dump: Supabase's session pooler (DIRECT_URL, port 5432);
+#                        an sslmode in it is ignored (see BACKUP_SSLMODE)
 #   BACKUP_PASSPHRASE    the gpg passphrase: one line, at least 20 characters
 #   PG_BIN_DIR           where pg_dump and pg_restore 17 are (default: found on PATH)
 #   BACKUP_MIN_BYTES     the smallest believable backup (default 150000: an empty DishRank
 #                        database dumps to about 90 KB, production with its Overture data to more)
+#   BACKUP_SSLMODE       libpq sslmode (default verify-full: the server's certificate chain and host
+#                        name are checked against BACKUP_CA_FILE; "prefer" only for a plaintext
+#                        database on this machine)
+#   BACKUP_CA_FILE       the root CA to verify with (default config/supabase-root-2021.crt, the
+#                        certificate src/server/db-ssl.ts verifies Supabase with)
 #
 # Usage: scripts/db-backup.sh <output directory>  → <output directory>/dishrank-<UTC time>.dump.gpg
 set -euo pipefail
@@ -34,6 +40,23 @@ fi
 [[ ${#passphrase} -ge 20 ]] || fail "BACKUP_PASSPHRASE is missing or shorter than 20 characters"
 [[ "$passphrase" != *$'\n'* ]] || fail "BACKUP_PASSPHRASE must be a single line"
 [[ "$min_bytes" =~ ^[0-9]+$ ]] || fail "BACKUP_MIN_BYTES must be a whole number"
+
+# TLS (audit 2026-11, A-03): with libpq, sslmode=require encrypts but does not verify the server, so
+# anyone between the runner and Supabase could read the dump. The server is verified against
+# Supabase's root CA and its host name instead (verify-full), as the app does. An sslmode inside the
+# URL would replace PGSSLMODE, so it is removed from the URL first.
+sslmode=${BACKUP_SSLMODE:-verify-full}
+ca_file=${BACKUP_CA_FILE:-$(cd "$(dirname "$0")/.." && pwd)/config/supabase-root-2021.crt}
+case "$sslmode" in
+  verify-full | verify-ca)
+    [[ -r "$ca_file" ]] || fail "BACKUP_CA_FILE not found: $ca_file"
+    export PGSSLROOTCERT=$ca_file
+    ;;
+  require | prefer | disable | allow) ;;
+  *) fail "BACKUP_SSLMODE must be verify-full, verify-ca, require, prefer, allow or disable" ;;
+esac
+export PGSSLMODE=$sslmode
+url=$(printf '%s' "$url" | sed -E 's/([?&])sslmode=[^&]*&?/\1/; s/[?&]$//')
 
 pg_dump=${PG_BIN_DIR:+$PG_BIN_DIR/}pg_dump
 pg_restore=${PG_BIN_DIR:+$PG_BIN_DIR/}pg_restore

@@ -266,7 +266,12 @@ that less likely. It runs `scripts/db-backup.sh`:
    session pooler (`PROD_DIRECT_URL`; the transaction pooler cannot serve a dump): the `public`
    schema, which holds every DishRank table, plus the `pg_trgm` and `unaccent` extensions, in
    custom format. Not in it: Supabase's own schemas (`auth`, `storage` and the like, which
-   DishRank does not use) and the photo files in Storage.
+   DishRank does not use) and the photo files in Storage. The connection verifies the server's
+   certificate chain and host name against Supabase's root CA (`config/supabase-root-2021.crt`,
+   the same certificate the app verifies with; libpq `sslmode=verify-full`), because
+   `sslmode=require` alone would encrypt without checking who answers (audit 2026-11). An
+   `sslmode` inside `PROD_DIRECT_URL` is ignored. If a run ever fails on the certificate check,
+   `BACKUP_SSLMODE=require` in the workflow restores the old behaviour while the cause is found.
 2. `pg_restore --list` must read the dump and find the data of the core tables (`User`,
    `Restaurant`, `Rating` and others).
 3. gpg encrypts it with `BACKUP_PASSPHRASE` (symmetric AES-256, the classic OpenPGP format every gpg
