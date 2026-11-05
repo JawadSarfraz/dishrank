@@ -5,6 +5,7 @@
 import { useState, useTransition } from "react";
 import { describeActionError } from "@/components/admin/action-error";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { deleteAccountAction } from "@/server/actions/account";
 
 export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
@@ -26,15 +27,14 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <details className="rounded-lg border px-3 py-2">
-      <summary className="min-h-11 cursor-pointer py-2.5 text-base">Delete my account</summary>
+    <Disclosure summary="Delete my account">
       {isAdmin ? (
-        <p className="pb-2 text-sm">
+        <p className="text-sm">
           An admin account cannot delete itself. Ask another admin, or remove the admin role first.
         </p>
       ) : (
         <form
-          className="flex flex-col gap-3 pb-2 text-sm"
+          className="flex flex-col gap-3 text-sm"
           onSubmit={(e) => {
             e.preventDefault();
             remove();
@@ -58,7 +58,7 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               autoComplete="off"
-              className="min-h-11 rounded-lg border border-input bg-transparent px-3 text-base"
+              className="field font-normal"
             />
           </label>
           {error && (
@@ -70,12 +70,12 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
             type="submit"
             variant="destructive"
             disabled={pending || confirm !== "DELETE"}
-            className="h-11 w-fit px-5"
+            className="w-fit"
           >
             {pending ? "Deleting…" : "Delete my account"}
           </Button>
         </form>
       )}
-    </details>
+    </Disclosure>
   );
 }

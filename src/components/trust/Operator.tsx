@@ -3,7 +3,11 @@
 import { OPERATOR } from "@/server/site";
 
 function Placeholder({ text }: { text: string }) {
-  return <span className="rounded border border-dashed px-1 font-mono text-sm">[{text}]</span>;
+  return (
+    <span className="rounded border border-dashed bg-card px-1.5 font-mono text-sm text-muted-foreground">
+      [{text}]
+    </span>
+  );
 }
 
 export function OperatorName() {
@@ -16,9 +20,7 @@ export function OperatorName() {
 
 export function ContactEmail() {
   return OPERATOR.email ? (
-    <a href={`mailto:${OPERATOR.email}`} className="underline">
-      {OPERATOR.email}
-    </a>
+    <a href={`mailto:${OPERATOR.email}`}>{OPERATOR.email}</a>
   ) : (
     <Placeholder text="contact e-mail: set CONTACT_EMAIL" />
   );

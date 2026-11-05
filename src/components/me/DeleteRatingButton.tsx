@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { describeActionError } from "@/components/admin/action-error";
@@ -16,7 +17,7 @@ export function DeleteRatingButton({ ratingId, label }: { ratingId: string; labe
       <button
         type="button"
         disabled={pending}
-        className="min-h-11 py-2 text-destructive underline"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-destructive underline-offset-4 hover:underline disabled:opacity-50"
         onClick={() => {
           if (!window.confirm(`Delete your rating of ${label}?`)) return;
           startTransition(async () => {
@@ -30,6 +31,7 @@ export function DeleteRatingButton({ ratingId, label }: { ratingId: string; labe
           });
         }}
       >
+        <Trash2Icon aria-hidden="true" className="size-4" />
         {pending ? "Deleting…" : "Delete"}
       </button>
       {error && (
