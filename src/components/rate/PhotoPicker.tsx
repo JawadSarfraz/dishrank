@@ -2,8 +2,10 @@
 
 // Optional dish photo: resized to ≤ 1600 px and re-encoded in the browser (no EXIF/GPS), then sent
 // straight to storage with a 10-minute signed URL (docs/06 POST /api/v1/uploads/sign).
+import { CameraIcon } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { describeActionError } from "@/components/admin/action-error";
+import { Button } from "@/components/ui/button";
 import { preparePhoto } from "@/lib/image";
 import { signPhotoUploadAction } from "@/server/actions/rating";
 
@@ -60,9 +62,7 @@ export function PhotoPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={inputId} className="text-sm font-medium">
-        Photo
-      </label>
+      <span className="text-sm font-medium">Photo (optional)</span>
       <input
         id={inputId}
         type="file"
@@ -74,8 +74,16 @@ export function PhotoPicker({
           e.target.value = "";
           void choose(file);
         }}
-        className="min-h-11 text-base file:mr-3 file:min-h-11 file:rounded-lg file:border file:px-3"
+        className="peer sr-only"
       />
+      <label
+        htmlFor={inputId}
+        aria-disabled={busy}
+        className="inline-flex min-h-11 w-fit cursor-pointer items-center gap-2 rounded-lg border bg-card px-4 text-base font-medium hover:bg-muted aria-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
+      >
+        <CameraIcon aria-hidden="true" className="size-5" />
+        {preview || current ? "Change photo" : "Add a photo"}
+      </label>
       {preview && (
         // A local object URL of the photo just chosen; never a remote image.
         // eslint-disable-next-line @next/next/no-img-element
@@ -83,9 +91,10 @@ export function PhotoPicker({
       )}
       {status && <p className="text-sm text-muted-foreground">{status}</p>}
       {(preview || current) && (
-        <button
+        <Button
           type="button"
-          className="min-h-11 self-start text-sm underline"
+          variant="link"
+          className="min-h-11 w-fit justify-start"
           onClick={() => {
             setPreview(null);
             setStatus(null);
@@ -94,7 +103,7 @@ export function PhotoPicker({
           }}
         >
           Remove photo
-        </button>
+        </Button>
       )}
       {error && (
         <p role="alert" className="text-sm text-destructive">

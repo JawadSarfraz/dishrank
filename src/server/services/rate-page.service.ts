@@ -66,6 +66,7 @@ export async function getRatePageData(
     "";
   return {
     signedIn: Boolean(user),
+    userName: user?.name ?? null,
     isPanel: Boolean(rater?.isPanel && !rater.bannedAt),
     photosEnabled: photoUploadsEnabled(),
     cities,

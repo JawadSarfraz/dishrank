@@ -6,9 +6,8 @@ import { useState, useTransition } from "react";
 import { SignInButton } from "@/components/auth/SignInButton";
 import { describeActionError } from "@/components/admin/action-error";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { proposeAction } from "@/server/actions/rating";
-
-const field = "h-11 rounded-lg border border-input bg-transparent px-3 text-base";
 
 function useProposal() {
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
@@ -55,14 +54,11 @@ export function SuggestRestaurant({
 }) {
   const { message, pending, send } = useProposal();
   return (
-    <details className="rounded-lg border px-3 py-2">
-      <summary className="min-h-11 cursor-pointer py-2 text-base">
-        Can&apos;t find it? Suggest a restaurant
-      </summary>
+    <Disclosure summary="Can't find it? Suggest a restaurant">
       {signedIn ? (
         <form
           key={city.id}
-          className="flex flex-col gap-3 pb-2"
+          className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
@@ -86,12 +82,12 @@ export function SuggestRestaurant({
               minLength={2}
               maxLength={120}
               defaultValue={defaultName}
-              className={field}
+              className="field"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Area in {city.name}
-            <select name="areaId" required defaultValue="" className={field}>
+            <select name="areaId" required defaultValue="" className="field field-select">
               <option value="" disabled>
                 Choose an area
               </option>
@@ -108,21 +104,21 @@ export function SuggestRestaurant({
               name="note"
               maxLength={280}
               placeholder="e.g. next to the petrol pump"
-              className={field}
+              className="field"
             />
           </label>
-          <Button type="submit" disabled={pending} className="h-11 self-start">
+          <Button type="submit" disabled={pending} className="self-start">
             {pending ? "Sending…" : "Suggest restaurant"}
           </Button>
           <Feedback message={message} />
         </form>
       ) : (
-        <div className="flex flex-col gap-2 pb-2">
+        <div className="flex flex-col gap-2">
           <p className="text-sm">Sign in to suggest a restaurant.</p>
           <SignInButton callbackURL={`/rate?city=${city.slug}`} />
         </div>
       )}
-    </details>
+    </Disclosure>
   );
 }
 
@@ -139,13 +135,10 @@ export function ProposeDish({
 }) {
   const { message, pending, send } = useProposal();
   return (
-    <details className="rounded-lg border px-3 py-2">
-      <summary className="min-h-11 cursor-pointer py-2 text-base">
-        Dish not listed? Propose it
-      </summary>
+    <Disclosure summary="Dish not listed? Propose it">
       {signedIn ? (
         <form
-          className="flex flex-col gap-3 pb-2"
+          className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
@@ -168,24 +161,24 @@ export function ProposeDish({
               minLength={2}
               maxLength={120}
               defaultValue={defaultName}
-              className={field}
+              className="field"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Note (optional)
-            <input name="note" maxLength={280} className={field} />
+            <input name="note" maxLength={280} className="field" />
           </label>
-          <Button type="submit" disabled={pending} className="h-11 self-start">
+          <Button type="submit" disabled={pending} className="self-start">
             {pending ? "Sending…" : "Propose dish"}
           </Button>
           <Feedback message={message} />
         </form>
       ) : (
-        <div className="flex flex-col gap-2 pb-2">
+        <div className="flex flex-col gap-2">
           <p className="text-sm">Sign in to propose a dish.</p>
           <SignInButton callbackURL={callbackUrl} />
         </div>
       )}
-    </details>
+    </Disclosure>
   );
 }

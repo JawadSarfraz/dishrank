@@ -9,7 +9,7 @@ export async function findRestaurantDish(
 ) {
   return client.restaurantDish.findUnique({
     where: { restaurantId_dishId: { restaurantId, dishId } },
-    select: { id: true, status: true },
+    select: { id: true, status: true, rankInCity: true },
   });
 }
 

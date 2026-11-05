@@ -45,7 +45,7 @@ test("ranking page: ranked list, not-enough-votes list, and a new vote shows up"
   await corner.getByRole("link", { name: "Rate" }).tap();
   await page.getByRole("button", { name: "8 out of 10" }).tap();
   await page.getByRole("button", { name: "Submit rating" }).tap();
-  await expect(page.getByRole("heading", { name: "Thanks for rating!" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
   await expect(async () => {
     await page.goto("/islamabad/best-pizza");
     await expect(

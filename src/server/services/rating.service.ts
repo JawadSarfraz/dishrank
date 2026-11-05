@@ -50,7 +50,7 @@ import { getStorage, type StorageAdapter } from "@/server/storage";
 import type { MeRatingsQuery, RatingInput } from "@/server/validation";
 import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
-import { BURST, USER_DISH } from "./ranking.constants";
+import { BURST, RANKING, USER_DISH } from "./ranking.constants";
 import { recordEvent } from "./analytics.service";
 import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
 import { deleteUnusedPhotos, PHOTO_PREFIX, verifyUploadedPhoto } from "./upload.service";
@@ -73,7 +73,11 @@ export type RatingResult = {
   votes: number;
   eligible: boolean;
   rank: number | null;
+  /** The row's rank before this rating (null: it was not ranked), so the diner sees what changed. */
+  previousRank: number | null;
   ratingsNeeded: number;
+  /** Different raters a rank needs in this city right now (4 in early rankings, 8 after launch). */
+  minRaters: number;
   mode: Thresholds["mode"];
   restaurant: { id: string; slug: string; name: string; citySlug: string };
   dish: { id: string; slug: string; name: string };
@@ -440,7 +444,9 @@ export async function createOrReplace(
     votes: ranked?.votes ?? 0,
     eligible: ranked?.eligible ?? false,
     rank: ranked?.rankInCity ?? null,
+    previousRank: existingRow?.rankInCity ?? null,
     ratingsNeeded: ranked?.ratingsNeeded ?? 0,
+    minRaters: ranked?.thresholds.minRaters ?? RANKING.bootstrap.minRaters,
     mode: ranked?.thresholds.mode ?? "bootstrap",
     restaurant: {
       id: restaurant.id,

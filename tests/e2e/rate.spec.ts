@@ -54,7 +54,7 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   // Signed in: the button saves (signed out it would offer Google sign-in instead).
   await tap(page.getByRole("button", { name: "Submit rating" }));
 
-  await expect(page.getByRole("heading", { name: "Thanks for rating!" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
   const elapsed = Date.now() - started;
   expect(taps).toBe(4);
   expect(elapsed).toBeLessThan(30_000);
@@ -63,9 +63,11 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   await expect(page.getByText(/#\d+ in /)).toHaveCount(0);
   await expectNoSideScroll(page);
 
-  // Saved for this diner: /me lists it.
+  // Saved for this diner: /me lists it (the success screen names the restaurant too, so the
+  // check waits for /me and its restaurant link).
   await page.getByRole("main").getByRole("link", { name: "My ratings" }).tap();
-  await expect(page.getByText(restaurant.name)).toBeVisible();
+  await expect(page).toHaveURL(/\/me$/);
+  await expect(page.getByRole("link", { name: restaurant.name })).toBeVisible();
   await expect(page.getByText(dish.name).first()).toBeVisible();
   test.info().annotations.push({ type: "elapsed", description: `${elapsed} ms, ${taps} taps` });
 });

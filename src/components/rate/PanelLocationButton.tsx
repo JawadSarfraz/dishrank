@@ -64,8 +64,8 @@ export function PanelLocationButton({ restaurantId }: { restaurantId: string }) 
   }
 
   return (
-    <div className="flex flex-col gap-1 rounded-lg border border-dashed p-3">
-      <Button type="button" variant="outline" onClick={share} disabled={busy} className="h-11">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-dashed bg-card p-3">
+      <Button type="button" variant="outline" onClick={share} disabled={busy}>
         I&apos;m at this restaurant now – share location
       </Button>
       <p className="text-xs text-muted-foreground">
