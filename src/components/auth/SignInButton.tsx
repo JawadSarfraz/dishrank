@@ -4,7 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
+export function SignInButton({
+  callbackURL = "/",
+  className,
+}: {
+  callbackURL?: string;
+  className?: string;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,11 +31,11 @@ export function SignInButton({ callbackURL = "/" }: { callbackURL?: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Button type="button" onClick={signIn} disabled={pending} className="h-11 w-fit px-5">
-        Sign in with Google
+      <Button type="button" size="lg" onClick={signIn} disabled={pending} className={className}>
+        {pending ? "Opening Google…" : "Continue with Google"}
       </Button>
       {error ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}

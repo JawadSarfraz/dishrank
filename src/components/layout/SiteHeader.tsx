@@ -1,86 +1,126 @@
 "use client";
 
 // The header on every page. Client-side, so public pages stay static (ISR): the session is read in
-// the browser after load, and the sign-in control keeps its space meanwhile (no layout shift).
+// the browser after load, and the account control keeps its space meanwhile (no layout shift).
+// Signed in: a small account menu with My ratings, the Owner and Admin areas for those roles, and
+// Sign out (owner, Part 3). The role only picks which links show; every page checks it again.
+import { LogOutIcon, ShieldIcon, StarIcon, StoreIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { Wordmark } from "@/components/brand/Logo";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuLinkItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/components/ui/toast";
 import { authClient } from "@/lib/auth-client";
-
-const linkClass = "inline-flex min-h-11 items-center underline-offset-2 hover:underline";
+import { ButtonLink } from "@/components/ui/button-link";
 
 export function SiteHeader({ beta }: { beta: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data, isPending } = authClient.useSession();
-  // The role the server stored (Better Auth additional field); it only picks which links show,
-  // every page and action checks it again on the server.
   const role = (data?.user as { role?: string } | undefined)?.role;
   const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState(false);
 
   async function signOut() {
     setSigningOut(true);
-    setError(false);
     // Better Auth's sign-out deletes the database session and clears the cookie.
     const { error } = await authClient.signOut();
     setSigningOut(false);
     if (error) {
-      setError(true);
+      toast.add({ type: "error", title: "Sign-out did not finish. Try again." });
       return;
     }
     router.push("/");
     router.refresh();
   }
 
+  const initial = (data?.user.name?.trim()[0] ?? data?.user.email[0] ?? "?").toUpperCase();
+
   return (
-    <header className="mx-auto w-full max-w-xl px-4 pt-1">
-      <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4 text-sm">
-        <Link href="/" className={`${linkClass} text-base font-bold`}>
-          DishRank
+    <header className="sticky top-0 z-40 border-b bg-background/95">
+      <nav
+        aria-label="Main"
+        className="mx-auto flex h-14 w-full max-w-5xl items-center gap-2 px-4 sm:px-6"
+      >
+        <Link
+          href="/"
+          className="-ml-1 inline-flex min-h-11 items-center rounded-lg px-1"
+          aria-label="DishRank home"
+        >
+          <Wordmark />
         </Link>
-        {beta && <span className="rounded-full border px-2 py-0.5 text-xs font-medium">Beta</span>}
-        <Link href="/rate" className={linkClass}>
-          Rate a dish
-        </Link>
-        <Link href="/me" className={linkClass}>
-          My ratings
-        </Link>
-        {role === "OWNER" && (
-          <Link href="/owner" className={linkClass}>
-            Owner
-          </Link>
+        {beta && (
+          <Badge variant="outline" className="px-2">
+            Beta
+          </Badge>
         )}
-        {role === "ADMIN" && (
-          <Link href="/admin" className={linkClass}>
-            Admin
-          </Link>
-        )}
-        <span className="ml-auto inline-flex min-w-14 justify-end">
-          {isPending ? null : data ? (
-            <button
-              type="button"
-              onClick={signOut}
-              disabled={signingOut}
-              className={`${linkClass} underline disabled:opacity-50`}
-            >
-              Sign out
-            </button>
-          ) : pathname === "/sign-in" ? null : (
-            <Link
-              href={`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`}
-              className={`${linkClass} underline`}
-            >
-              Sign in
-            </Link>
+        <div className="ml-auto flex items-center gap-1.5">
+          {pathname !== "/rate" && (
+            <ButtonLink href="/rate" size="sm" className="h-11 px-3.5 text-base">
+              Rate<span className="hidden min-[430px]:inline"> a dish</span>
+            </ButtonLink>
           )}
-        </span>
+          <span className="inline-flex min-w-11 justify-end">
+            {isPending ? null : data ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Account menu"
+                      className="rounded-full font-display text-lg font-bold text-brand"
+                    />
+                  }
+                >
+                  {initial}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={8}>
+                  <DropdownMenuLabel className="truncate px-2.5 pt-1.5 pb-1 text-sm">
+                    {data.user.name || data.user.email}
+                  </DropdownMenuLabel>
+                  <DropdownMenuLinkItem render={<Link href="/me" />}>
+                    <StarIcon /> My ratings
+                  </DropdownMenuLinkItem>
+                  {role === "OWNER" && (
+                    <DropdownMenuLinkItem render={<Link href="/owner" />}>
+                      <StoreIcon /> Owner
+                    </DropdownMenuLinkItem>
+                  )}
+                  {role === "ADMIN" && (
+                    <DropdownMenuLinkItem render={<Link href="/admin" />}>
+                      <ShieldIcon /> Admin
+                    </DropdownMenuLinkItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={signOut} disabled={signingOut}>
+                    <LogOutIcon /> {signingOut ? "Signing out…" : "Sign out"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : pathname === "/sign-in" ? null : (
+              <ButtonLink
+                variant="ghost"
+                size="sm"
+                className="h-11 px-2.5 text-base"
+                href={`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`}
+              >
+                Sign in
+              </ButtonLink>
+            )}
+          </span>
+        </div>
       </nav>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          Sign-out did not finish. Try again.
-        </p>
-      )}
     </header>
   );
 }

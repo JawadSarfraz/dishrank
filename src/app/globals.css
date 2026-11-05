@@ -2,131 +2,211 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Design tokens (docs/12-DESIGN.md). Light theme now; the .dark block holds the values for a dark
+   theme later and is not switched on anywhere yet. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* next/font sets --font-geist and --font-bricolage on <html> (src/app/layout.tsx). Never
+     var(--font-sans) here: a variable that refers to itself is invalid, and the page falls back to a
+     serif. */
+  --font-sans: var(--font-geist);
+  --font-display: var(--font-bricolage);
+  --font-heading: var(--font-display);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* next/font sets --font-geist-sans/-mono on <html> (src/app/layout.tsx). Never var(--font-sans)
-     here: a variable that refers to itself is invalid, and the page falls back to a serif. */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  /* Gold: only the #1 rank and the medals (owner, Part 3) */
+  --color-gold: var(--gold);
+  --color-gold-ink: var(--gold-ink);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-text: var(--gold-text);
+  --color-silver: var(--silver);
+  --color-bronze: var(--bronze);
+  /* Score bands (src/lib/score-band.ts) */
+  --color-score-top: var(--score-top);
+  --color-score-high: var(--score-high);
+  --color-score-good: var(--score-good);
+  --color-score-mid: var(--score-mid);
+  --color-score-low: var(--score-low);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-xl: calc(var(--radius) * 1.35);
+  --radius-2xl: calc(var(--radius) * 1.75);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-sheet: var(--shadow-sheet);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Surfaces and text */
+  --background: #f7f8f6;
+  --foreground: #16201b;
+  --card: #ffffff;
+  --card-foreground: #16201b;
+  --popover: #ffffff;
+  --popover-foreground: #16201b;
+  --muted: #eef1ee;
+  --muted-foreground: #5e6963;
+  --accent: #eef1ee;
+  --accent-foreground: #16201b;
+  --border: #e2e6e2;
+  --input: #c9d1cb;
+  /* Brand green: actions, links, focus */
+  --brand: #0e6b4a;
+  --brand-ink: #0a4d35;
+  --brand-soft: #e4f1ea;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--brand-soft);
+  --secondary-foreground: var(--brand-ink);
+  --ring: var(--brand);
+  --destructive: #b42318;
+  /* Gold (Pakistan's cricket kit), silver, bronze: the medals */
+  --gold: #d4a72c;
+  --gold-ink: #3a2a00;
+  --gold-soft: #fbf1d6;
+  --gold-text: #7a5c00;
+  --silver: #d7dce1;
+  --bronze: #d9a77b;
+  /* Score bands: white text on each */
+  --score-top: #14532d;
+  --score-high: #166534;
+  --score-good: #15803d;
+  --score-mid: #475569;
+  --score-low: #6b7280;
+
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px rgb(22 32 27 / 0.06), 0 1px 1px rgb(22 32 27 / 0.04);
+  --shadow-raised: 0 8px 24px -8px rgb(22 32 27 / 0.18), 0 2px 6px rgb(22 32 27 / 0.06);
+  --shadow-sheet: 0 -8px 28px rgb(22 32 27 / 0.14);
 }
 
+/* Ready for later: the same tokens for a dark theme (not enabled anywhere yet). */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #10171a;
+  --foreground: #eef2ee;
+  --card: #18211e;
+  --card-foreground: #eef2ee;
+  --popover: #18211e;
+  --popover-foreground: #eef2ee;
+  --muted: #212c27;
+  --muted-foreground: #a3ada6;
+  --accent: #212c27;
+  --accent-foreground: #eef2ee;
+  --border: #2b3732;
+  --input: #3a4842;
+  --brand: #3fae82;
+  --brand-ink: #7fd1ad;
+  --brand-soft: #173126;
+  --primary: var(--brand);
+  --primary-foreground: #06251a;
+  --secondary: var(--brand-soft);
+  --secondary-foreground: var(--brand-ink);
+  --ring: var(--brand);
+  --destructive: #f0796e;
+  --gold: #d4a72c;
+  --gold-ink: #3a2a00;
+  --gold-soft: #3a2f10;
+  --gold-text: #e8c25a;
+  --silver: #3b444c;
+  --bronze: #6d4a2b;
+  --score-top: #22c55e;
+  --score-high: #16a34a;
+  --score-good: #15803d;
+  --score-mid: #64748b;
+  --score-low: #6b7280;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-raised: 0 8px 24px -8px rgb(0 0 0 / 0.6);
+  --shadow-sheet: 0 -8px 28px rgb(0 0 0 / 0.5);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
+  body {
+    @apply bg-background text-foreground;
+    font-size: 1rem;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  /* Keyboard focus is always visible; components with their own ring add to this. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--brand-soft);
+    color: var(--brand-ink);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* A native text field, select or textarea: 44 px tall, 16 px text (no zoom on iOS). */
+@utility field {
+  @apply min-h-11 w-full min-w-0 rounded-lg border border-input bg-card px-3 text-base text-foreground placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50;
+}
+/* A native <select> with its own chevron. */
+@utility field-select {
+  appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e6963' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1.1rem;
+}
+/* Long names never widen a row or a tile at 360 px. */
+@utility break-anywhere {
+  overflow-wrap: anywhere;
 }
