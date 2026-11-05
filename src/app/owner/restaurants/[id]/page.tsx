@@ -34,6 +34,7 @@ export default async function OwnerRestaurantPage({
     data = await getOwnerRestaurant(user, id);
   } catch (error) {
     if (error instanceof AppError && error.code === "NOT_FOUND") notFound();
+    if (error instanceof AppError && error.code === "USER_BANNED") return <Forbidden />;
     throw error;
   }
   const { restaurant: r, dishes, removed } = data;

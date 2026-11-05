@@ -25,6 +25,7 @@ import {
   deleteRestaurantDish,
   findRestaurantDish,
   insertCandidateDish,
+  listDishPagesOfRows,
   listDishesOfRestaurant,
   lockDishesOfRestaurants,
   moveDishToRestaurant,
@@ -34,10 +35,12 @@ import {
   addRatingHistory,
   deleteRating,
   listRatingsOfRestaurantDishes,
+  listRowsRatedByUserAt,
   moveRatingHistory,
   moveRatings,
 } from "@/server/repositories/rating.repo";
 import {
+  closeOpenClaimItems,
   closeReviewItem,
   deleteClaims,
   deleteFlags,
@@ -295,7 +298,7 @@ export async function updateRestaurant(
       }
     }
     const aliases = normalizeAliases(input.aliases, input.name);
-    return updateRestaurantById(
+    const saved = await updateRestaurantById(
       id,
       {
         ...data,
@@ -310,9 +313,13 @@ export async function updateRestaurant(
       },
       tx,
     );
+    // The ranking, city and home pages show its dish rows with the name, area and location: the
+    // caller revalidates them (audit 2026-11, B-05).
+    const rows = await listDishesOfRestaurant(id, tx);
+    return { ...saved, dishPages: await listDishPagesOfRows(rows.map((r) => r.id), tx) };
   });
   logEvent("restaurant.update", { userId: admin.id, entityId: id });
-  return { id, slug: updated.slug, citySlug: updated.city.slug };
+  return { id, slug: updated.slug, citySlug: updated.city.slug, dishPages: updated.dishPages };
 }
 
 export async function setRestaurantStatus(
@@ -328,9 +335,13 @@ export async function setRestaurantStatus(
     if (live.status !== status) await updateRestaurantById(id, { status }, tx);
     return live;
   });
+  let dishPages: Awaited<ReturnType<typeof listDishPagesOfRows>> = [];
   if (restaurant.status !== status) {
-    // Only ACTIVE restaurants rank (docs/04): its dish rows gain or lose their rank numbers now.
+    // Only ACTIVE restaurants rank (docs/04): its dish rows gain or lose their rank numbers now,
+    // and every page that lists them is revalidated by the caller (audit 2026-11, B-05).
     await rerankRestaurant(id);
+    const rows = await listDishesOfRestaurant(id);
+    dishPages = await listDishPagesOfRows(rows.map((r) => r.id));
     logEvent("restaurant.status", {
       userId: admin.id,
       entityId: id,
@@ -338,7 +349,7 @@ export async function setRestaurantStatus(
       to: status,
     });
   }
-  return { id, slug: restaurant.slug, citySlug: restaurant.city.slug, status };
+  return { id, slug: restaurant.slug, citySlug: restaurant.city.slug, status, dishPages };
 }
 
 // ---------- search and lookups ----------
@@ -549,6 +560,8 @@ export type MergeResult = {
   droppedFlags: string[];
   movedClaims: string[];
   droppedClaims: string[];
+  /** OPEN claim items of the dropped claims, closed as duplicates. */
+  closedClaimItems: number;
   movedMenuUploads: number;
   movedReviewItems: number;
   /** Held-rating review items of dropped rows, now on the kept row (or merged into its item). */
@@ -564,6 +577,8 @@ export type MergeResult = {
   droppedPhotoPaths: string[];
   /** Dishes of the source, whose ranking pages change. */
   dishSlugs: string[];
+  /** Every page that lists a dish row of the target after the merge (set after commit). */
+  dishPages: { citySlug: string; dishSlug: string; restaurantSlug: string }[];
 };
 
 /** Step 7: recompute the kept rows whose ratings changed (each recompute re-ranks its list). */
@@ -682,6 +697,7 @@ export async function mergeRestaurants(
       droppedFlags: [],
       movedClaims: [],
       droppedClaims: [],
+      closedClaimItems: 0,
       movedMenuUploads: 0,
       movedReviewItems: 0,
       movedHeldRatingItems: 0,
@@ -693,6 +709,7 @@ export async function mergeRestaurants(
       recomputeIds: [],
       droppedPhotoPaths: [],
       dishSlugs: sourceDishes.map((rd) => rd.dish.slug),
+      dishPages: [],
     };
 
     for (const rd of plan.move) {
@@ -778,9 +795,24 @@ export async function mergeRestaurants(
     await moveClaims(claimPlan.move, targetId, tx);
     out.droppedClaims = claimPlan.drop;
     out.movedClaims = claimPlan.move;
+    // The dropped claims' open review items would stay open for good (their claim is gone):
+    // closed as duplicates (audit 2026-11, B-02).
+    out.closedClaimItems = (
+      await closeOpenClaimItems(
+        claimPlan.drop,
+        `rejected: duplicate claim (${source.name} was merged into ${target.name})`,
+        new Date(),
+        tx,
+      )
+    ).count;
     out.movedReviewItems = (await moveOpenReviewItems(sourceId, targetId, tx)).count;
     out.movedCandidates = (await moveCandidatesToRestaurant(sourceId, targetId, tx)).count;
     out.movedLocationObservations = (await moveLocationObservations(sourceId, targetId, tx)).count;
+    // The source's owner becomes the target's: their own ratings at the target stop counting
+    // (docs/04 control 1), so those rows are recomputed too (audit 2026-11, B-06).
+    if (owner.moveToTarget && source.claimedByUserId) {
+      out.recomputeIds.push(...(await listRowsRatedByUserAt(source.claimedByUserId, targetId, tx)));
+    }
 
     for (const [userId, delta] of [...counterDeltas].sort(([a], [b]) =>
       a < b ? -1 : a > b ? 1 : 0,
@@ -828,8 +860,11 @@ export async function mergeRestaurants(
   // never leaves them behind (best effort: failures are logged with the path).
   await deleteUnusedPhotos(result.droppedPhotoPaths, storage);
   await afterCommit(result.recomputeIds);
-  // The target now holds the source's dish rows: re-rank its lists (names break ties).
+  // The target now holds the source's dish rows: re-rank its lists (names break ties), and tell
+  // the caller every page that lists them (audit 2026-11, B-05).
   await rerankRestaurant(targetId);
+  const targetRows = await listDishesOfRestaurant(targetId);
+  result.dishPages = await listDishPagesOfRows(targetRows.map((r) => r.id));
   logEvent("restaurant.merge", {
     userId: admin.id,
     sourceId,
@@ -842,6 +877,7 @@ export async function mergeRestaurants(
     droppedFlags: result.droppedFlags,
     movedClaims: result.movedClaims,
     droppedClaims: result.droppedClaims,
+    closedClaimItems: result.closedClaimItems,
     movedMenuUploads: result.movedMenuUploads,
     movedReviewItems: result.movedReviewItems,
     movedHeldRatingItems: result.movedHeldRatingItems,

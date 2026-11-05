@@ -50,8 +50,10 @@ export async function updateRestaurantAction(restaurantId: unknown, input: unkno
       parseInput(adminRestaurantUpdateInput, input),
     );
     revalidatePath(restaurantPage(result.citySlug, result.slug));
+    // A new name, area or location shows on every ranking page of its dishes, the city page and home.
+    for (const page of result.dishPages) revalidateDishPages(page);
     refresh();
-    return result;
+    return { id: result.id, slug: result.slug, citySlug: result.citySlug };
   });
 }
 
@@ -61,8 +63,10 @@ export async function setRestaurantStatusAction(restaurantId: unknown, input: un
     const { status } = parseInput(restaurantStatusInput, input);
     const result = await setRestaurantStatus(actor, parseInput(id, restaurantId), status);
     revalidatePath(restaurantPage(result.citySlug, result.slug));
+    // A closed or hidden restaurant leaves its ranking pages at once, not at the hourly refresh.
+    for (const page of result.dishPages) revalidateDishPages(page);
     refresh();
-    return result;
+    return { id: result.id, slug: result.slug, citySlug: result.citySlug, status: result.status };
   });
 }
 
@@ -77,6 +81,8 @@ export async function mergeRestaurantAction(restaurantId: unknown, input: unknow
     for (const dishSlug of result.dishSlugs) {
       revalidatePath(`/${result.target.citySlug}/best-${dishSlug}`);
     }
+    // The target's dish rows (name, area, location, scores) on every page that lists them.
+    for (const page of result.dishPages) revalidateDishPages(page);
     refresh();
     return {
       target: result.target,

@@ -57,7 +57,6 @@ export async function ensureRestaurantDish(
   return { ...row, created: count > 0 };
 }
 
-/** Which of these (restaurant, dish) pairs already exist, for the import preview. */
 /** docs/02 lifecycle: a STALE row that gets a new rating is confirmed again. */
 export async function reviveRestaurantDish(id: string, now: Date, tx: Tx) {
   await tx.restaurantDish.update({
@@ -67,6 +66,17 @@ export async function reviveRestaurantDish(id: string, now: Date, tx: Tx) {
   });
 }
 
+/** The STALE rows among these become USER_CONFIRMED (a held rating on them was released). */
+export async function reviveStaleDishRows(ids: readonly string[], now: Date, tx: Tx) {
+  if (ids.length === 0) return 0;
+  const { count } = await tx.restaurantDish.updateMany({
+    where: { id: { in: [...ids] }, status: "STALE" },
+    data: { status: "USER_CONFIRMED", lastVerifiedAt: now },
+  });
+  return count;
+}
+
+/** Which of these (restaurant, dish) pairs already exist, for the import preview. */
 export async function listRestaurantDishPairs(
   restaurantIds: readonly string[],
   dishIds: readonly string[],

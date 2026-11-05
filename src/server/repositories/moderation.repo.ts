@@ -321,6 +321,27 @@ export async function updateOwnerClaim(
   return tx.ownerClaim.update({ where: { id }, data, select: { id: true } });
 }
 
+/**
+ * Closes the OPEN OWNER_CLAIM items of these claims (a merge dropped the claims themselves, audit
+ * 2026-11 B-02): nobody could approve or reject an item whose claim is gone.
+ */
+export async function closeOpenClaimItems(
+  claimIds: readonly string[],
+  resolution: string,
+  at: Date,
+  tx: Tx,
+) {
+  if (claimIds.length === 0) return { count: 0 };
+  return tx.reviewItem.updateMany({
+    where: {
+      type: "OWNER_CLAIM",
+      status: "OPEN",
+      OR: claimIds.map((id) => ({ payload: { path: ["claimId"], equals: id } })),
+    },
+    data: { status: "REJECTED", resolution, resolvedAt: at },
+  });
+}
+
 /** /me: the user's own claims, newest first, with the reason of a rejection. */
 export async function listClaimsOfUser(userId: string) {
   return db.ownerClaim.findMany({

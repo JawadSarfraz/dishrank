@@ -21,6 +21,7 @@ import { listDishGroupsOfRows, lockCityDishLists } from "@/server/repositories/r
 import {
   listDishPagesOfRows,
   lockRestaurantDishes,
+  reviveStaleDishRows,
 } from "@/server/repositories/restaurant-dish.repo";
 import {
   listRatingsForReview,
@@ -218,6 +219,14 @@ async function decideHeldRatings(
     await setRatingStatus(
       release.map((r) => r.id),
       "ACTIVE",
+      tx,
+    );
+    // docs/02 lifecycle: a rating that counts revives a STALE row. A rating held at write time left
+    // the row STALE; its release is when it starts to count (audit 2026-11, B-03). The rows were
+    // locked before the item (lockItemParents).
+    await reviveStaleDishRows(
+      [...new Set(release.map((r) => r.restaurantDishId))],
+      now,
       tx,
     );
     return {
@@ -631,7 +640,7 @@ export async function resolveReviewItem(
     userId: admin.id,
     entityId: itemId,
     type: decision.type,
-    action: input.action,
+    decision: input.action,
     status: decision.status,
     recomputedRows: rows.size,
   });

@@ -19,6 +19,7 @@ import {
 import { lockRestaurantDish } from "@/server/repositories/ranking.repo";
 import { lockRestaurantForRating } from "@/server/repositories/restaurant.repo";
 import { inTransaction } from "@/server/repositories/transaction";
+import { findRater } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import type { OwnerDishInput } from "@/server/validation";
 import { DAY_MS } from "./ranking.constants";
@@ -36,9 +37,18 @@ function assertManages(user: SessionUser, restaurant: { claimedByUserId: string 
   }
 }
 
+/** A banned account keeps nothing of the owner area, like every other write path (audit 2026-11, B-13). */
+async function assertNotBanned(user: SessionUser) {
+  const rater = await findRater(user.id);
+  if (!rater || rater.bannedAt) {
+    throw new AppError("USER_BANNED", "This account cannot manage restaurants", 403);
+  }
+}
+
 /** /owner: the restaurants this user manages. */
 export async function listMyRestaurants(actor: SessionUser | null) {
   const user = assertRole(actor, OWNER_ROLES);
+  await assertNotBanned(user);
   return listRestaurantsManagedBy(user.id);
 }
 
@@ -59,6 +69,7 @@ export async function getOwnerRestaurant(
   now: Date = new Date(),
 ) {
   const user = assertRole(actor, OWNER_ROLES);
+  await assertNotBanned(user);
   const restaurant = await findRestaurantForOwner(restaurantId);
   assertManages(user, restaurant);
   if (restaurant!.status === "DUPLICATE")
@@ -114,6 +125,7 @@ export async function updateOwnerDish(
   now: Date = new Date(),
 ) {
   const user = assertRole(actor, OWNER_ROLES);
+  await assertNotBanned(user);
   const row = await inTransaction(async (tx) => {
     const peek = await findDishRowWithOwner(rowId, tx);
     if (!peek) throw new AppError("NOT_FOUND", "Dish not found", 404);

@@ -100,6 +100,12 @@ export async function listMyClaims(actor: SessionUser | null) {
   }));
 }
 
+type ClaimRestaurant = NonNullable<Awaited<ReturnType<typeof findRestaurantById>>>;
+
+export type ClaimDecision =
+  | { approved: true; userId: string; restaurant: ClaimRestaurant; reason: null }
+  | { approved: false; userId: string | null; restaurant: ClaimRestaurant; reason: string };
+
 /**
  * The admin's decision on an OWNER_CLAIM item, inside the review transaction after the
  * restaurant's row lock (review.service lockItemParents). Returns what changed.
@@ -113,10 +119,23 @@ export async function decideOwnerClaimTx(
   },
   now: Date,
   tx: Tx,
-) {
+): Promise<ClaimDecision> {
   const { claimId } = input.item.payload as ClaimPayload;
   const claim = await findClaimById(claimId, tx);
-  if (!claim || claim.restaurantId !== input.item.restaurantId) {
+  if (!claim) {
+    // The claim is gone (the claimant deleted their account, or a merge dropped a duplicate): the
+    // item can only be rejected, so the queue can always be cleared (audit 2026-11, B-02).
+    if (input.action !== "reject") {
+      throw new AppError("ITEM_CHANGED", "This claim no longer exists. Reject the item.", 409);
+    }
+    const restaurant = input.item.restaurantId
+      ? await findRestaurantById(input.item.restaurantId, tx)
+      : null;
+    if (!restaurant) throw new AppError("NOT_FOUND", "Restaurant not found", 404);
+    const reason = input.reason?.trim() || "the claim no longer exists";
+    return { approved: false, userId: null, restaurant, reason };
+  }
+  if (claim.restaurantId !== input.item.restaurantId) {
     throw new AppError("ITEM_CHANGED", "This claim changed after you opened it. Reload it.", 409);
   }
   if (claim.status !== "PENDING") {
@@ -141,6 +160,11 @@ export async function decideOwnerClaimTx(
   }
   if (restaurant.claimedByUserId && restaurant.claimedByUserId !== claim.userId) {
     throw new AppError("RESTAURANT_CLAIMED", "Another owner manages this restaurant already", 409);
+  }
+  // A banned account is never made an owner (audit 2026-11, B-13): reject the claim instead.
+  const claimant = await findRater(claim.userId, tx);
+  if (!claimant || claimant.bannedAt) {
+    throw new AppError("USER_BANNED", "This account is banned: reject the claim", 409);
   }
   // The claimant's row is locked before anything is written, as a removal locks it
   // (removeRestaurantOwner): one of the two waits for the other, so a user who manages a restaurant

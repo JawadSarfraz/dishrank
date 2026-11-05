@@ -21,7 +21,7 @@ export async function runAction<T>(name: string, fn: () => Promise<T>): Promise<
     }
     logEvent(
       "action.error",
-      { action: name, error: error instanceof Error ? error.message : String(error) },
+      { name, error: error instanceof Error ? error.message : String(error) },
       "error",
     );
     return { error: { code: "INTERNAL", message: "Something went wrong. Try again." } };
