@@ -245,6 +245,19 @@ Cost: a 1600 px photo is ≈ 2.5–3k input tokens and a few hundred output toke
 
 Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and triggers `recomputeOne` where ratings changed. A decision is refused (`ITEM_CHANGED`) when the item changed after the admin opened it, so it never applies to ratings, comments or a location they did not see. A status change of a rating never moves its `updatedAt` (the decay clock, docs/04). Phase 3 builds the decisions for `SUSPICIOUS_RATINGS`, `DISH_PROPOSAL`, `RESTAURANT_PROPOSAL` and `LOCATION_SUGGESTION` on `/admin/review`, Phase 4 those for `FLAG` reports and disputes, Phase 5 those for `UNMATCHED_MENU_ITEM`; the other types arrive with their phases.
 
+## 7a. Panel invite links (`/admin/users`, `/join/<token>`)
+
+Owner, 2026-11-06. An admin creates a link with a label, a maximum number of uses (default 30) and an expiry (default 14 days). The token is 256 random bits; only its sha256 is stored, so the whole link is shown once, right after creating it. It never goes in a log.
+
+Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.3 unless an admin set an override, exempt from the burst rule, panel limits) and passes the beta allowlist. How:
+
+1. `/join/<token>` (dynamic, `noindex`, `no-referrer`) shows what the panel is. Signed out: **Continue with Google** first validates the link and sets an HttpOnly cookie for 30 minutes (`startPanelInviteAction`, `ip:{hash}:panel-invite`).
+2. Better Auth's `user.create.before` hook lets a new, verified account past `BETA_ALLOWED_EMAILS` when that cookie holds a usable link. A banned e-mail stays refused, link or not.
+3. Its `session.create.after` hook redeems the link and clears the cookie; a problem there never blocks the sign-in, and the page then offers the one-tap join. Back on `/join/<token>` the visitor reads "You're on the panel".
+4. Someone already signed in joins with one tap (`joinPanelAction`, `user:{id}:panel-join`).
+
+Redeeming runs under the link's row lock, then the user's, so the limit holds however many sign in at once. Someone already on the panel, or already counted on this link, uses up no place, and an admin who turned the panel off for someone is not overruled by that person opening the link again. Revoking or expiring a link stops new joins; people who joined stay on the panel until an admin turns them off. /admin/users lists each link with its state and who joined; deleting an account removes that person from the list (the used count stays).
+
 ## 7. Panel operations (non-code, but the plan depends on it)
 
 - Recruit 8–12 panel members; admin sets `isPanel` on `/admin/users` (trust fixed at 1.3; 30 ratings/day, 10 per restaurant per day; no new-account burst hold; still blocked from restaurants they own).

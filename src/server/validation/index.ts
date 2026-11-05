@@ -333,6 +333,17 @@ export type CandidateSkipInput = z.infer<typeof candidateSkipInput>;
 /** /admin/import Reopen: a skipped candidate goes back to the list. */
 export const candidateReopenInput = z.strictObject({ candidateId: id });
 
+/** A panel invite link's token: 256 random bits, base64url. */
+export const panelInviteToken = z.string().regex(/^[A-Za-z0-9_-]{43}$/, "Invalid invite link");
+
+/** /admin/users: a new panel invite link; the defaults (30 uses, 14 days) live in the service. */
+export const panelInviteCreateInput = z.strictObject({
+  label: text(80),
+  maxUses: z.int().min(1).max(500).optional(),
+  expiresInDays: z.int().min(1).max(90).optional(),
+});
+export type PanelInviteCreateInput = z.infer<typeof panelInviteCreateInput>;
+
 /** /admin/import/auto-list Apply: how many restaurants this request may create. */
 export const autoListApplyInput = z.strictObject({ limit: z.int().min(1).max(200).optional() });
 export type AutoListApplyInput = z.infer<typeof autoListApplyInput>;

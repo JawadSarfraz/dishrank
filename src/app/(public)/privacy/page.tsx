@@ -60,7 +60,8 @@ export default function PrivacyPage() {
           never sent to us.
         </p>
         <p>
-          Panel members (trusted raters chosen by our team) can choose to share their location while
+          Panel members (trusted raters invited by our team; if you join through an invite link, we
+          keep which link you used) can choose to share their location while
           they are at a restaurant. We keep that location with the restaurant, not with the rating,
           and use it only to correct where the restaurant is on the map.
         </p>

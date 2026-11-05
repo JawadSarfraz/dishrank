@@ -5,7 +5,14 @@ import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import { revalidateDishPages } from "@/server/revalidate";
 import { setPanel, setTrustOverride } from "@/server/services/admin-users.service";
-import { adminPanelInput, adminTrustInput, parseInput } from "@/server/validation";
+import { createPanelInvite, revokePanelInvite } from "@/server/services/panel-invite.service";
+import { absoluteUrl } from "@/server/site";
+import {
+  adminPanelInput,
+  adminTrustInput,
+  panelInviteCreateInput,
+  parseInput,
+} from "@/server/validation";
 import { id } from "@/server/validation/common";
 import { runAction } from "./result";
 
@@ -18,6 +25,30 @@ export async function setPanelAction(userId: unknown, input: unknown) {
     const result = await setPanel(actor, parseInput(id, userId), isPanel);
     // The user's trust changed: so did the scores of every row their ratings count in.
     for (const page of result.dishPages) revalidateDishPages(page);
+    refresh();
+    return result;
+  });
+}
+
+/** A new panel invite link. The whole link goes back once, here; only its hash is stored. */
+export async function createPanelInviteAction(input: unknown) {
+  return runAction("panel_invite.create", async () => {
+    const actor = await requireRole("ADMIN");
+    await assertRateLimit(`user:${actor.id}:admin-write`, RATE_LIMITS.adminWrite);
+    const { invite, token } = await createPanelInvite(
+      actor,
+      parseInput(panelInviteCreateInput, input),
+    );
+    refresh();
+    return { id: invite.id, url: absoluteUrl(`/join/${token}`) };
+  });
+}
+
+export async function revokePanelInviteAction(inviteId: unknown) {
+  return runAction("panel_invite.revoke", async () => {
+    const actor = await requireRole("ADMIN");
+    await assertRateLimit(`user:${actor.id}:admin-write`, RATE_LIMITS.adminWrite);
+    const result = await revokePanelInvite(actor, parseInput(id, inviteId));
     refresh();
     return result;
   });

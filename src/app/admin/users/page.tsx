@@ -1,5 +1,6 @@
 import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import { AdminPagination } from "@/components/admin/AdminPagination";
+import { PanelInvites } from "@/components/admin/PanelInvites";
 import { PanelToggle } from "@/components/admin/PanelToggle";
 import { TrustOverride } from "@/components/admin/TrustOverride";
 import { Forbidden } from "@/components/auth/Forbidden";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { requirePageRole } from "@/server/auth";
 import { listUsersForAdmin } from "@/server/services/admin-users.service";
+import { PANEL_INVITE, listPanelInvites } from "@/server/services/panel-invite.service";
 import { adminUserListQuery } from "@/server/validation";
 
 const date = new Intl.DateTimeFormat("en-PK", { dateStyle: "medium", timeZone: "Asia/Karachi" });
@@ -18,7 +20,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
 
   const parsed = adminUserListQuery.safeParse(await searchParams);
   const query = parsed.success ? parsed.data : { page: 1 };
-  const { items, total, page, pages } = await listUsersForAdmin(user, query);
+  const [{ items, total, page, pages }, invites] = await Promise.all([
+    listUsersForAdmin(user, query),
+    listPanelInvites(user),
+  ]);
   const href = (p: number) => {
     const params = new URLSearchParams();
     if (query.q) params.set("q", query.q);
@@ -34,6 +39,11 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
         title="Users"
         help="Panel members are trusted early raters: trust 1.3, 30 ratings a day and 10 per restaurant, never held by the new-account burst rule, still blocked from their own restaurants (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table."
       />
+      <PanelInvites
+        invites={invites}
+        defaults={{ maxUses: PANEL_INVITE.maxUses, days: PANEL_INVITE.days }}
+      />
+      <h2 className="text-lg font-bold">Everyone</h2>
       <form className="flex flex-wrap items-end gap-3" role="search">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Email or name

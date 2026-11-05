@@ -30,10 +30,12 @@ const AUTH = /\b(requireUser|requireRole)\(/;
 
 describe("security surface (Phase 6)", () => {
   it("every server action checks the session (the anonymous ones are listed here on purpose)", () => {
-    // Anyone may file a dispute (limited per IP); the menu button asks whether to show itself.
+    // Anyone may file a dispute (limited per IP); the menu button asks whether to show itself; a
+    // panel invite starts before sign-in (limited per IP) and only sets a cookie for a valid link.
     const anonymous: Record<string, RegExp> = {
       fileDisputeAction: /getSessionUser\(/,
       menuUploadAccessAction: /getSessionUser\(/,
+      startPanelInviteAction: /assertRateLimit\(/,
     };
     const files = walk("src/server/actions").filter(
       (f) => f.endsWith(".ts") && !/\/(result|index)\.ts$/.test(f),

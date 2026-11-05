@@ -30,7 +30,7 @@ export function robotsFor(mode: SiteMode): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/owner", "/me", "/rate", "/sign-in", "/api"],
+      disallow: ["/admin", "/owner", "/me", "/rate", "/sign-in", "/join", "/api"],
     },
     sitemap: absoluteUrl("/sitemap.xml"),
   };
@@ -47,20 +47,24 @@ export const OPERATOR = {
  * marks as verified counts. Beta: only the invited accounts (BETA_ALLOWED_EMAILS, comma- or
  * space-separated) and ADMIN_EMAIL, because Google's "Testing" status does not limit plain Sign in
  * with Google; an empty list lets only the admin in. Live: everyone. Existing accounts are not
- * affected. ADMIN_EMAIL becomes ADMIN in both modes.
+ * affected. ADMIN_EMAIL becomes ADMIN in both modes. `invited`: the visitor came through a usable
+ * panel invite link (docs/07 §7a), which passes the beta list like an invited address.
  */
 // Decided 2026-11-04: in beta without BETA_ALLOWED_EMAILS only ADMIN_EMAIL can sign up (closed by default).
 export function newAccountDecision(
   user: { email: string; emailVerified?: boolean | null },
-  input: { mode: SiteMode; allowed?: string; adminEmail?: string },
+  input: { mode: SiteMode; allowed?: string; adminEmail?: string; invited?: boolean },
 ): { allowed: boolean; admin: boolean } {
   const email = user.email.trim().toLowerCase();
   const verified = user.emailVerified === true && email !== "";
   const admin = verified && input.adminEmail?.trim().toLowerCase() === email;
   if (input.mode === "live") return { allowed: true, admin };
-  const invited = (input.allowed ?? "")
+  const listed = (input.allowed ?? "")
     .split(/[\s,;]+/)
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return { allowed: verified && (admin || invited.includes(email)), admin };
+  return {
+    allowed: verified && (admin || Boolean(input.invited) || listed.includes(email)),
+    admin,
+  };
 }

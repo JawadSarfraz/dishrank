@@ -9,12 +9,25 @@ import { env } from "@/env";
 import { db } from "./db";
 import { logEvent } from "./log";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
+import { revalidateDishPages } from "./revalidate";
 import { isEmailBanned } from "./services/ban-list";
+import {
+  PANEL_INVITE,
+  getPanelInviteState,
+  redeemPanelInvite,
+} from "./services/panel-invite.service";
 import { SITE_MODE, newAccountDecision } from "./site";
+import { panelInviteToken } from "./validation";
 import { BRAND } from "@/lib/brand";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
+
+/** The invite this sign-in started from on /join/<token>, from its HttpOnly cookie (docs/07 §7a). */
+function panelInviteOf(ctx: { getCookie(key: string): string | null } | null | undefined) {
+  const parsed = panelInviteToken.safeParse(ctx?.getCookie(PANEL_INVITE.cookie));
+  return parsed.success ? parsed.data : null;
+}
 
 /** Google sign-in is offered only when both credentials are set (src/env.ts requires them in production). */
 export const googleSignInEnabled = Boolean(googleClientId && googleClientSecret);
@@ -43,7 +56,7 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        before: async (user) => {
+        before: async (user, ctx) => {
           // A banned account that deleted itself may not come back (ban list, audit 2026-11 A-01).
           if (await isEmailBanned(user.email)) {
             logEvent("auth.signup_refused", { reason: "banned" }, "warn");
@@ -55,10 +68,12 @@ export const auth = betterAuth({
           // Private beta: only invited Google accounts get an account (BETA_ALLOWED_EMAILS, docs/10);
           // the OAuth callback sends anyone else to /sign-in?error=BETA_INVITE_ONLY. The first
           // admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
+          const invite = panelInviteOf(ctx);
           const decision = newAccountDecision(user, {
             mode: SITE_MODE,
             allowed: env.BETA_ALLOWED_EMAILS,
             adminEmail: env.ADMIN_EMAIL,
+            invited: invite !== null && (await getPanelInviteState(invite)) === "usable",
           });
           if (!decision.allowed) {
             logEvent("auth.signup_refused", { reason: "beta_invite_only" }, "warn");
@@ -68,6 +83,27 @@ export const auth = betterAuth({
             });
           }
           return { data: decision.admin ? { ...user, role: "ADMIN" } : user };
+        },
+      },
+    },
+    session: {
+      create: {
+        // Whoever signs in through a panel invite link joins the panel, new account or not. A
+        // problem here never blocks the sign-in: /join/<token> then offers the one-tap join.
+        after: async (session, ctx) => {
+          const invite = panelInviteOf(ctx);
+          if (!invite) return;
+          try {
+            const { dishPages } = await redeemPanelInvite(session.userId, invite);
+            for (const page of dishPages) revalidateDishPages(page);
+            ctx?.setCookie(PANEL_INVITE.cookie, "", { maxAge: 0, path: "/" });
+          } catch (error) {
+            logEvent(
+              "panel_invite.redeem_failed",
+              { error: error instanceof Error ? error.name : "unknown" },
+              "error",
+            );
+          }
         },
       },
     },
