@@ -26,10 +26,13 @@ export async function getCityOverview(citySlug: string, now: Date = new Date()) 
   const { counts, tops } = await listCityDishSummaries(city.id);
   const ranked = new Map(counts.map((c) => [c.dishId, c._count._all]));
   const top = new Map(tops.map((t) => [t.dishId, t]));
+  // The live thresholds: the pages' trust text reads the rater count from here, never a constant.
+  const thresholds = thresholdsFor(city.launchedAt, now);
   return {
     city: { slug: city.slug, name: city.name },
     cities: cities.map((c) => ({ slug: c.slug, name: c.name })),
-    mode: thresholdsFor(city.launchedAt, now).mode,
+    mode: thresholds.mode,
+    minRaters: thresholds.minRaters,
     dishes: dishes.map((d): CityDish => {
       const first = top.get(d.id);
       return {

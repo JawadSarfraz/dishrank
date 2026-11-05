@@ -2,12 +2,27 @@
 
 // The ranked list with its filter bar (docs/08 Phase 4): the page sends every ranked row, and this
 // filters and sorts them in the browser. Filters live in the URL (?area=&min=&votes=&sort=) so a
-// link keeps them. "Near me" asks for the location only when tapped, never sends it anywhere, and
-// puts restaurants without a location last. Ranks are city-wide and never renumbered.
+// link keeps them; on phones they open in a bottom sheet. "Near me" asks for the location only when
+// tapped, never sends it anywhere, and puts restaurants without a location last. Ranks are city-wide
+// and never renumbered.
+import { MapPinIcon, SlidersHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { RankDisc } from "@/components/ranking/RankDisc";
+import { ScoreBadge } from "@/components/ranking/ScoreBadge";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { haversineKm } from "@/lib/geo";
-import { formatKm, formatPrice, formatScore, formatVotes } from "@/lib/format";
+import { formatFromPrice, formatKm } from "@/lib/format";
 
 export type BrowserRow = {
   rank: number;
@@ -60,8 +75,6 @@ function parse(search: string): Filters {
     sort: SORTS.some((s) => s.value === sort) ? (sort as Sort) : "score",
   };
 }
-
-const select = "h-11 rounded-lg border border-input bg-background px-2 text-base";
 
 export function RankingBrowser({
   rows,
@@ -130,83 +143,117 @@ export function RankingBrowser({
     return list.sort(by[filters.sort]);
   }, [rows, filters.area, filters.min, filters.votes, filters.sort, here]);
 
-  const filtered = filters.area !== "" || filters.min > 0 || filters.votes > 0;
+  const activeFilters =
+    Number(filters.area !== "") + Number(filters.min > 0) + Number(filters.votes > 0);
+  const reset = () => update({ area: "", min: 0, votes: 0 });
 
   return (
     <div className="flex flex-col gap-3">
-      <form
-        aria-label="Filter and sort"
-        className="grid grid-cols-2 gap-2"
-        onSubmit={(e) => e.preventDefault()}
-      >
-        <label className="flex flex-col gap-1 text-sm">
-          Area
-          <select
-            className={select}
-            value={filters.area}
-            onChange={(e) => update({ area: e.target.value })}
-          >
-            <option value="">All areas</option>
-            {areas.map(([slug, name]) => (
-              <option key={slug} value={slug}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
+      <div role="group" aria-label="Filter and sort" className="flex flex-wrap items-center gap-2">
+        <Sheet>
+          <SheetTrigger render={<Button variant="outline" size="sm" className="h-11 text-base" />}>
+            <SlidersHorizontalIcon aria-hidden="true" />
+            Filters
+            {activeFilters > 0 && (
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
+                {activeFilters}
+                <span className="sr-only"> active</span>
+              </span>
+            )}
+          </SheetTrigger>
+          <SheetContent side="bottom" className="mx-auto w-full sm:max-w-md sm:rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Filters</SheetTitle>
+              <SheetDescription>Rank numbers stay as they are for the whole city.</SheetDescription>
+            </SheetHeader>
+            <div className="flex flex-col gap-4 px-4">
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Area
+                <select
+                  className="field field-select"
+                  value={filters.area}
+                  onChange={(e) => update({ area: e.target.value })}
+                >
+                  <option value="">All areas</option>
+                  {areas.map(([slug, name]) => (
+                    <option key={slug} value={slug}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Minimum score
+                <select
+                  className="field field-select"
+                  value={filters.min}
+                  onChange={(e) => update({ min: Number(e.target.value) })}
+                >
+                  {MIN_SCORES.map((n) => (
+                    <option key={n} value={n}>
+                      {n ? `${n} and up` : "Any score"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Minimum votes
+                <select
+                  className="field field-select"
+                  value={filters.votes}
+                  onChange={(e) => update({ votes: Number(e.target.value) })}
+                >
+                  {MIN_VOTES.map((n) => (
+                    <option key={n} value={n}>
+                      {n ? `${n} or more` : "Any number"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <SheetFooter className="flex-row">
+              <Button type="button" variant="ghost" onClick={reset} disabled={activeFilters === 0}>
+                Reset
+              </Button>
+              <SheetClose render={<Button type="button" className="flex-1" />}>
+                Show {shown.length} restaurant{shown.length === 1 ? "" : "s"}
+              </SheetClose>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+        <label className="sr-only" htmlFor="ranking-sort">
           Sort
-          <select
-            className={select}
-            value={filters.sort}
-            onChange={(e) => update({ sort: e.target.value as Sort })}
-          >
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Minimum score
-          <select
-            className={select}
-            value={filters.min}
-            onChange={(e) => update({ min: Number(e.target.value) })}
-          >
-            {MIN_SCORES.map((n) => (
-              <option key={n} value={n}>
-                {n ? `${n}+` : "Any"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Minimum votes
-          <select
-            className={select}
-            value={filters.votes}
-            onChange={(e) => update({ votes: Number(e.target.value) })}
-          >
-            {MIN_VOTES.map((n) => (
-              <option key={n} value={n}>
-                {n ? `${n}+` : "Any"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
+        <select
+          id="ranking-sort"
+          className="field field-select h-11 w-auto min-w-0 font-medium"
+          value={filters.sort}
+          onChange={(e) => update({ sort: e.target.value as Sort })}
+        >
+          {SORTS.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
+          className="h-11 text-base"
           onClick={nearMe}
           disabled={locating === "busy"}
-          className="col-span-2 min-h-11 rounded-lg border px-3 text-base"
+          aria-pressed={here !== null}
+          aria-label="Near me"
         >
-          {locating === "busy" ? "Finding you…" : here ? "Near me (on)" : "Near me"}
-        </button>
-      </form>
+          <MapPinIcon aria-hidden="true" />
+          <span className="hidden min-[400px]:inline">
+            {locating === "busy" ? "Finding you…" : here ? "Near me (on)" : "Near me"}
+          </span>
+        </Button>
+      </div>
       {locating === "failed" && (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-sm text-muted-foreground">
           Your location is not available, so the list stays in rank order.
         </p>
       )}
@@ -215,32 +262,31 @@ export function RankingBrowser({
       )}
 
       {shown.length === 0 ? (
-        <p className="text-sm">
-          No restaurant matches these filters.{" "}
-          {filtered && (
-            <button
-              type="button"
-              className="min-h-11 underline"
-              onClick={() => update({ area: "", min: 0, votes: 0 })}
-            >
-              Show all
-            </button>
+        <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed bg-card p-4">
+          <p className="font-medium">No restaurant matches these filters.</p>
+          {activeFilters > 0 && (
+            <Button type="button" variant="secondary" onClick={reset}>
+              Show all {rows.length}
+            </Button>
           )}
-        </p>
+        </div>
       ) : (
-        <ol aria-label="Ranked restaurants" className="flex flex-col divide-y rounded-lg border">
+        <ol
+          aria-label="Ranked restaurants"
+          className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card"
+        >
           {shown.map((r) => (
-            <li key={r.slug} className="flex items-start gap-3 px-3 py-2">
-              <span
-                aria-label={`Rank ${r.rank}`}
-                className="mt-2.5 min-w-8 text-center text-lg font-bold tabular-nums"
-              >
-                {r.rank}
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col">
+            <li
+              key={r.slug}
+              className={`flex items-start gap-3 px-3 py-3 sm:px-4 ${
+                r.rank === 1 ? "bg-linear-to-r from-gold-soft via-gold-soft/40 to-card" : ""
+              }`}
+            >
+              <RankDisc rank={r.rank} className="mt-1" />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <Link
                   href={`/${citySlug}/r/${r.slug}`}
-                  className="inline-flex min-h-11 items-center font-medium underline-offset-2 hover:underline"
+                  className="inline-flex min-h-11 items-center font-display text-lg leading-tight font-bold break-anywhere underline-offset-4 hover:underline"
                 >
                   {r.name}
                 </Link>
@@ -250,21 +296,21 @@ export function RankingBrowser({
                     .join(" · ")}
                 </span>
                 {(r.price !== null || r.tags.length > 0) && (
-                  <span className="text-sm">
-                    {[r.price !== null ? formatPrice(r.price) : null, ...r.tags]
-                      .filter(Boolean)
-                      .join(" · ")}
+                  <span className="flex flex-wrap items-center gap-1.5 pt-1 text-sm">
+                    {r.price !== null && <span>{formatFromPrice(r.price)}</span>}
+                    {r.tags.map((t) => (
+                      <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                        {t}
+                      </span>
+                    ))}
                   </span>
                 )}
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <span className="rounded-md bg-foreground px-2 py-0.5 text-base font-semibold text-background tabular-nums">
-                  {formatScore(r.score)}
-                </span>
-                <span className="text-xs text-muted-foreground">{formatVotes(r.votes)}</span>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <ScoreBadge score={r.score} votes={r.votes} size="lg" layout="stack" />
                 <Link
                   href={`/rate?city=${citySlug}&r=${r.slug}&d=${dishSlug}`}
-                  className="inline-flex min-h-11 items-center text-sm font-medium underline"
+                  className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
                 >
                   Rate this
                 </Link>

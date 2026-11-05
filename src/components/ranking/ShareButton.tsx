@@ -2,11 +2,25 @@
 
 // Share a page with the phone's share sheet (Web Share), or copy the link where that is missing.
 // The text reads well as a WhatsApp message; the link is added after it.
-import { useState } from "react";
+import { Share2Icon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
 
-export function ShareButton({ title, text, path }: { title: string; text: string; path: string }) {
-  const [status, setStatus] = useState<string | null>(null);
-
+export function ShareButton({
+  title,
+  text,
+  path,
+  label = "Share this list",
+  variant = "outline",
+  className,
+}: {
+  title: string;
+  text: string;
+  path: string;
+  label?: string;
+  variant?: "outline" | "secondary" | "default";
+  className?: string;
+}) {
   async function share() {
     const url = new URL(path, window.location.origin).toString();
     if (typeof navigator.share === "function") {
@@ -19,26 +33,15 @@ export function ShareButton({ title, text, path }: { title: string; text: string
     }
     try {
       await navigator.clipboard.writeText(`${text}\n${url}`);
-      setStatus("Link copied. Paste it in a chat.");
+      toast.add({ type: "success", title: "Link copied", description: "Paste it in a chat." });
     } catch {
-      setStatus(url);
+      toast.add({ type: "info", title: "Copy this link", description: url, timeout: 15_000 });
     }
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={share}
-        className="inline-flex min-h-11 items-center justify-center rounded-lg border px-4 text-base font-medium"
-      >
-        Share this list
-      </button>
-      {status && (
-        <p role="status" className="text-sm break-all">
-          {status}
-        </p>
-      )}
-    </div>
+    <Button type="button" variant={variant} onClick={share} className={className}>
+      <Share2Icon aria-hidden="true" /> {label}
+    </Button>
   );
 }

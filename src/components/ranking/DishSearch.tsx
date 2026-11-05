@@ -2,12 +2,15 @@
 
 // Dish search on the home and city pages: every spelling in DishAlias, Roman Urdu included
 // (karahi / kadai / karhai), through GET /api/v1/dishes. Each result opens its ranking page.
+import { SearchIcon } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { DishIcon } from "@/components/brand/DishIcon";
 
 type Hit = { slug: string; name: string; eligibleCount: number };
 
 export function DishSearch({ citySlug, cityName }: { citySlug: string; cityName: string }) {
+  const id = useId();
   const [q, setQ] = useState("");
   // Results remember the query they answer, so a slow, older answer is never shown.
   const [results, setResults] = useState<{ q: string; hits: Hit[] } | null>(null);
@@ -36,34 +39,49 @@ export function DishSearch({ citySlug, cityName }: { citySlug: string; cityName:
 
   return (
     <div className="flex flex-col gap-2">
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label htmlFor={id} className="sr-only">
         Find a dish in {cityName}
+      </label>
+      <div className="relative">
+        <SearchIcon
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted-foreground"
+        />
         <input
+          id={id}
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. karahi, kadai, nihari"
+          placeholder="Find a dish: karahi, kadai, nihari…"
           autoComplete="off"
           enterKeyHint="search"
-          className="h-11 rounded-lg border border-input bg-transparent px-3 text-base"
+          className="field h-12 pl-11 shadow-card"
         />
-      </label>
+      </div>
       {hits && (
-        <ul aria-live="polite" className="flex flex-col divide-y rounded-lg border">
+        <ul
+          aria-live="polite"
+          className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card"
+        >
           {hits.map((hit) => (
             <li key={hit.slug}>
               <Link
                 href={`/${citySlug}/best-${hit.slug}`}
-                className="flex min-h-11 items-center justify-between gap-2 px-3 py-2"
+                className="flex min-h-12 items-center gap-3 px-3 py-2 hover:bg-muted"
               >
-                <span className="font-medium">{hit.name}</span>
-                <span className="text-sm text-muted-foreground">
+                <DishIcon slug={hit.slug} className="text-brand" />
+                <span className="min-w-0 flex-1 font-medium break-anywhere">{hit.name}</span>
+                <span className="shrink-0 text-sm text-muted-foreground">
                   {hit.eligibleCount > 0 ? `${hit.eligibleCount} ranked` : "Not enough votes yet"}
                 </span>
               </Link>
             </li>
           ))}
-          {hits.length === 0 && <li className="px-3 py-2 text-sm">No dish matches “{text}”.</li>}
+          {hits.length === 0 && (
+            <li className="px-3 py-3 text-sm text-muted-foreground">
+              No dish matches “{text}”. Try another spelling, or pick one below.
+            </li>
+          )}
         </ul>
       )}
     </div>

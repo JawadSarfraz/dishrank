@@ -2,14 +2,21 @@
 // [slug] segment answers only slugs with the "best-" prefix. ISR, one cached page per city × dish:
 // it never reads searchParams; the filter bar works on the rows in the browser.
 import type { Metadata } from "next";
+import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
+import { Main } from "@/components/layout/Page";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
 import { ViewBeacon } from "@/components/ranking/ViewBeacon";
-import { formatNeeded, formatScore, formatVotes } from "@/lib/format";
+import { WaitingList } from "@/components/ranking/WaitingList";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BRAND } from "@/lib/brand";
+import { formatScore, formatVotes } from "@/lib/format";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
 import { getRanking, type Ranking } from "@/server/services/ranking.service";
@@ -42,7 +49,7 @@ function summaryOf(r: Ranking) {
       : `No restaurant has votes for ${r.dish.name} in ${r.city.name} yet.`;
   }
   const ranked = `${r.eligible.length} restaurant${r.eligible.length === 1 ? "" : "s"} ranked from ${formatVotes(votes)}`;
-  return waiting > 0 ? `${ranked}; ${waiting} more collecting votes.` : `${ranked}.`;
+  return waiting > 0 ? `${ranked} · ${waiting} more collecting votes` : ranked;
 }
 
 /** "1. Butt Karahi (8.3), 2. …" for share text and descriptions. */
@@ -55,18 +62,24 @@ const topThree = (r: Ranking) =>
 export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">): Promise<Metadata> {
   const { city, slug } = await params;
   const ranking = await load(city, slug);
-  if (!ranking) return { title: "Not found – DishRank", robots: { index: false } };
-  const title = `${titleOf(ranking)} (${yearInPakistan()}) – DishRank`;
+  if (!ranking) return { title: "Not found", robots: { index: false } };
+  const title = `${titleOf(ranking)} (${yearInPakistan()})`;
   const description =
     ranking.eligible.length > 0
-      ? `${summaryOf(ranking)} Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`
+      ? `${summaryOf(ranking)}. Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`
       : `${summaryOf(ranking)} Rate ${ranking.dish.name} to help rank the restaurants.`;
   return {
     title,
     description,
     alternates: { canonical: pathOf(ranking) },
-    openGraph: { title, description, url: pathOf(ranking), type: "website", siteName: "DishRank" },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: {
+      title: `${title} · ${BRAND.name}`,
+      description,
+      url: pathOf(ranking),
+      type: "website",
+      siteName: BRAND.name,
+    },
+    twitter: { card: "summary_large_image", title: `${title} · ${BRAND.name}`, description },
     // A page that ranks nobody yet stays out of search results (it is still linked and crawled).
     ...(ranking.eligible.length === 0 ? { robots: { index: false, follow: true } } : {}),
   };
@@ -79,27 +92,40 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const { eligible, insufficient, thresholds, mode } = ranking;
   const shareText =
     eligible.length > 0
-      ? `${titleOf(ranking)}, ranked by diners on DishRank: ${topThree(ranking)}`
-      : `${titleOf(ranking)}: help rank them on DishRank`;
+      ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
+      : `${titleOf(ranking)}: help rank them on ${BRAND.name}`;
+  const rateHref = `/rate?city=${ranking.city.slug}`;
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 py-6">
-      <nav aria-label="Breadcrumb" className="text-sm">
+    <Main className="gap-5">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
         <Link
           href={`/${ranking.city.slug}`}
-          className="inline-flex min-h-11 items-center underline"
+          className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline"
         >
           {ranking.city.name}
         </Link>
+        <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+        <span className="text-muted-foreground">{ranking.dish.name}</span>
       </nav>
-      <header className="flex flex-col gap-2">
+      <header className="flex flex-col gap-3">
         {mode === "bootstrap" && (
-          <span className="w-fit rounded-full border px-2.5 py-0.5 text-sm font-medium">
-            Early rankings
-          </span>
+          <Badge className="w-fit">
+            <span>Early rankings</span>
+            <span aria-hidden="true"> · {thresholds.minRaters} raters needed</span>
+          </Badge>
         )}
-        <h1 className="text-2xl font-bold">{titleOf(ranking)}</h1>
-        <p className="text-base">{summaryOf(ranking)}</p>
+        <div className="flex items-start gap-3">
+          <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <DishIcon slug={ranking.dish.slug} size={26} />
+          </span>
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-3xl font-extrabold break-anywhere sm:text-4xl">
+              {titleOf(ranking)}
+            </h1>
+            <p className="text-base text-muted-foreground">{summaryOf(ranking)}</p>
+          </div>
+        </div>
       </header>
 
       {eligible.length > 0 && (
@@ -121,41 +147,31 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         />
       )}
 
+      {eligible.length === 0 && insufficient.length === 0 && (
+        <EmptyState
+          icon={<DishIcon slug={ranking.dish.slug} size={26} />}
+          title={`Nobody has rated ${ranking.dish.name} in ${ranking.city.name} yet`}
+          text={`Be the first. It takes four taps, and the restaurant ranks once ${thresholds.minRaters} people have rated it.`}
+          action={{ href: rateHref, label: `Rate ${ranking.dish.name}` }}
+        />
+      )}
+
       {insufficient.length > 0 && (
-        <section aria-labelledby="not-enough" className="flex flex-col gap-2">
-          <h2 id="not-enough" className="text-lg font-semibold">
-            Not enough votes yet
-          </h2>
-          <ul className="flex flex-col divide-y rounded-lg border">
-            {insufficient.map((row) => (
-              <li key={row.restaurantDishId} className="flex items-center gap-3 px-3 py-2">
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <Link
-                    href={`/${ranking.city.slug}/r/${row.restaurant.slug}`}
-                    className="inline-flex min-h-11 items-center font-medium underline-offset-2 hover:underline"
-                  >
-                    {row.restaurant.name}
-                  </Link>
-                  <span className="text-sm text-muted-foreground">
-                    {[
-                      row.restaurant.area?.name,
-                      row.votes > 0 ? formatVotes(row.votes) : "No votes yet",
-                      formatNeeded(row.ratingsNeeded),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </div>
-                <Link
-                  href={`/rate?city=${ranking.city.slug}&r=${row.restaurant.slug}&d=${ranking.dish.slug}`}
-                  className="inline-flex min-h-11 items-center text-sm font-medium underline"
-                >
-                  Rate
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <WaitingList
+          citySlug={ranking.city.slug}
+          dishSlug={ranking.dish.slug}
+          dishName={ranking.dish.name}
+          minRaters={thresholds.minRaters}
+          leadIn={eligible.length === 0}
+          rows={insufficient.map((row) => ({
+            id: row.restaurantDishId,
+            slug: row.restaurant.slug,
+            name: row.restaurant.name,
+            area: row.restaurant.area?.name ?? null,
+            votes: row.votes,
+            ratingsNeeded: row.ratingsNeeded,
+          }))}
+        />
       )}
 
       <p className="text-sm text-muted-foreground">
@@ -163,7 +179,10 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         have rated it there; recent votes and trusted raters count more.
         {mode === "bootstrap" &&
           ` While ${ranking.city.name} is new, fewer votes are needed: these are early rankings.`}{" "}
-        <Link href="/how-rankings-work" className="underline">
+        <Link
+          href="/how-rankings-work"
+          className="font-medium text-brand underline-offset-4 hover:underline"
+        >
           How rankings work
         </Link>
       </p>
@@ -189,6 +208,6 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
           })}
         />
       )}
-    </main>
+    </Main>
   );
 }

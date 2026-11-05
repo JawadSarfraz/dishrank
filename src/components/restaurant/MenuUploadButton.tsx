@@ -69,9 +69,12 @@ export function MenuUploadButton({ restaurantId }: { restaurantId: string }) {
   }
 
   return (
-    <section aria-labelledby={`${inputId}-title`} className="flex flex-col gap-2">
-      <h2 id={`${inputId}-title`} className="text-lg font-semibold">
-        Menu
+    <section
+      aria-labelledby={`${inputId}-title`}
+      className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-card"
+    >
+      <h2 id={`${inputId}-title`} className="text-xl font-bold">
+        Menu photo
       </h2>
       <input
         id={inputId}
@@ -88,7 +91,7 @@ export function MenuUploadButton({ restaurantId }: { restaurantId: string }) {
       <label
         htmlFor={inputId}
         aria-disabled={busy}
-        className="inline-flex min-h-11 w-fit cursor-pointer items-center rounded-lg border px-4 text-sm font-medium aria-disabled:opacity-50 peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50"
+        className="inline-flex min-h-11 w-fit cursor-pointer items-center rounded-lg border bg-card px-4 text-base font-medium hover:bg-muted aria-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
       >
         {status?.startsWith("Thanks") ? "Upload another page" : "Upload menu photo"}
       </label>

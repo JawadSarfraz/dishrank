@@ -6,9 +6,8 @@ import { useState, useTransition } from "react";
 import { describeActionError } from "@/components/admin/action-error";
 import { SignInButton } from "@/components/auth/SignInButton";
 import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { claimRestaurantAction } from "@/server/actions/claim";
-
-const field = "min-h-11 rounded-lg border border-input bg-transparent px-3 text-base";
 
 export function ClaimRestaurant({
   restaurantId,
@@ -38,23 +37,20 @@ export function ClaimRestaurant({
   }
 
   return (
-    <details className="rounded-lg border px-3 py-2">
-      <summary className="min-h-11 cursor-pointer py-2.5 text-base">
-        Is this your restaurant?
-      </summary>
+    <Disclosure summary="Is this your restaurant?">
       {state === "sent" ? (
-        <p role="status" className="pb-2 text-sm">
+        <p role="status" className="text-sm">
           Thanks. We will call to check it, then you can confirm dishes and prices here. You can
           follow your claim on My ratings.
         </p>
       ) : state === "signin" ? (
-        <div className="flex flex-col gap-2 pb-2 text-sm">
+        <div className="flex flex-col gap-2 text-sm">
           <p>Sign in to claim this restaurant. You will come back to this page.</p>
           <SignInButton callbackURL={returnPath} />
         </div>
       ) : (
         <form
-          className="flex flex-col gap-3 pb-2"
+          className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             send();
@@ -74,7 +70,7 @@ export function ClaimRestaurant({
               maxLength={20}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className={field}
+              className="field"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -86,7 +82,7 @@ export function ClaimRestaurant({
               placeholder="e.g. Call the number on our signboard and ask for the owner"
               value={proofNote}
               onChange={(e) => setProofNote(e.target.value)}
-              className="rounded-lg border border-input bg-transparent px-3 py-2 text-base"
+              className="field py-2"
             />
           </label>
           {error && (
@@ -94,11 +90,11 @@ export function ClaimRestaurant({
               {error}
             </p>
           )}
-          <Button type="submit" disabled={pending} className="h-11 w-fit px-5">
-            Send claim
+          <Button type="submit" disabled={pending} className="w-fit">
+            {pending ? "Sending…" : "Send claim"}
           </Button>
         </form>
       )}
-    </details>
+    </Disclosure>
   );
 }

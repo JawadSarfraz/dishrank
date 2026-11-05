@@ -3,14 +3,22 @@
 // API); "Report a problem". Merged restaurants redirect permanently (308); closed and hidden ones
 // answer 404. ISR.
 import type { Metadata } from "next";
+import { BadgeCheckIcon, ChevronRightIcon, MapPinIcon, PhoneIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
+import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
+import { Main, SectionHeader } from "@/components/layout/Page";
+import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { ClaimRestaurant } from "@/components/restaurant/ClaimRestaurant";
 import { MenuUploadButton } from "@/components/restaurant/MenuUploadButton";
 import { ReportProblem } from "@/components/restaurant/ReportProblem";
-import { formatPrice, formatScore, formatVotes } from "@/lib/format";
+import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button-link";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BRAND } from "@/lib/brand";
+import { formatFromPrice, formatScore, formatVotes } from "@/lib/format";
 import { restaurantJsonLd } from "@/server/seo";
 import { getPublicRestaurant } from "@/server/services/restaurant.service";
 
@@ -31,12 +39,12 @@ export async function generateMetadata({
   params,
 }: PageProps<"/[city]/r/[slug]">): Promise<Metadata> {
   const result = await load((await params).slug);
-  if (result.kind !== "found") return { title: "DishRank", robots: { index: false } };
+  if (result.kind !== "found") return { title: "Not found", robots: { index: false } };
   const { restaurant, dishes } = result;
   const place = [restaurant.area?.name, restaurant.city.name].filter(Boolean).join(", ");
   const best = dishes.find((d) => d.rankInCity !== null);
   const votes = dishes.reduce((sum, d) => sum + d.votes, 0);
-  const title = `${restaurant.name}, ${place} – DishRank`;
+  const title = `${restaurant.name}, ${place}`;
   const description = best
     ? `${restaurant.name} in ${place}: ${best.dish.name} is #${best.rankInCity} in ${restaurant.city.name} (${formatScore(best.score ?? 0)} · ${formatVotes(best.votes)}). Dish-by-dish scores from diners.`
     : `${restaurant.name} in ${place}: dish-by-dish scores from diners' ratings.`;
@@ -45,7 +53,13 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: path },
-    openGraph: { title, description, url: path, type: "website", siteName: "DishRank" },
+    openGraph: {
+      title: `${title} · ${BRAND.name}`,
+      description,
+      url: path,
+      type: "website",
+      siteName: BRAND.name,
+    },
     // Until someone rates a dish here the page has nothing of its own: kept out of search results.
     ...(votes === 0 ? { robots: { index: false, follow: true } } : {}),
   };
@@ -62,60 +76,99 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
   }
   const path = `/${restaurant.city.slug}/r/${restaurant.slug}`;
   const located = restaurant.lat !== null && restaurant.lng !== null;
+  const rateHere = `/rate?city=${restaurant.city.slug}&r=${restaurant.slug}`;
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-4 py-6">
-      <nav aria-label="Breadcrumb" className="text-sm">
+    <Main className="gap-6">
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
         <Link
           href={`/${restaurant.city.slug}`}
-          className="inline-flex min-h-11 items-center underline"
+          className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline"
         >
           {restaurant.city.name}
         </Link>
+        {restaurant.area && (
+          <>
+            <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+            <span className="text-muted-foreground">{restaurant.area.name}</span>
+          </>
+        )}
       </nav>
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">{restaurant.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {[restaurant.area?.name, restaurant.city.name].filter(Boolean).join(", ")}
-          {claimed ? " · Claimed by the owner" : ""}
-        </p>
-        {restaurant.address && <p className="text-sm">{restaurant.address}</p>}
-        <div className="flex flex-wrap gap-x-4">
-          {restaurant.phone && (
-            <a
-              href={`tel:${restaurant.phone}`}
-              className="inline-flex min-h-11 items-center underline"
-            >
-              {restaurant.phone}
-            </a>
-          )}
-          {located && (
-            <a
-              href={mapsLink(restaurant.lat!, restaurant.lng!)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center underline"
-            >
-              Open in Google Maps
-            </a>
+      <header className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-3xl font-extrabold break-anywhere sm:text-4xl">{restaurant.name}</h1>
+          {claimed && (
+            <Badge>
+              <BadgeCheckIcon aria-hidden="true" /> Owner on {BRAND.name}
+            </Badge>
           )}
         </div>
+        <p className="text-base text-muted-foreground">
+          {[restaurant.address, restaurant.area?.name, restaurant.city.name]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+        {(restaurant.phone || located) && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {restaurant.phone && (
+              <ButtonLink
+                variant="outline"
+                size="sm"
+                className="h-11 text-base"
+                href={`tel:${restaurant.phone}`}
+              >
+                <PhoneIcon aria-hidden="true" /> {restaurant.phone}
+              </ButtonLink>
+            )}
+            {located && (
+              <ButtonLink
+                variant="outline"
+                size="sm"
+                className="h-11 text-base"
+                href={mapsLink(restaurant.lat!, restaurant.lng!)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MapPinIcon aria-hidden="true" /> Open in Google Maps
+              </ButtonLink>
+            )}
+          </div>
+        )}
       </header>
 
-      <section aria-labelledby="dishes" className="flex flex-col gap-2">
-        <h2 id="dishes" className="text-lg font-semibold">
-          Dishes
-        </h2>
+      <section aria-labelledby="dishes" className="flex flex-col gap-3">
+        <SectionHeader
+          id="dishes"
+          title="Dishes here"
+          aside={
+            dishes.length > 0 ? (
+              <Link
+                href={rateHere}
+                className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
+              >
+                Rate another dish here
+              </Link>
+            ) : undefined
+          }
+        />
         {dishes.length === 0 ? (
-          <p className="text-sm">No dishes listed yet.</p>
+          <EmptyState
+            icon={<DishIcon name="plate" size={26} />}
+            title="No dishes listed yet"
+            text={`Rate what you ate here and it appears on this page and in its ranking.`}
+            action={{ href: rateHere, label: "Rate a dish here" }}
+          />
         ) : (
-          <ul className="flex flex-col divide-y rounded-lg border">
+          <ul className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card">
             {dishes.map((d) => (
-              <li key={d.restaurantDishId} className="flex items-center gap-3 px-3 py-2">
-                <div className="flex min-w-0 flex-1 flex-col">
+              <li key={d.restaurantDishId} className="flex items-start gap-3 px-3 py-3 sm:px-4">
+                <span className="mt-1.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                  <DishIcon slug={d.dish.slug} size={22} />
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <Link
                     href={`/${restaurant.city.slug}/best-${d.dish.slug}`}
-                    className="inline-flex min-h-11 items-center font-medium underline-offset-2 hover:underline"
+                    className="inline-flex min-h-11 items-center font-display text-lg leading-tight font-bold break-anywhere underline-offset-4 hover:underline"
                   >
                     {d.dish.name}
                   </Link>
@@ -125,22 +178,27 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
                       : d.votes > 0
                         ? "Not enough votes yet"
                         : "No votes yet"}
-                    {d.price !== null ? ` · ${formatPrice(d.price)}` : ""}
-                    {d.variantTags.length > 0 ? ` · ${d.variantTags.join(", ")}` : ""}
+                    {d.price !== null ? ` · ${formatFromPrice(d.price)}` : ""}
                   </span>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {d.rankInCity !== null && d.score !== null ? (
-                    <span className="rounded-md bg-foreground px-2 py-0.5 text-base font-semibold text-background tabular-nums">
-                      {formatScore(d.score)}
+                  {d.variantTags.length > 0 && (
+                    <span className="flex flex-wrap gap-1.5 pt-1">
+                      {d.variantTags.map((t) => (
+                        <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-xs">
+                          {t}
+                        </span>
+                      ))}
                     </span>
-                  ) : null}
-                  {d.votes > 0 && (
-                    <span className="text-xs text-muted-foreground">{formatVotes(d.votes)}</span>
                   )}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {d.rankInCity !== null && d.score !== null ? (
+                    <ScoreBadge score={d.score} votes={d.votes} size="lg" layout="stack" />
+                  ) : d.votes > 0 ? (
+                    <span className="text-xs text-muted-foreground">{formatVotes(d.votes)}</span>
+                  ) : null}
                   <Link
-                    href={`/rate?city=${restaurant.city.slug}&r=${restaurant.slug}&d=${d.dish.slug}`}
-                    className="inline-flex min-h-11 items-center text-sm font-medium underline"
+                    href={`${rateHere}&d=${d.dish.slug}`}
+                    className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
                   >
                     Rate
                   </Link>
@@ -149,23 +207,18 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
             ))}
           </ul>
         )}
-        <Link
-          href={`/rate?city=${restaurant.city.slug}&r=${restaurant.slug}`}
-          className="inline-flex min-h-11 w-fit items-center text-sm underline"
-        >
-          Rate another dish here
-        </Link>
       </section>
 
       <MenuUploadButton restaurantId={restaurant.id} />
 
-      <ReportProblem
-        restaurantId={restaurant.id}
-        dishes={dishes.map((d) => ({ id: d.dish.id, name: d.dish.name }))}
-        returnPath={path}
-      />
-
-      {!claimed && <ClaimRestaurant restaurantId={restaurant.id} returnPath={path} />}
+      <div className="flex flex-col gap-3">
+        <ReportProblem
+          restaurantId={restaurant.id}
+          dishes={dishes.map((d) => ({ id: d.dish.id, name: d.dish.name }))}
+          returnPath={path}
+        />
+        {!claimed && <ClaimRestaurant restaurantId={restaurant.id} returnPath={path} />}
+      </div>
 
       <JsonLd
         data={{
@@ -183,6 +236,6 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
           }),
         }}
       />
-    </main>
+    </Main>
   );
 }

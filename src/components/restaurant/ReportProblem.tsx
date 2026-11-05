@@ -5,6 +5,8 @@
 import { useState, useTransition } from "react";
 import { describeActionError } from "@/components/admin/action-error";
 import { SignInButton } from "@/components/auth/SignInButton";
+import { Button } from "@/components/ui/button";
+import { Disclosure } from "@/components/ui/disclosure";
 import { reportProblemAction } from "@/server/actions/report";
 
 const REASONS = [
@@ -50,36 +52,35 @@ export function ReportProblem({
   }
 
   return (
-    <details className="rounded-lg border px-3 py-2">
-      <summary className="min-h-11 cursor-pointer py-2.5 text-base">Report a problem</summary>
+    <Disclosure summary="Report a problem">
       {state === "sent" ? (
-        <p role="status" className="pb-2 text-sm">
+        <p role="status" className="text-sm">
           Thanks. We will check it.
         </p>
       ) : state === "signin" ? (
-        <div className="flex flex-col gap-2 pb-2 text-sm">
+        <div className="flex flex-col gap-2 text-sm">
           <p>Sign in to send a report. You will come back to this page.</p>
           <SignInButton callbackURL={returnPath} />
         </div>
       ) : (
         <form
-          className="flex flex-col gap-3 pb-2"
+          className="flex flex-col gap-3"
           onSubmit={(e) => {
             e.preventDefault();
             send();
           }}
         >
           <fieldset className="flex flex-col gap-1">
-            <legend className="text-sm font-medium">What is wrong?</legend>
+            <legend className="mb-1 text-sm font-medium">What is wrong?</legend>
             {REASONS.map((r) => (
-              <label key={r.value} className="flex min-h-11 items-center gap-2 text-base">
+              <label key={r.value} className="flex min-h-11 items-center gap-3 text-base">
                 <input
                   type="radio"
                   name="reason"
                   value={r.value}
                   checked={reason === r.value}
                   onChange={() => setReason(r.value)}
-                  className="size-5"
+                  className="size-5 accent-brand"
                 />
                 {r.label}
               </label>
@@ -91,7 +92,7 @@ export function ReportProblem({
               <select
                 value={dishId}
                 onChange={(e) => setDishId(e.target.value)}
-                className="h-11 rounded-lg border border-input bg-background px-2 text-base"
+                className="field field-select"
               >
                 <option value="">Choose a dish</option>
                 {dishes.map((d) => (
@@ -109,16 +110,12 @@ export function ReportProblem({
               onChange={(e) => setNote(e.target.value)}
               maxLength={280}
               rows={3}
-              className="rounded-lg border border-input bg-transparent px-3 py-2 text-base"
+              className="field py-2"
             />
           </label>
-          <button
-            type="submit"
-            disabled={pending}
-            className="min-h-11 rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground"
-          >
+          <Button type="submit" disabled={pending} className="w-fit">
             {pending ? "Sending…" : "Send report"}
-          </button>
+          </Button>
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -126,6 +123,6 @@ export function ReportProblem({
           )}
         </form>
       )}
-    </details>
+    </Disclosure>
   );
 }

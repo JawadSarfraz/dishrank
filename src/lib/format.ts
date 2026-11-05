@@ -11,6 +11,9 @@ export const formatVotes = (votes: number) => `${votes} vote${votes === 1 ? "" :
 export const formatPrice = (price: number) =>
   `Rs ${String(price).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
+/** "from Rs 1,850": a dish row stores its lowest size's price (owner, Part 3), so public pages say so. */
+export const formatFromPrice = (price: number) => `from ${formatPrice(price)}`;
+
 /** "1.4 km". */
 export const formatKm = (km: number) => `${km.toFixed(1)} km`;
 
