@@ -49,14 +49,25 @@ export function jaroWinkler(a: string, b: string): number {
   return jaro + prefix * 0.1 * (1 - jaro);
 }
 
-/** Names that are probably the same place when the places are within 50 m. */
-export function similarNames(a: string, b: string): boolean {
-  const x = nameKey(a);
-  const y = nameKey(b);
+/** similarNames on keys already worked out (nameKey). */
+export function similarKeys(x: string, y: string): boolean {
   if (x === y) return true;
   if (x.length < DUPLICATE_RULES.minKeyLength || y.length < DUPLICATE_RULES.minKeyLength)
     return false;
   return jaroWinkler(x, y) >= DUPLICATE_RULES.jaroWinkler || x.includes(y) || y.includes(x);
+}
+
+/** Names that are probably the same place when the places are within 50 m. */
+export function similarNames(a: string, b: string): boolean {
+  return similarKeys(nameKey(a), nameKey(b));
+}
+
+/** sameName on keys already worked out (nameKey). */
+export function sameKeys(x: string, y: string): boolean {
+  if (x === y) return true;
+  if (x.length < DUPLICATE_RULES.minKeyLength || y.length < DUPLICATE_RULES.minKeyLength)
+    return false;
+  return jaroWinkler(x, y) >= DUPLICATE_RULES.jaroWinkler;
 }
 
 /**
@@ -64,12 +75,7 @@ export function similarNames(a: string, b: string): boolean {
  * (otherwise "Cafe" would match every café in the area).
  */
 export function sameName(a: string, b: string): boolean {
-  const x = nameKey(a);
-  const y = nameKey(b);
-  if (x === y) return true;
-  if (x.length < DUPLICATE_RULES.minKeyLength || y.length < DUPLICATE_RULES.minKeyLength)
-    return false;
-  return jaroWinkler(x, y) >= DUPLICATE_RULES.jaroWinkler;
+  return sameKeys(nameKey(a), nameKey(b));
 }
 
 export const metresBetween = (a: LatLng, b: LatLng) => Math.round(haversineKm(a, b) * 1000);
@@ -83,13 +89,15 @@ export class NearbyIndex<T extends LatLng> {
   private readonly cells = new Map<string, T[]>();
 
   constructor(points: Iterable<T>) {
-    for (const p of points) {
-      const [y, x] = cellOf(p);
-      const key = `${y}:${x}`;
-      const cell = this.cells.get(key);
-      if (cell) cell.push(p);
-      else this.cells.set(key, [p]);
-    }
+    for (const p of points) this.add(p);
+  }
+
+  add(p: T) {
+    const [y, x] = cellOf(p);
+    const key = `${y}:${x}`;
+    const cell = this.cells.get(key);
+    if (cell) cell.push(p);
+    else this.cells.set(key, [p]);
   }
 
   /** Points within `metres` of `at`, with their distance. */

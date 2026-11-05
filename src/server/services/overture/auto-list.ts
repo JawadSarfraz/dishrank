@@ -2,12 +2,14 @@
 // a per-place review, under what name and with which dish links. Pure: auto-list.service loads the
 // rows and writes the result. A name is only ever shortened or re-cased, never made up, and a place
 // these rules cannot judge stays NEW for /admin/import.
+import type { LatLng } from "@/lib/geo";
 import { cleanText, indexOfPhrase, tokenize } from "../matching/normalize";
 import {
   NearbyIndex,
+  metresBetween,
   nameKey,
-  restaurantHints,
-  similarNames,
+  sameKeys,
+  similarKeys,
   type DedupeRestaurant,
 } from "./duplicates";
 import { compareReleases } from "./places";
@@ -479,18 +481,40 @@ function byStrength(a: AutoListRow, b: AutoListRow) {
   );
 }
 
-/** Two places at this distance with these names are probably one place. */
-function likelyDuplicate(names: readonly string[], others: readonly string[], metres: number) {
-  return names.some((a) =>
-    others.some(
-      (b) =>
-        (metres <= AUTO_LIST.similarNameMetres && similarNames(a, b)) ||
-        (metres <= AUTO_LIST.sameNameMetres && nameKey(a) === nameKey(b)),
-    ),
-  );
-}
+type NamedPoint = LatLng & { keys: readonly string[] };
 
-const WIDEST = Math.max(AUTO_LIST.similarNameMetres, AUTO_LIST.sameNameMetres);
+const keysOf = (names: readonly string[]) => [...new Set(names.map(nameKey))];
+
+/**
+ * Places to compare a candidate with. Each name's key is worked out once, and equal names are looked
+ * up rather than scanned for: the plan runs on every Apply request and page view, over thousands of
+ * names, so it has to stay cheap.
+ */
+class PlaceIndex {
+  private readonly byKey = new Map<string, NamedPoint[]>();
+  private readonly nearby = new NearbyIndex<NamedPoint>([]);
+
+  add(point: NamedPoint) {
+    this.nearby.add(point);
+    for (const key of point.keys) {
+      const list = this.byKey.get(key);
+      if (list) list.push(point);
+      else this.byKey.set(key, [point]);
+    }
+  }
+
+  /** Is a place here probably this one: the same name nearby, or a similar name close by? */
+  matches(at: LatLng, keys: readonly string[]): boolean {
+    for (const key of keys) {
+      for (const point of this.byKey.get(key) ?? []) {
+        if (metresBetween(at, point) <= AUTO_LIST.sameNameMetres) return true;
+      }
+    }
+    return this.nearby
+      .near(at, AUTO_LIST.similarNameMetres)
+      .some(({ point }) => keys.some((a) => point.keys.some((b) => similarKeys(a, b))));
+  }
+}
 
 /**
  * The dry run: every NEW candidate becomes a pick or is held back with its reason, and the same
@@ -509,12 +533,20 @@ export function planAutoList(input: {
   areaNames: readonly string[];
 }): { picks: AutoListPick[]; held: AutoListHeld[] } {
   const areaKeys = new Set(input.areaNames.map(nameKey));
-  const restaurantIndex = new NearbyIndex(
-    input.restaurants.flatMap((r) =>
-      r.lat !== null && r.lng !== null ? [{ ...r, lat: r.lat, lng: r.lng }] : [],
-    ),
-  );
-  const reviewedIndex = new NearbyIndex(input.reviewed);
+  const restaurants = new PlaceIndex();
+  /** Restaurants with no location can only be matched by name, within their area (docs/07 §2). */
+  const unlocatedByArea = new Map<string, string[]>();
+  for (const r of input.restaurants) {
+    const keys = keysOf([r.name, ...r.aliases]);
+    if (r.lat !== null && r.lng !== null) {
+      restaurants.add({ lat: r.lat, lng: r.lng, keys });
+    } else if (r.areaId) {
+      unlocatedByArea.set(r.areaId, [...(unlocatedByArea.get(r.areaId) ?? []), ...keys]);
+    }
+  }
+  const reviewed = new PlaceIndex();
+  for (const c of input.reviewed) reviewed.add({ lat: c.lat, lng: c.lng, keys: keysOf([c.name]) });
+  const picked = new PlaceIndex();
   const picks: AutoListPick[] = [];
   const held: AutoListHeld[] = [];
   const eligible: AutoListPick[] = [];
@@ -536,44 +568,25 @@ export function planAutoList(input: {
     });
   }
 
-  const eligibleIndex = new NearbyIndex(eligible);
-  const pickedIds = new Set<string>();
   for (const row of eligible) {
-    const names = [row.name, row.cleanName];
+    const keys = keysOf([row.name, row.cleanName]);
     const isOurs =
       input.usedOvertureIds.has(row.overtureId) ||
-      names.some(
-        (name) =>
-          restaurantHints(
-            { id: row.id, name, lat: row.lat, lng: row.lng, suggestedAreaId: row.suggestedAreaId },
-            input.restaurants,
-            restaurantIndex,
-          ).length > 0,
-      ) ||
-      restaurantIndex
-        .near(row, WIDEST)
-        .some(({ point, metres }) =>
-          likelyDuplicate(names, [point.name, ...point.aliases], metres),
-        );
+      restaurants.matches(row, keys) ||
+      (unlocatedByArea.get(row.suggestedAreaId) ?? []).some((other) =>
+        keys.some((key) => sameKeys(key, other)),
+      );
     const reason: HoldReason | null = isOurs
       ? "DUPLICATE_OF_RESTAURANT"
-      : reviewedIndex
-            .near(row, WIDEST)
-            .some(({ point, metres }) => likelyDuplicate(names, [point.name], metres))
+      : reviewed.matches(row, keys)
         ? "DUPLICATE_OF_REVIEWED"
-        : eligibleIndex
-              .near(row, WIDEST)
-              .some(
-                ({ point, metres }) =>
-                  pickedIds.has(point.id) &&
-                  likelyDuplicate(names, [point.name, point.cleanName], metres),
-              )
+        : picked.matches(row, keys)
           ? "DUPLICATE"
           : null;
     if (reason) {
       held.push({ row, reason, cleanName: row.cleanName });
     } else {
-      pickedIds.add(row.id);
+      picked.add({ lat: row.lat, lng: row.lng, keys });
       picks.push(row);
     }
   }

@@ -211,8 +211,10 @@ export async function applyAutoListBatch(
   let dishLinks = 0;
   let skipped = 0;
   let failed = 0;
+  // Counted from here, so working out the plan can never use up a request's whole budget.
+  const creating = Date.now();
   for (const pick of batch) {
-    if (Date.now() - started > TIME_BUDGET_MS) break;
+    if (Date.now() - creating > TIME_BUDGET_MS) break;
     try {
       const created = await inTransaction((tx) => createFromPick(pick, admin, dishIds, now, tx));
       if (!created) {

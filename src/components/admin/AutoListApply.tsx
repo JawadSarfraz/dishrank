@@ -19,7 +19,6 @@ export function AutoListApply({ toCreate }: { toCreate: number }) {
     setRunning(true);
     let created = 0;
     let dishLinks = 0;
-    let failed = 0;
     try {
       for (;;) {
         const res = await applyAutoListAction({});
@@ -27,14 +26,22 @@ export function AutoListApply({ toCreate }: { toCreate: number }) {
           setStatus(`${created} created, then: ${describeActionError(res.error)}`);
           break;
         }
+        const { remaining, failed, skipped } = res.data;
         created += res.data.created;
         dishLinks += res.data.dishLinks;
-        failed += res.data.failed;
-        setStatus(`${created} created, ${res.data.remaining} left…`);
-        if (res.data.remaining === 0 || res.data.created === 0) {
+        setStatus(`${created} created, ${remaining} left…`);
+        const unfinished =
+          failed > 0 ? ` ${failed} could not be created and stay NEW; see the log.` : "";
+        if (remaining === 0) {
           setStatus(
-            `Done: ${created} restaurants created with ${dishLinks} dish links.` +
-              (failed > 0 ? ` ${failed} could not be created and stay NEW; see the log.` : ""),
+            `Done: ${created} restaurants created with ${dishLinks} dish links.${unfinished}`,
+          );
+          break;
+        }
+        // Nothing moved in this request: stop rather than ask again for ever, and never say "Done".
+        if (res.data.created === 0 && skipped === 0) {
+          setStatus(
+            `${created} created and ${remaining} left. Apply again to carry on.${unfinished}`,
           );
           break;
         }
