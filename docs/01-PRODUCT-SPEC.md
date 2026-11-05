@@ -1,5 +1,11 @@
 # 01 — Product spec (v1)
 
+## Name
+
+Kahan Khayen (Urdu کہاں کھائیں, "where should we eat?"), since 2026-11-06; DishRank before that.
+Tagline "Har dish ka pehla number" with the English line "Restaurants ranked dish by dish, by people
+who ate there." Internal identifiers stay `dishrank`.
+
 ## One line
 
 "Where is the best chicken karahi in Islamabad?" — answered with a ranked list built from dish-level ratings by real diners.
@@ -93,7 +99,7 @@ Chicken Karahi · Mutton Karahi · Chicken Biryani · Beef Nihari · Haleem · C
 
 ## Trust rules shown to users
 
-- Rankings use only ratings submitted on DishRank.
+- Rankings use only ratings submitted on Kahan Khayen.
 - A dish needs enough votes from different people before it gets a rank.
 - Newer votes count more than old ones.
 - Restaurants cannot pay to change a rank. They can only buy a badge that shows the rank they already have.

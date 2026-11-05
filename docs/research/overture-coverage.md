@@ -1,4 +1,4 @@
-# Overture Maps places: can it seed DishRank's restaurants?
+# Overture Maps places: can it seed Kahan Khayen's restaurants?
 
 Research note, 2026-10-25. Question: is Overture Maps Places (open data) good enough to seed restaurants
 in Islamabad and Rawalpindi instead of Google Places? Short answer: **partly** (verdict at the end). It
@@ -411,7 +411,7 @@ Why not bulk:
 - **Bad locations.** 120 food places sit on placeholder points. Chain records show roughly 1 duplicate
   in 9 that a name check misses.
 - **No closed-place signal.** `operating_status` is empty, and "updated" is only Meta's export date.
-- **Thin where DishRank needs depth.** Outer Rawalpindi areas have 2–13 food places each, and G-7, G-8,
+- **Thin where Kahan Khayen needs depth.** Outer Rawalpindi areas have 2–13 food places each, and G-7, G-8,
   G-10, G-13 and I-10 have 17–24.
 - **No dishes.** Overture has no menus. Six dishes appear in 20 or more place names: pizza 157, burger
   58, biryani 40, chai 25, broast 21, nihari 20. Karahi (24 names) and tikka (49) appear without the meat

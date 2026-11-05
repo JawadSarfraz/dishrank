@@ -1,4 +1,4 @@
-# DishRank — project guide for Claude Code
+# Kahan Khayen — project guide for Claude Code
 
 Read this file fully before any task. Then read `docs/` in this order:
 `01-PRODUCT-SPEC` → `02-ARCHITECTURE` → `03-DATA-MODEL` → `04-RANKING` → `05-DISH-TAXONOMY` → `06-API-SPEC` → `07-DATA-PIPELINES` → `08-IMPLEMENTATION-PLAN`.
@@ -6,6 +6,11 @@ For anything visible in the UI also read `docs/12-DESIGN.md` (tokens, components
 Prompts for each phase are in `docs/09-CLAUDE-CODE-PROMPTS.md`. Open questions go in `docs/OPEN-QUESTIONS.md`.
 
 ## What this product is
+
+The product is **Kahan Khayen** (Urdu کہاں کھائیں, "where should we eat?"; renamed from DishRank on
+2026-11-06). The name lives only in `src/lib/brand.ts`; the Urdu name is drawn as outlines in the logo,
+never with an Urdu web font. Internal names (this repo, the database, the package, env vars, cookie and
+cache prefixes) stay `dishrank` on purpose: never rename them.
 
 Dish-first restaurant ranking for Pakistan. A user picks a **city + a dish**
 (e.g. "Chicken Karahi" in Islamabad) and sees restaurants ranked 1, 2, 3… **for that dish**,

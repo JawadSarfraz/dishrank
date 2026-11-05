@@ -14,7 +14,7 @@ Diagrams are Mermaid. They render on GitHub and in VS Code with the "Markdown Pr
 
 ```mermaid
 flowchart LR
-  Diner((Diner)) -->|browse rankings, rate dishes| App["DishRank web app<br/>Next.js on Vercel"]
+  Diner((Diner)) -->|browse rankings, rate dishes| App["Kahan Khayen web app<br/>Next.js on Vercel"]
   Panel((Tasting panel)) -->|seed ratings, menu photos| App
   Owner((Restaurant owner)) -->|claim, fix menu, view report| App
   Admin((Admin)) -->|imports, review queue, moderation| App
@@ -240,7 +240,7 @@ dishrank/
 │   │   ├── sitemap.ts  robots.ts  opengraph-image.tsx           # sitemap: indexable pages only
 │   ├── components/
 │   │   ├── ui/            # shadcn (Base UI): button, button-link, badge, card, input, dialog, sheet, dropdown-menu, toast, tabs, table, skeleton, progress, empty-state, disclosure
-│   │   ├── brand/         # Logo (the mark and wordmark), DishIcon (original line icons per dish family)
+│   │   ├── brand/         # Logo (the mark, the two-line wordmark, the Urdu name as outlines from urdu-name.ts), DishIcon (original line icons per dish family)
 │   │   ├── pwa/           # PwaRegister (service worker, install event), InstallPrompt (add to home screen)
 │   │   ├── ranking/       # RankingBrowser (filter sheet + ranked list, client), WaitingList, ScoreBadge, RankDisc, TrustBox, ShareButton, CityDishGrid, CityPicker, DishSearch
 │   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
@@ -282,7 +282,7 @@ dishrank/
 │   │   ├── vision/                 # parseMenu.ts (prompt, docs/07 schema, structured output), menu-items.ts (answer → items, prices)
 │   │   └── validation/             # zod schemas shared by actions + API
 │   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts, brand.ts (the name, one place), score-band.ts (score colours), pwa-prompt.ts (when to offer the install)
-│   ├── fonts/                      # the two faces: variable WOFF2 (latin) for the pages via next/font/local, TTF instances for the share images (next/og), OFL licences alongside
+│   ├── fonts/                      # the two faces: variable WOFF2 (latin) for the pages via next/font/local, TTF instances for the share images (next/og); OFL licences alongside, incl. Noto Nastaliq Urdu (the Urdu name is committed as outlines, no Urdu font is served)
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
 │   ├── env.ts  env-schema.ts       # Zod-validated env; production fails fast at startup (the schema, side-effect free, is also the Vercel build's check)
 │   ├── instrumentation.ts          # register() imports env.ts
@@ -331,6 +331,6 @@ dishrank/
 | ADR-10 | Admin verifies owner claims manually | Trust > speed at launch | > 20 claims/week |
 | ADR-11 | Better Auth replaces Auth.js v5: Google sign-in, Prisma adapter, database sessions, same roles and `requireUser()` / `requireRole()` | Auth.js v5 never left beta (`next-auth@5.0.0-beta.32` in Oct 2026) and is in maintenance under the Better Auth team; Better Auth 1.7 is stable and supports Next.js 16 and Prisma 7 | Phone OTP (Phase 7) or a native app needs another sign-in method |
 | ADR-12 | Pinned versions: Node.js 24 LTS, Next.js 16 (stable), Prisma ORM 7 (latest stable 7.x, not the 8.0 release candidate that npm `latest` installs) | Node 20 is end-of-life; Next.js 16 is the current stable major; Prisma 7 needs `prisma.config.ts` and a driver adapter (`@prisma/adapter-pg`) | Prisma 8 is GA plus one patch release; Node 26 becomes the Vercel default |
-| ADR-13 | No Google Places at all (2026-10-25). Restaurant candidates come from Overture Maps Places, Meta and Microsoft records only (CDLA Permissive 2.0), staged by `pnpm overture:sync` and reviewed one by one by an admin on /admin/import before anything is public; the Create form may prefill from Overture; restaurants keep Overture's coordinates as our own; /about/data carries the credit and the licence link | Google Maps Platform Terms 3.2.3(d)(iii) forbid using the Places API "in a listings or directory service", which DishRank is; Google also forbids saving names and addresses and caps stored coordinates at 30 days. Overture's open licence allows storing, changing and showing the data with a credit. AllThePlaces is left out (scraped, rule 1) and Foursquare too (Apache 2.0 notice duties); coverage and quality: docs/research/overture-coverage.md | Overture changes its licences or sources, or reviews show its records are too poor (then owner sign-ups and panel visits carry more of the load) |
+| ADR-13 | No Google Places at all (2026-10-25). Restaurant candidates come from Overture Maps Places, Meta and Microsoft records only (CDLA Permissive 2.0), staged by `pnpm overture:sync` and reviewed one by one by an admin on /admin/import before anything is public; the Create form may prefill from Overture; restaurants keep Overture's coordinates as our own; /about/data carries the credit and the licence link | Google Maps Platform Terms 3.2.3(d)(iii) forbid using the Places API "in a listings or directory service", which Kahan Khayen is; Google also forbids saving names and addresses and caps stored coordinates at 30 days. Overture's open licence allows storing, changing and showing the data with a credit. AllThePlaces is left out (scraped, rule 1) and Foursquare too (Apache 2.0 notice duties); coverage and quality: docs/research/overture-coverage.md | Overture changes its licences or sources, or reviews show its records are too poor (then owner sign-ups and panel visits carry more of the load) |
 | ADR-14 | Photo uploads through Supabase Storage's S3 protocol (2026-10-26): `/api/v1/uploads/sign` returns a SigV4 presigned `PUT` (`src/server/storage`, no AWS SDK) valid 10 minutes, with the content type signed; the server checks the object (HEAD) before a rating accepts it. Storage stays Supabase Storage | The owner asked for upload URLs valid ≤ 10 minutes; Supabase's own signed upload URLs are fixed at 2 hours on hosted projects, while S3 presigned URLs take any expiry. Needs four env vars (endpoint, region, access key id, secret) from the project's Storage settings | Supabase makes its own signed upload URLs' expiry configurable, or uploads move to a server-side proxy |
 | ADR-15 | The site installs as a web app (2026-11-05): manifest + a minimal service worker + an install card, no native app and no push | The owner wants "open like an app" without a store; a worker that caches only static files keeps signed-in and admin pages and API answers out of any cache, so the privacy rules (docs/11) hold | Push notifications or offline rating would need a different worker and a decision on what to cache |

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Database backup (docs/10 "Backups and restore"); .github/workflows/db-backup.yml runs it every
-# day at 03:00 PKT. pg_dump of the app's schema (public: every DishRank table, with the pg_trgm and
+# day at 03:00 PKT. pg_dump of the app's schema (public: every Kahan Khayen table, with the pg_trgm and
 # unaccent extensions) in custom format, checked with pg_restore, encrypted with gpg (symmetric
 # AES-256), then decrypted again and compared. Neither the database URL nor the passphrase is ever
 # printed. Any failure, or a suspiciously small file, exits non-zero: the workflow run fails and
@@ -10,7 +10,7 @@
 #                        an sslmode in it is ignored (see BACKUP_SSLMODE)
 #   BACKUP_PASSPHRASE    the gpg passphrase: one line, at least 20 characters
 #   PG_BIN_DIR           where pg_dump and pg_restore 17 are (default: found on PATH)
-#   BACKUP_MIN_BYTES     the smallest believable backup (default 150000: an empty DishRank
+#   BACKUP_MIN_BYTES     the smallest believable backup (default 150000: an empty Kahan Khayen
 #                        database dumps to about 90 KB, production with its Overture data to more)
 #   BACKUP_SSLMODE       libpq sslmode (default verify-full: the server's certificate chain and host
 #                        name are checked against BACKUP_CA_FILE; "prefer" only for a plaintext

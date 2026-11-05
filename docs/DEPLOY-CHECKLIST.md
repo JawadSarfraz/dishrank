@@ -1,4 +1,4 @@
-# Deploy checklist: DishRank private beta
+# Deploy checklist: Kahan Khayen private beta
 
 Do the steps in order. Keep a password manager open: several secrets are shown only once.
 `<domain>` means your production domain from step 5, for example `dishrank.vercel.app`.
@@ -9,7 +9,7 @@ Why things are set up this way: `docs/10-DEPLOYMENT.md`.
 1. supabase.com → New project. Organization: your own. Name: `dishrank`.
    Database password: generate a strong one and save it. Region: **South Asia (Mumbai)**
    (`ap-south-1`). Plan: Free. Create, and wait until the project is ready.
-2. Project Settings → Data API: turn the **Data API off**. DishRank talks to Postgres directly;
+2. Project Settings → Data API: turn the **Data API off**. Kahan Khayen talks to Postgres directly;
    with the Data API on, the project's public anon key could read the app's tables.
 3. **Connect** (top of the project page) → Connection string:
    - **Transaction pooler**: copy it, put your database password in place of `[YOUR-PASSWORD]` and
@@ -115,15 +115,16 @@ each).
 
 ## 7. Google sign-in (Google Auth Platform)
 
-1. console.cloud.google.com, signed in with your personal Google account → new project `DishRank`.
-2. **Google Auth Platform** → Get started: app name `DishRank`, user support e-mail = your Gmail,
+1. console.cloud.google.com, signed in with your personal Google account → new project `Kahan Khayen`.
+2. **Google Auth Platform** → Get started: app name `Kahan Khayen` (a project set up under the old
+   name: Branding → App name → `Kahan Khayen`; the project ID and the client stay as they are), user support e-mail = your Gmail,
    Audience **External**, contact e-mail = your Gmail. Create.
 3. **Branding** → Authorized domains → add `<domain>`. Optional: home page `https://<domain>`,
    privacy `https://<domain>/privacy`, terms `https://<domain>/terms`.
 4. **Audience**: leave the publishing status on **Testing**. Under Test users, add your Gmail and
    the panel's Gmail addresses (up to 100). Note: for plain Google sign-in Google lets every
    account in even in Testing; `BETA_ALLOWED_EMAILS` is what keeps the beta private.
-5. **Clients** → Create client → Web application, name `DishRank production`:
+5. **Clients** → Create client → Web application, name `Kahan Khayen production`:
    - Authorized JavaScript origins: `https://<domain>`
    - Authorized redirect URIs: `https://<domain>/api/auth/callback/google`
    - Create, then copy the **Client ID** and **Client secret** at once (or download the JSON): the
@@ -167,7 +168,7 @@ blocks sign-in there).
 5. My ratings → delete that rating. Supabase → Storage → `dish-photos`: its photo file is gone.
 6. Open a private (incognito) tab → `https://<domain>/sign-in` → Sign in with Google → **Use
    another account** → a Gmail that is not in `BETA_ALLOWED_EMAILS`. You land back on the sign-in
-   page with "DishRank is a private beta and this Google account is not invited yet". (A private tab
+   page with "Kahan Khayen is a private beta and this Google account is not invited yet". (A private tab
    keeps your own session; **Sign out** in the header works too.)
 7. `/admin/rankings` → **Recompute now**: a new run marked ok. The next morning a run marked
    `cron` should be there (it fires between 02:00 and 02:59 PKT).
@@ -206,7 +207,7 @@ Supabase Free keeps no backups; a GitHub Actions workflow takes one every night 
 (how it works and how to restore: `docs/10` "Backups and restore").
 
 1. On your laptop: `openssl rand -base64 32` → save it in your password manager as
-   **DishRank backup passphrase** first. Without it no backup can ever be read.
+   **Kahan Khayen backup passphrase** first. Without it no backup can ever be read.
 2. github.com/JawadSarfraz/dishrank → Settings → Secrets and variables → Actions → **New repository
    secret**:
    - `PROD_DIRECT_URL` = the same value as Vercel's `DIRECT_URL` (session pooler, port 5432,

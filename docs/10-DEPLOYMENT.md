@@ -80,10 +80,10 @@ denied access"). So for a Supabase host the app verifies the server itself again
 setting would replace the app's). The Prisma CLI has its own TLS stack: with `sslmode=require` it
 always encrypts but does not verify the certificate. Once the site works, turn on Database Settings
 → SSL Configuration → **Enforce SSL on incoming connections** (a short database restart); every
-DishRank connection already uses TLS.
+Kahan Khayen connection already uses TLS.
 
 **Data API off.** Supabase serves the `public` schema over its REST Data API to anyone holding the
-project's anon key, and DishRank's tables have no row-level security (the app reaches Postgres only
+project's anon key, and Kahan Khayen's tables have no row-level security (the app reaches Postgres only
 through Prisma). Turn the Data API off in the project settings. Storage's S3 protocol does not
 depend on it.
 
@@ -186,11 +186,11 @@ either; if a beta link is posted somewhere public, Google may still list the bar
 title or text). Keep beta links in private chats.
 
 Google does not keep a "Testing" app private when it asks only for name, e-mail and profile
-(`openid email profile`, which is all DishRank asks for): any Google account can sign in, without
+(`openid email profile`, which is all Kahan Khayen asks for): any Google account can sign in, without
 a warning, test user or not. So in beta the app itself admits only the Gmail addresses in
 `BETA_ALLOWED_EMAILS` and `ADMIN_EMAIL`, with an e-mail Google has verified, when they first sign
 in; anyone else lands on /sign-in with
-"DishRank is a private beta and this Google account is not invited yet". The list is checked when an
+"Kahan Khayen is a private beta and this Google account is not invited yet". The list is checked when an
 account is created: accounts that already exist keep working (there is no remove button yet). In
 `live` everyone can sign up.
 
@@ -264,9 +264,9 @@ that less likely. It runs `scripts/db-backup.sh`:
 
 1. `pg_dump` 17 (the server's major version, from the PostgreSQL apt repository) through the
    session pooler (`PROD_DIRECT_URL`; the transaction pooler cannot serve a dump): the `public`
-   schema, which holds every DishRank table, plus the `pg_trgm` and `unaccent` extensions, in
+   schema, which holds every Kahan Khayen table, plus the `pg_trgm` and `unaccent` extensions, in
    custom format. Not in it: Supabase's own schemas (`auth`, `storage` and the like, which
-   DishRank does not use) and the photo files in Storage. The connection verifies the server's
+   Kahan Khayen does not use) and the photo files in Storage. The connection verifies the server's
    certificate chain and host name against Supabase's root CA (`config/supabase-root-2021.crt`,
    the same certificate the app verifies with; libpq `sslmode=verify-full`), because
    `sslmode=require` alone would encrypt without checking who answers (audit 2026-11). An
@@ -276,7 +276,7 @@ that less likely. It runs `scripts/db-backup.sh`:
    `Restaurant`, `Rating` and others).
 3. gpg encrypts it with `BACKUP_PASSPHRASE` (symmetric AES-256, the classic OpenPGP format every gpg
    2.x reads), decrypts the result again and compares it with the dump.
-4. A file under 150 KB fails the run: an empty DishRank database dumps to about 90 KB, the dev
+4. A file under 150 KB fails the run: an empty Kahan Khayen database dumps to about 90 KB, the dev
    database with its Overture candidates to 390 KB (2026-11-04). Raise or lower it with
    `BACKUP_MIN_BYTES` in the workflow if ever needed.
 5. The encrypted file is kept as a workflow artifact for 30 days.

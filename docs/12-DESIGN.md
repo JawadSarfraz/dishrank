@@ -1,6 +1,6 @@
 # 12 — Design
 
-The look of DishRank from the redesign of 2026-11-05 (Part 3 of the audit-and-redesign task):
+The look of Kahan Khayen from the redesign of 2026-11-05 (Part 3 of the audit-and-redesign task):
 direction A, "Scoreboard", with the owner's changes (green score bands, gold only for the top
 place, the podium share image, the "what your rating did" message, live thresholds in the copy,
 "from" prices, the account menu, only the font weights in use) and the installable app. Light theme
@@ -13,15 +13,28 @@ screenshots of every screen at 360 px and 1280 px are in `tmp/design/before` and
 
 ## Brand
 
-- **Name in one place.** `src/lib/brand.ts` exports `BRAND` (name, short name, tagline,
-  description, theme and background colours). Pages, the share images, the manifest and the
-  header read it; the root layout's title template appends it (`%s · DishRank`). Changing the
-  name is a one-line change plus `pnpm icons:build` (the icons carry no text) and a new
-  Google OAuth consent-screen name.
+- **Name in one place.** The product is Kahan Khayen (Urdu کہاں کھائیں, "where should we eat?";
+  renamed from DishRank on 2026-11-06). `src/lib/brand.ts` exports `BRAND` (name, Urdu name, short
+  name, tagline, English tagline, description, theme and background colours). Pages, the share
+  images, the manifest and the header read it; the root layout's title template appends it
+  (`%s · Kahan Khayen`). Internal names (the repo, the database, the package, env vars, cookie and
+  cache prefixes) stay `dishrank`. Changing the name again is a one-line change plus new Urdu
+  outlines (`src/fonts/README.md`), a new Google OAuth consent-screen name and, if the mark
+  changes, `pnpm icons:build` (the icons carry no text).
+- **Tagline.** "Har dish ka pehla number" (Roman Urdu, "the number one for every dish"), always
+  with its English line "Restaurants ranked dish by dish, by people who ate there." Home hero lead,
+  footer and the default share image.
 - **Voice.** Short, plain words; opinions, never facts about a restaurant (CLAUDE.md rule 9);
   every score shows its vote count; "Not enough votes yet" is an invitation, never an apology.
-- **Wordmark.** The name in Bricolage Grotesque ExtraBold, tracking −0.025 em, with the mark to
-  its left (`Wordmark` in `src/components/brand/Logo.tsx`).
+- **Wordmark.** The mark, then two lines: "Kahan Khayen" in Bricolage Grotesque ExtraBold,
+  tracking −0.025 em, over کہاں کھائیں in brand green (`Wordmark` in
+  `src/components/brand/Logo.tsx`; sizes sm 16 px, md 18 px, lg 30 px). The Urdu name is Noto
+  Nastaliq Urdu Bold shaped by HarfBuzz and flattened to one SVG path
+  (`src/components/brand/urdu-name.ts`, OFL 1.1), defined once per page as an SVG symbol by the
+  root layout (`UrduNameDefs`) and referenced by every `UrduName`, so no Urdu web font is loaded
+  and the 6 KB path is in the HTML once. An optional tag ("Beta" in beta mode) sits after the Urdu
+  name on the second line, which is why the lockup (164 px at header size) still fits a 360 px
+  header beside "Rate" and "Sign in".
 - **Mark.** A karahi seen from above (the rim and its two ring handles) with three bars inside in
   podium order; the tallest, middle bar is gold. Drawn inline (`LogoMark`), so it takes the
   parent's colour; `scripts/make-icons.ts` renders it on a green tile for the app icons and the
@@ -120,7 +133,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 
 | Component | File | Notes |
 |---|---|---|
-| Header | `components/layout/SiteHeader.tsx` | Sticky, 56 px. Wordmark, the Beta chip, "Rate a dish" (hidden on /rate), then Sign in or the account menu: a 44 px initial disc opening My ratings, Owner (OWNER), Admin (ADMIN), Sign out. Reads the session in the browser, so public pages stay static. |
+| Header | `components/layout/SiteHeader.tsx` | Sticky, 56 px. Wordmark (with the Beta tag on its second line in beta mode), "Rate a dish" (hidden on /rate), then Sign in or the account menu: a 44 px initial disc opening My ratings, Owner (OWNER), Admin (ADMIN), Sign out. Reads the session in the browser, so public pages stay static. |
 | Footer | `components/layout/Footer.tsx` | Wordmark, tagline, the six trust links (dispute included, rule 9), one line "scores are opinions". |
 | Button, ButtonLink | `components/ui/button.tsx`, `button-link.tsx` | default (brand), outline, secondary (brand-soft), ghost, destructive, link; sizes default 44 px, lg 48 px, sm 40 px and xs 32 px for dense admin rows only. A link that looks like a button is a real `<a>` (ButtonLink). |
 | Fields | `.field`, `.field-select` utilities | 44 px, 16 px text, white, brand focus ring; selects carry their own chevron. `Input` wraps the same look for forms. |
@@ -151,7 +164,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   from 16 votes · 1 more collecting votes"), the filter bar, the ranked list with medals, the
   waiting list, the threshold note (live numbers) and Share. Empty: "Nobody has rated … yet" with
   a Rate button. Static (ISR); the browser does the filtering.
-- **Restaurant.** Name, "Owner on DishRank" when claimed, address, phone and Google Maps as
+- **Restaurant.** Name, "Owner on Kahan Khayen" when claimed, address, phone and Google Maps as
   outline buttons, the dish list with ranks, "from" prices, scores and Rate links, then the menu
   photo box (panel, owner, admin), Report a problem and Is this your restaurant? as disclosures.
 - **Rate flow.** Steps; Where did you eat? (city pills, search, result cards, Suggest a
@@ -164,7 +177,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   progress bar and "2 of 4 raters so far: needs 2 more ratings to rank before X gets a rank". Then
   "Rate another dish here", Share (the ranking when ranked, the restaurant otherwise), "Rate
   somewhere else" and "My ratings". The second saved rating may bring up the install card.
-- **Sign in.** Mark, "Sign in", one sentence on why, "Continue with Google", terms and privacy
+- **Sign in.** The wordmark (lg), "Sign in", one sentence on why, "Continue with Google", terms and privacy
   links; fixed texts for the beta and ban refusals.
 - **My ratings.** Rows with the dish icon, name, restaurant, date, the diner's score as a large
   number, status chip, comment, Edit and Delete; claims; Your account with Delete my account.
@@ -176,9 +189,10 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 - **Trust pages.** `Prose` (`components/layout/Prose.tsx`): one reading column, brand links,
   tables for the trust levels.
 - **Share images** (`app/opengraph-image.tsx`, `app/(public)/[city]/[slug]/opengraph-image.tsx`).
-  Paper background, the mark and wordmark, the title in Bricolage Grotesque, and a podium of the
+  Paper background, the two-line wordmark (`OgWordmark`: mark, name, Urdu outlines), the title in
+  Bricolage Grotesque, and a podium of the
   top three (gold, silver and bronze discs, the first in the middle and taller, each with its
-  score band colour and votes); "Rate it on DishRank" when nothing ranks. 1200 × 630, readable
+  score band colour and votes); "Rate it on Kahan Khayen" when nothing ranks. 1200 × 630, readable
   as a WhatsApp preview.
 
 ## Installable (PWA)
@@ -191,7 +205,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   navigation that fails shows the offline page, everything else goes to the network untouched.
   Old caches are dropped on activate and the cache is capped at 300 entries. The CSP is unchanged
   (`script-src 'self'` covers the worker).
-- `components/pwa/InstallPrompt.tsx` offers "Add DishRank to your home screen" after the second
+- `components/pwa/InstallPrompt.tsx` offers "Add Kahan Khayen to your home screen" after the second
   saved rating or on the second visit (a second day), with Add and Not now; "Not now" hides it
   for 30 days; on iPhone it shows "Share → Add to Home Screen" instead (`src/lib/pwa-prompt.ts`,
   localStorage, wrapped in try/catch). It never shows inside the installed app. No push

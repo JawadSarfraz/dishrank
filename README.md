@@ -1,6 +1,7 @@
-# DishRank — planning kit
+# Kahan Khayen — planning kit
 
-This repo starts as the planning kit for DishRank (dish-first restaurant rankings for Pakistan).
+This repo starts as the planning kit for Kahan Khayen (کہاں کھائیں; dish-first restaurant rankings for
+Pakistan, called DishRank until 2026-11-06; the repo, package and database keep the old name).
 `CLAUDE.md`, `docs/` and `seed/` sit at the repo root; Claude Code builds the app around them.
 
 ## 1. Set up the repo
