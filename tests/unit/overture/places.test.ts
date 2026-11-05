@@ -171,6 +171,10 @@ describe("Overture filters (docs/07 §1)", () => {
     expect(isGoogleLink("share.google/AbCdEf")).toBe(true);
     expect(isGoogleLink("(https://maps.app.goo.gl/x),")).toBe(true);
     expect(isGoogleLink("G.Co.")).toBe(false); // a word, not a link
+    // A bare Google host is a link too (audit 2026-11, B-11).
+    expect(isGoogleLink("maps.google.com")).toBe(true);
+    expect(isGoogleLink("goo.gl")).toBe(true);
+    expect(isGoogleLink("fixture-grill.example")).toBe(false);
     expect(isGoogleLink("https://fixture-grill.example/menu")).toBe(false);
     expect(isGoogleLink("https://www.facebook.com/fixturegrill")).toBe(false);
 
@@ -178,6 +182,7 @@ describe("Overture filters (docs/07 §1)", () => {
       "Shop 4, Jinnah Super",
     );
     expect(stripGoogleLinks("https://maps.app.goo.gl/AbC123, Islamabad")).toBe("Islamabad");
+    expect(stripGoogleLinks("Shop 4, see maps.google.com")).toBe("Shop 4, see");
     expect(stripGoogleLinks("https://goo.gl/maps/xyz")).toBeNull();
     expect(stripGoogleLinks("Plot 7,  F-7 Markaz ")).toBe("Plot 7, F-7 Markaz"); // spaces only
     // A literal "\n" escape glued to the link, as in one real record.

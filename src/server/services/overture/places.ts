@@ -56,14 +56,18 @@ export function hasOpenSources(sources: OverturePlace["sources"]): boolean {
 
 /** Google hosts: Maps, its short links and shares. Their links are never kept. */
 const GOOGLE_HOST = /(^|\.)(google\.[a-z]{2,3}(\.[a-z]{2})?|goo\.gl|g\.page|g\.co|share\.google)$/;
+/** Google hosts that are links even written bare ("maps.google.com", "goo.gl"); "G.Co." stays a word. */
+const GOOGLE_BARE_HOST = /(^|\.)(google\.[a-z]{2,3}(\.[a-z]{2})?|goo\.gl|g\.page|share\.google)$/;
 
 /** The host of a link-like token; bare words with a dot ("G.Co.") are text, not links. */
 function linkHost(token: string): string | null {
   const m = /^(?:(https?):\/\/)?([a-z0-9.-]+\.[a-z]{2,})([/?#].*)?$/i.exec(token);
   if (!m) return null;
   const [, scheme, host, rest] = m;
-  if (!scheme && !rest && !/^www\./i.test(host)) return null;
-  return host.toLowerCase();
+  const lower = host.toLowerCase();
+  // A bare Google host is a link too (audit 2026-11, B-11).
+  if (!scheme && !rest && !/^www\./i.test(host) && !GOOGLE_BARE_HOST.test(lower)) return null;
+  return lower;
 }
 
 /** True for a link to a Google host (maps.app.goo.gl/…, google.com/maps/…, g.page/…). */
