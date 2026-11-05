@@ -40,6 +40,7 @@ enum SourceType {
   OWNER
   MENU_PHOTO
   ADMIN
+  AUTO_LIST // read from the place's name or category by the Auto-list (docs/07 §2a); never checked by a person
 }
 
 enum RatingStatus {
@@ -164,6 +165,8 @@ model User {
   claimedRestaurants   Restaurant[]
   reviewedCandidates   OvertureCandidate[]
   locationObservations LocationObservation[]
+  panelInvites         PanelInvite[]
+  panelInviteUses      PanelInviteUse[]
 }
 
 /// Banned Google accounts, as one-way hashes of their e-mail address (sha256 of the trimmed,
@@ -271,6 +274,8 @@ model Restaurant {
   claimedByUserId String?
   claimedAt       DateTime?
   mergedIntoId    String? // set with status DUPLICATE; its URLs redirect permanently to this restaurant
+  autoListedAt    DateTime? // created by the Auto-list (docs/07 §2a); NULL = created by a person
+  checkedAt       DateTime? // an admin confirmed or edited an auto-listed restaurant
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -288,6 +293,7 @@ model Restaurant {
 
   @@index([cityId, status])
   @@index([cityId, areaId])
+  @@index([autoListedAt, checkedAt])
   // Trigram index, created by the raw SQL migration after pg_trgm exists; declared here so Prisma does not drop it.
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin, map: "restaurants_search_trgm")
 }
@@ -318,6 +324,7 @@ model OvertureCandidate {
   restaurantId     String? // CREATED or LINKED: the restaurant
   reviewedByUserId String?
   reviewedAt       DateTime?
+  autoListedAt     DateTime? // CREATED by the Auto-list (docs/07 §2a); `name` stays Overture's original for audit
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -672,4 +679,51 @@ model JobRun {
   finishedAt DateTime?
   ok         Boolean?
   summary    Json?
+}
+
+/// Panel invite links on /admin/users (docs/07 §7a). Only the sha256 of the token is stored: the link
+/// is shown once. Signing in through one makes the user a panel member and passes the beta allowlist.
+model PanelInvite {
+  id              String    @id @default(cuid())
+  tokenHash       String    @unique
+  label           String
+  maxUses         Int       @default(30)
+  usesCount       Int       @default(0) // raised under the row lock; never above maxUses
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdByUserId String? // null once that admin deleted their account
+  createdAt       DateTime  @default(now())
+
+  createdBy User?            @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  uses      PanelInviteUse[]
+
+  @@index([createdAt])
+}
+
+/// Who joined through a link. One row per user per link.
+model PanelInviteUse {
+  id        String   @id @default(cuid())
+  inviteId  String
+  userId    String
+  createdAt DateTime @default(now())
+
+  invite PanelInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([inviteId, userId])
+  @@index([userId])
+}
+
+/// Unexpected server errors (docs/02 Observability): the route pattern, the error's name, a short
+/// scrubbed message and Next.js's digest. Never a user, a path with ids, a header or a query. The
+/// last 50 show on /admin; the nightly run deletes rows older than 30 days.
+model ServerError {
+  id        String   @id @default(cuid())
+  route     String
+  name      String
+  message   String
+  digest    String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
