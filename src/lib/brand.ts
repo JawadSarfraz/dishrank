@@ -1,11 +1,19 @@
-// The brand in one place (owner, Part 3): the name may still change, so no page, image or manifest
-// spells it out. Colours here mirror the tokens in src/app/globals.css (docs/12-DESIGN.md).
+// The brand in one place (owner, Part 3; renamed from DishRank to Kahan Khayen on 2026-11-06): no
+// page, image or manifest spells the name out. Internal names (the repo, the database, the package,
+// env vars, cookie and cache prefixes) stay "dishrank" on purpose. The Urdu name is drawn as
+// outlines (src/components/brand/urdu-name.ts), never with an Urdu web font. Colours here mirror
+// the tokens in src/app/globals.css (docs/12-DESIGN.md).
 
 export const BRAND = {
-  name: "DishRank",
+  name: "Kahan Khayen",
+  /** کہاں کھائیں, "where should we eat?": the name in Urdu script, for alt texts and the docs. */
+  urduName: "کہاں کھائیں",
   /** Under a home-screen icon (12 characters or fewer). */
-  shortName: "DishRank",
-  tagline: "Restaurants ranked dish by dish",
+  shortName: "Kahan Khayen",
+  /** Roman Urdu: "the number one for every dish". */
+  tagline: "Har dish ka pehla number",
+  /** The English line that goes with the tagline. */
+  taglineEnglish: "Restaurants ranked dish by dish, by people who ate there.",
   description:
     "The best restaurants for each dish in Islamabad and Rawalpindi, ranked by diners who ate there.",
   /** The browser chrome of the installed app and the manifest (= --brand). */
@@ -14,6 +22,6 @@ export const BRAND = {
   backgroundColor: "#F7F8F6",
 } as const;
 
-/** "Rate a dish · DishRank", "Best Chicken Karahi in Islamabad – DishRank". */
+/** "Rate a dish · Kahan Khayen", "Best Chicken Karahi in Islamabad – Kahan Khayen". */
 export const pageTitle = (title: string, separator: "·" | "–" = "·") =>
   `${title} ${separator} ${BRAND.name}`;

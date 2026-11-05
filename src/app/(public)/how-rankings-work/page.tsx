@@ -5,13 +5,13 @@ import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
 import Link from "next/link";
 import { BURST, RANKING, TRUST } from "@/server/services/ranking.constants";
+import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "How rankings work",
-  description:
-    "How DishRank turns diners' dish ratings into a ranking: recent ratings from different people, pulled toward the city average until there are enough of them.",
+  description: `How ${BRAND.name} turns diners' dish ratings into a ranking: recent ratings from different people, pulled toward the city average until there are enough of them.`,
   alternates: { canonical: "/how-rankings-work" },
 };
 
@@ -44,7 +44,7 @@ export default function HowRankingsWorkPage() {
       <Prose>
         <h1>How rankings work</h1>
         <p>
-          DishRank ranks restaurants one dish at a time. A restaurant&apos;s place for Chicken
+          {BRAND.name} ranks restaurants one dish at a time. A restaurant&apos;s place for Chicken
           Karahi comes only from ratings of its Chicken Karahi. In one sentence: the score is an
           average of recent ratings from different people, pulled toward the city average until
           there are enough of them.
@@ -52,10 +52,10 @@ export default function HowRankingsWorkPage() {
 
         <h2>Where the ratings come from</h2>
         <p>
-          Every rating is a diner&apos;s opinion, a whole number from 1 to 10, given on DishRank. We
-          import no scores, stars or reviews from anywhere else. Each person has one rating per dish
-          per restaurant; rating it again replaces the old one. &quot;Votes&quot; on our pages means
-          different people.
+          Every rating is a diner&apos;s opinion, a whole number from 1 to 10, given on {BRAND.name}
+          . We import no scores, stars or reviews from anywhere else. Each person has one rating per
+          dish per restaurant; rating it again replaces the old one. &quot;Votes&quot; on our pages
+          means different people.
         </p>
 
         <h2>How much a rating counts</h2>
@@ -86,10 +86,10 @@ export default function HowRankingsWorkPage() {
           yet&quot;, with how many more ratings it needs. It never gets a number.
         </p>
         <p>
-          <strong>Early rankings.</strong> While a city is new on DishRank (before its launch and
-          for {RANKING.bootstrapDays} days after it), a rank needs {bootstrap.minRaters} different
-          people and a weight of {bootstrap.minWeight.toFixed(1)}. Those pages say &quot;Early
-          rankings&quot;.
+          <strong>Early rankings.</strong> While a city is new on {BRAND.name} (before its launch
+          and for {RANKING.bootstrapDays} days after it), a rank needs {bootstrap.minRaters}{" "}
+          different people and a weight of {bootstrap.minWeight.toFixed(1)}. Those pages say
+          &quot;Early rankings&quot;.
         </p>
         <p>
           Equal scores are ordered by more votes, then the most recent rating, then name. Rank

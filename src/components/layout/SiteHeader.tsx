@@ -9,7 +9,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Wordmark } from "@/components/brand/Logo";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
 import { authClient } from "@/lib/auth-client";
+import { BRAND } from "@/lib/brand";
 import { ButtonLink } from "@/components/ui/button-link";
 
 export function SiteHeader({ beta }: { beta: boolean }) {
@@ -55,15 +55,10 @@ export function SiteHeader({ beta }: { beta: boolean }) {
         <Link
           href="/"
           className="-ml-1 inline-flex min-h-11 items-center rounded-lg px-1"
-          aria-label="DishRank home"
+          aria-label={beta ? `${BRAND.name} Beta, home` : `${BRAND.name} home`}
         >
-          <Wordmark />
+          <Wordmark tag={beta ? "Beta" : undefined} />
         </Link>
-        {beta && (
-          <Badge variant="outline" className="px-2">
-            Beta
-          </Badge>
-        )}
         <div className="ml-auto flex items-center gap-1.5">
           {pathname !== "/rate" && (
             <ButtonLink href="/rate" size="sm" className="h-11 px-3.5 text-base">

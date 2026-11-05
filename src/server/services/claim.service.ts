@@ -28,6 +28,7 @@ import { findRater, findUserRole, lockUser, updateUserById } from "@/server/repo
 import { assertRole, type SessionUser } from "@/server/roles";
 import type { ClaimInput, OwnerRemoveInput } from "@/server/validation";
 import { recomputeEach } from "./ranking.service";
+import { BRAND } from "@/lib/brand";
 
 export type ClaimPayload = { claimId: string; phone: string; proofNote: string | null };
 
@@ -45,7 +46,7 @@ export async function submitClaim(
     throw new AppError("NOT_FOUND", "Restaurant not found", 404);
   }
   if (restaurant.status !== "ACTIVE") {
-    throw new AppError("RESTAURANT_INACTIVE", "This restaurant is not open on DishRank", 409);
+    throw new AppError("RESTAURANT_INACTIVE", `This restaurant is not open on ${BRAND.name}`, 409);
   }
   if (restaurant.claimedByUserId === user.id) {
     throw new AppError("ALREADY_OWNER", "You already manage this restaurant", 409);

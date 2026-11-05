@@ -2,7 +2,7 @@
 // 1200 × 630, in the brand colours (docs/12-DESIGN.md). Rendered on each request (crawlers fetch
 // it rarely). Satori (next/og) needs an explicit flex display on every element with text.
 import { ImageResponse } from "next/og";
-import { OgMark, ogFont } from "@/app/opengraph-image";
+import { OgWordmark, ogFont } from "@/app/opengraph-image";
 import { BRAND } from "@/lib/brand";
 import { formatScore, formatVotes } from "@/lib/format";
 import { SCORE_BAND_HEX, scoreBand } from "@/lib/score-band";
@@ -138,17 +138,7 @@ export default async function Image({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <OgMark size={40} ink="#0e6b4a" gold="#d4a72c" />
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: 34,
-            letterSpacing: -1,
-          }}
-        >
-          {BRAND.name}
-        </div>
+        <OgWordmark scale={0.5} />
         {ranking?.mode === "bootstrap" && (
           <div
             style={{

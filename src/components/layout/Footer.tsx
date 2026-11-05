@@ -15,9 +15,12 @@ export function Footer() {
   return (
     <footer className="mt-auto border-t bg-card">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-8 sm:px-6">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Wordmark size="sm" />
-          <p className="text-sm text-muted-foreground">{BRAND.tagline}, by people who ate there.</p>
+          <div className="flex flex-col gap-0.5 sm:items-end sm:text-right">
+            <p className="font-display text-base font-bold tracking-tight">{BRAND.tagline}</p>
+            <p className="text-sm text-muted-foreground">{BRAND.taglineEnglish}</p>
+          </div>
         </div>
         <nav
           aria-label="Footer"

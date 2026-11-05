@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { UrduNameDefs } from "@/components/brand/Logo";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${sans.variable} ${display.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
+        <UrduNameDefs />
         <Toaster>
           <SiteHeader beta={isBeta} />
           {children}

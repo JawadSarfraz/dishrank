@@ -5,12 +5,13 @@ import { Prose } from "@/components/layout/Prose";
 import Link from "next/link";
 import { LegalDraftNotice } from "@/components/trust/LegalDraftNotice";
 import { ContactEmail, OperatorName } from "@/components/trust/Operator";
+import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "What DishRank keeps about you, why, and how to have it deleted.",
+  description: `What ${BRAND.name} keeps about you, why, and how to have it deleted.`,
   alternates: { canonical: "/privacy" },
   // Decided 2026-11-04: kept out of search results until a lawyer has reviewed the draft.
   robots: { index: false, follow: true },
@@ -23,13 +24,13 @@ export default function PrivacyPage() {
         <h1>Privacy</h1>
         <LegalDraftNotice />
         <p>
-          This page says what DishRank keeps about you and why. We keep as little as we can, we do
-          not sell it, and we show no ads.
+          This page says what {BRAND.name} keeps about you and why. We keep as little as we can, we
+          do not sell it, and we show no ads.
         </p>
 
         <h2>Who we are</h2>
         <p>
-          DishRank is run by <OperatorName />. For anything about your data, write to{" "}
+          {BRAND.name} is run by <OperatorName />. For anything about your data, write to{" "}
           <ContactEmail />.
         </p>
 
@@ -47,10 +48,10 @@ export default function PrivacyPage() {
           your comment and your photo, with a scrambled (hashed) form of your IP address that helps
           us spot abuse. Your scores count toward the public rankings without your name. Comments
           and photos are checked by our team and may be shown on public pages; your e-mail address
-          is never shown. When you upload a photo on DishRank, the app re-saves it in your browser
-          first, which removes the location and camera details stored inside the file. A photo is
-          stored under a random name that says nothing about you; a photo you upload but never use
-          is deleted after a day.
+          is never shown. When you upload a photo on {BRAND.name}, the app re-saves it in your
+          browser first, which removes the location and camera details stored inside the file. A
+          photo is stored under a random name that says nothing about you; a photo you upload but
+          never use is deleted after a day.
         </p>
 
         <h2>Locations</h2>

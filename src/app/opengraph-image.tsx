@@ -3,9 +3,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
+import { URDU_NAME } from "@/components/brand/urdu-name";
 import { BRAND } from "@/lib/brand";
 
-export const alt = `${BRAND.name}: restaurants ranked dish by dish`;
+export const alt = `${BRAND.name} (${BRAND.urduName}): ${BRAND.taglineEnglish}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,6 +33,40 @@ export function OgMark({ size: px, ink, gold }: { size: number; ink: string; gol
   );
 }
 
+/** The Urdu name's outlines (urdu-name.ts) at a given height; Satori draws the path itself. */
+export function OgUrduName({ height, fill }: { height: number; fill: string }) {
+  const width = Math.round((height * URDU_NAME.width) / URDU_NAME.height);
+  return (
+    <svg viewBox={URDU_NAME.viewBox} width={width} height={height}>
+      <path d={URDU_NAME.d} fill={fill} />
+    </svg>
+  );
+}
+
+/** Mark + name + Urdu name, the same two-line lockup as the header (Wordmark in Logo.tsx). */
+export function OgWordmark({ scale = 1 }: { scale?: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 20 * scale }}>
+      <OgMark size={100 * scale} ink="#0e6b4a" gold="#d4a72c" />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 * scale }}>
+        <div
+          style={{
+            display: "flex",
+            fontFamily: "Bricolage Grotesque",
+            fontSize: 64 * scale,
+            lineHeight: 1,
+            letterSpacing: -2 * scale,
+            color: "#16201b",
+          }}
+        >
+          {BRAND.name}
+        </div>
+        <OgUrduName height={50 * scale} fill="#0e6b4a" />
+      </div>
+    </div>
+  );
+}
+
 export default async function Image() {
   const [displayFont, bodyFont] = await Promise.all([display, body]);
   return new ImageResponse(
@@ -48,33 +83,21 @@ export default async function Image() {
         fontFamily: "Geist",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        <OgMark size={96} ink="#0e6b4a" gold="#d4a72c" />
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: 92,
-            letterSpacing: -3,
-          }}
-        >
-          {BRAND.name}
-        </div>
-      </div>
+      <OgWordmark />
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div
           style={{
             display: "flex",
             fontFamily: "Bricolage Grotesque",
-            fontSize: 58,
+            fontSize: 66,
             lineHeight: 1.1,
-            letterSpacing: -1.5,
+            letterSpacing: -2,
           }}
         >
-          {BRAND.tagline},
+          {BRAND.tagline}
         </div>
-        <div style={{ display: "flex", fontSize: 40, color: "#5e6963" }}>
-          from ratings by people who ate there.
+        <div style={{ display: "flex", fontSize: 36, color: "#5e6963" }}>
+          {BRAND.taglineEnglish}
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 30 }}>

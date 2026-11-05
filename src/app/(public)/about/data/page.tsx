@@ -3,12 +3,13 @@ import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
 import { CDLA_PERMISSIVE_2_URL, OvertureCredit } from "@/components/layout";
 import { getOvertureCredit } from "@/server/services/data-credits";
+import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Data sources",
-  description: "Where DishRank's rankings and restaurant listings come from, and the credits.",
+  description: `Where ${BRAND.name}'s rankings and restaurant listings come from, and the credits.`,
 };
 
 export default async function DataSourcesPage() {
@@ -18,7 +19,7 @@ export default async function DataSourcesPage() {
       <Prose>
         <h1>Data sources</h1>
         <p className="text-sm">
-          Rankings come only from ratings by DishRank users. We import no scores or reviews from
+          Rankings come only from ratings by {BRAND.name} users. We import no scores or reviews from
           anywhere.
         </p>
         <p className="text-sm">

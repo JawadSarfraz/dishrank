@@ -1,10 +1,10 @@
 /*
- * DishRank's service worker (docs/12-DESIGN.md, "Installable"). It caches only static files
+ * Kahan Khayen's service worker (docs/12-DESIGN.md, "Installable"). It caches only static files
  * (/_next/static, the icons, the manifest) and the offline page, so the app opens quickly and shows
  * something when the network is gone. It never caches a page with personal data (signed-in, admin,
  * owner pages), an API response or anything else: every other request goes to the network as is.
  */
-const VERSION = "2026-11-05";
+const VERSION = "2026-11-06";
 const CACHE = "dishrank-static-" + VERSION;
 const OFFLINE_URL = "/offline";
 const STATIC_PREFIXES = ["/_next/static/", "/icons/"];

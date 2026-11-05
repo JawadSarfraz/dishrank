@@ -11,6 +11,7 @@ import { logEvent } from "./log";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
 import { isEmailBanned } from "./services/ban-list";
 import { SITE_MODE, newAccountDecision } from "./site";
+import { BRAND } from "@/lib/brand";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -34,7 +35,7 @@ export const auth = betterAuth({
   },
   // Every check reads the session and role from the database, so role changes apply at once.
   session: { cookieCache: { enabled: false } },
-  // DishRank has no profile editing: Better Auth's own update-user endpoint (an unbounded name and
+  // Kahan Khayen has no profile editing: Better Auth's own update-user endpoint (an unbounded name and
   // image for any signed-in user) answers 404 (audit 2026-11, A-09).
   disabledPaths: ["/update-user"],
   // Ids come from the Prisma defaults, like every other table.
@@ -48,7 +49,7 @@ export const auth = betterAuth({
             logEvent("auth.signup_refused", { reason: "banned" }, "warn");
             throw new APIError("FORBIDDEN", {
               code: "ACCOUNT_BANNED",
-              message: "This Google account was banned from DishRank and cannot sign up again.",
+              message: `This Google account was banned from ${BRAND.name} and cannot sign up again.`,
             });
           }
           // Private beta: only invited Google accounts get an account (BETA_ALLOWED_EMAILS, docs/10);
@@ -63,7 +64,7 @@ export const auth = betterAuth({
             logEvent("auth.signup_refused", { reason: "beta_invite_only" }, "warn");
             throw new APIError("FORBIDDEN", {
               code: "BETA_INVITE_ONLY",
-              message: "DishRank is a private beta and this Google account is not invited.",
+              message: `${BRAND.name} is a private beta and this Google account is not invited.`,
             });
           }
           return { data: decision.admin ? { ...user, role: "ADMIN" } : user };

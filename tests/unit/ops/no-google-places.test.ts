@@ -1,4 +1,4 @@
-// CLAUDE.md rules 1-2 and docs/02 ADR-13: DishRank never uses Google Places. Google appears only as
+// CLAUDE.md rules 1-2 and docs/02 ADR-13: Kahan Khayen never uses Google Places. Google appears only as
 // the sign-in provider (OAuth) and the Geist font; no Places client, key, endpoint or cron returns.
 import fs from "node:fs";
 import path from "node:path";

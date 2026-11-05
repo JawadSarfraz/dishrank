@@ -1,6 +1,6 @@
 "use client";
 
-// "Add DishRank to your home screen": a small card at the bottom, after the second rating or the
+// "Add Kahan Khayen to your home screen": a small card at the bottom, after the second rating or the
 // second visit (src/lib/pwa-prompt.ts). One tap dismisses it for 30 days. On iPhone there is no
 // install event, so it shows the Share → Add to Home Screen steps instead. No push notifications.
 import { ShareIcon, XIcon } from "lucide-react";

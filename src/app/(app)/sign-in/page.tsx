@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignInButton } from "@/components/auth/SignInButton";
-import { LogoMark } from "@/components/brand/Logo";
+import { Wordmark } from "@/components/brand/Logo";
 import { Main } from "@/components/layout/Page";
 import { BRAND } from "@/lib/brand";
 import { getSessionUser, googleSignInEnabled } from "@/server/auth";
@@ -32,7 +32,7 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   return (
     <Main width="narrow" className="justify-center gap-6 py-12">
       <div className="flex flex-col items-start gap-4">
-        <LogoMark size={44} className="text-brand" />
+        <Wordmark size="lg" />
         <h1 className="text-3xl font-extrabold sm:text-4xl">Sign in</h1>
         <p className="max-w-prose text-muted-foreground">
           One tap with your Google account. It keeps one rating per person per dish; your e-mail

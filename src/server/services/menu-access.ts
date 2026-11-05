@@ -7,6 +7,7 @@ import { AppError } from "@/server/errors";
 import { findRestaurantById } from "@/server/repositories/restaurant.repo";
 import { findRater } from "@/server/repositories/user.repo";
 import type { SessionUser } from "@/server/roles";
+import { BRAND } from "@/lib/brand";
 
 export type MenuUploader = "admin" | "panel" | "owner";
 
@@ -33,7 +34,7 @@ export async function assertMenuUploader(user: SessionUser, restaurantId: string
     throw new AppError("NOT_FOUND", "Restaurant not found", 404);
   }
   if (restaurant.status !== "ACTIVE") {
-    throw new AppError("RESTAURANT_INACTIVE", "This restaurant is not open on DishRank", 409);
+    throw new AppError("RESTAURANT_INACTIVE", `This restaurant is not open on ${BRAND.name}`, 409);
   }
   const rater = await findRater(user.id);
   if (!rater || rater.bannedAt)

@@ -1,4 +1,4 @@
-// Who runs DishRank and how to reach them, on /privacy and /terms (OPERATOR_NAME, CONTACT_EMAIL,
+// Who runs Kahan Khayen and how to reach them, on /privacy and /terms (OPERATOR_NAME, CONTACT_EMAIL,
 // docs/10). A missing value shows a placeholder that is plainly not finished text.
 import { OPERATOR } from "@/server/site";
 

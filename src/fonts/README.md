@@ -1,6 +1,6 @@
 # Fonts
 
-Both faces are under the SIL Open Font License 1.1; the licence texts with their copyright notices
+All three faces are under the SIL Open Font License 1.1; the licence texts with their copyright notices
 sit next to the files. Everything is served from this site: nothing on a page, and nothing in a
 build, calls Google.
 
@@ -31,3 +31,23 @@ Satori needs TTF, so two static instances are kept as well, both from Google Fon
 - `geist-500.ttf`: Geist Medium (names, counts).
 
 `next.config.ts` traces `src/fonts/*.ttf` into the two image routes.
+
+## For the Urdu name in the logo (`src/components/brand/urdu-name.ts`)
+
+No Urdu font is served. کہاں کھائیں is committed as one SVG path, made once from Noto Nastaliq Urdu
+(the variable TTF in google/fonts, `ofl/notonastaliqurdu`; © 2022 The Noto Project Authors,
+github.com/notofonts/nastaliq; `LICENSE-noto-nastaliq-urdu.txt`) at weight 700, shaped by HarfBuzz
+and flattened glyph by glyph. To make it again (a new name or weight), in a scratch folder:
+
+```bash
+npm pack harfbuzzjs@0.4.12 && tar xzf harfbuzzjs-0.4.12.tgz          # hb.wasm + hbjs.js wrapper
+curl -LO "https://github.com/google/fonts/raw/main/ofl/notonastaliqurdu/NotoNastaliqUrdu%5Bwght%5D.ttf"
+```
+
+then, in Node: `hb.createFace(hb.createBlob(ttf), 0)`, `font.setVariations({ wght: 700 })`,
+`font.setScale(upem, upem)`, a buffer with `addText("کہاں کھائیں")`, `setDirection("rtl")`,
+`setScript("Arab")`, `setLanguage("ur")`, `hb.shape(font, buffer)`; for each glyph of
+`buffer.json()` (visual order, left to right) take `font.glyphToPath(g.g)`, add the pen position and
+`dx`/`dy` to every coordinate, flip y, and advance the pen by `ax`. Measure the ink box of the joined
+path (`getBBox()` in a browser), move it to 0,0, scale it to a height of 1000 and round to whole units;
+that is `URDU_NAME.d`, with the width in `viewBox`.

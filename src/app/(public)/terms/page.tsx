@@ -5,12 +5,13 @@ import { Prose } from "@/components/layout/Prose";
 import Link from "next/link";
 import { LegalDraftNotice } from "@/components/trust/LegalDraftNotice";
 import { ContactEmail, OperatorName } from "@/components/trust/Operator";
+import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Terms of use",
-  description: "The rules for using DishRank and rating dishes.",
+  description: `The rules for using ${BRAND.name} and rating dishes.`,
   alternates: { canonical: "/terms" },
   // Decided 2026-11-04: kept out of search results until a lawyer has reviewed the draft.
   robots: { index: false, follow: true },
@@ -23,7 +24,7 @@ export default function TermsPage() {
         <h1>Terms of use</h1>
         <LegalDraftNotice />
         <p>
-          DishRank is run by <OperatorName />. Questions about these terms: <ContactEmail />.
+          {BRAND.name} is run by <OperatorName />. Questions about these terms: <ContactEmail />.
         </p>
 
         <h2>Rating dishes</h2>
@@ -44,16 +45,16 @@ export default function TermsPage() {
 
         <h2>What you post</h2>
         <p>
-          Your comments and photos stay yours. By posting them you allow DishRank to show them on
-          its pages and to use them to rank dishes. Post only photos you took yourself.
+          Your comments and photos stay yours. By posting them you allow {BRAND.name} to show them
+          on its pages and to use them to rank dishes. Post only photos you took yourself.
         </p>
 
         <h2>What the rankings are</h2>
         <p>
           Scores and rankings are summaries of diners&apos; opinions. They are not statements of
           fact about any restaurant. Listings can be out of date or wrong; please tell us on the{" "}
-          <Link href="/dispute">dispute page</Link>. DishRank is provided as it is, without promises
-          that it is complete or always available.
+          <Link href="/dispute">dispute page</Link>. {BRAND.name} is provided as it is, without
+          promises that it is complete or always available.
         </p>
 
         <h2>Your data</h2>

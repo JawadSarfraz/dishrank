@@ -5,12 +5,13 @@ import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
 import Link from "next/link";
 import { DisputeForm } from "@/components/trust/DisputeForm";
+import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
   title: "Dispute a listing or ranking",
-  description: "Tell us when a restaurant listing, a dish or a ranking on DishRank is wrong.",
+  description: `Tell us when a restaurant listing, a dish or a ranking on ${BRAND.name} is wrong.`,
   alternates: { canonical: "/dispute" },
 };
 

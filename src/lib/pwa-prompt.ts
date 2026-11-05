@@ -1,4 +1,4 @@
-// When to offer "Add DishRank to your home screen" (owner, Part 3): after the diner's second
+// When to offer "Add Kahan Khayen to your home screen" (owner, Part 3): after the diner's second
 // rating, or on their second visit (a second day with the site open); dismissed for 30 days with
 // one tap; never once the app is installed. Everything lives in the browser's localStorage and
 // is wrapped in try/catch: private windows and blocked storage simply never show the prompt.

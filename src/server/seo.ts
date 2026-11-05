@@ -1,5 +1,5 @@
 // Structured data (schema.org) for the public pages. A restaurant never carries an aggregateRating:
-// DishRank rates dishes, never a restaurant as a whole (CLAUDE.md).
+// Kahan Khayen rates dishes, never a restaurant as a whole (CLAUDE.md).
 import { absoluteUrl } from "./site";
 
 export type JsonLdRestaurant = {

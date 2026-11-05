@@ -33,8 +33,8 @@ export default async function HomePage() {
           {cityName}?
         </h1>
         <p className="max-w-prose text-base text-muted-foreground sm:text-lg">
-          Restaurants ranked dish by dish, from ratings by people who ate there. No stars for the
-          whole restaurant, no imported reviews.
+          <strong className="font-semibold text-foreground">{BRAND.tagline}.</strong>{" "}
+          {BRAND.taglineEnglish} No stars for the whole restaurant, no imported reviews.
         </p>
         {overview && <DishSearch citySlug={overview.city.slug} cityName={overview.city.name} />}
         <p className="text-sm text-muted-foreground">

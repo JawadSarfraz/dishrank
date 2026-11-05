@@ -1,4 +1,4 @@
-// The web app manifest (owner, Part 3: DishRank installs as an app). Everything comes from the
+// The web app manifest (owner, Part 3: Kahan Khayen installs as an app). Everything comes from the
 // brand config; the icons are built by `pnpm icons:build` (scripts/make-icons.ts).
 import type { MetadataRoute } from "next";
 import { BRAND } from "@/lib/brand";

@@ -1,4 +1,4 @@
-// Overture Maps places → DishRank candidates (docs/07 §1). Pure: the DuckDB reader in
+// Overture Maps places → Kahan Khayen candidates (docs/07 §1). Pure: the DuckDB reader in
 // scripts/lib/overture.ts supplies the records, overture-sync.service writes the result.
 import { haversineKm, type LatLng } from "@/lib/geo";
 import { phone as phoneSchema } from "@/server/validation/common";
