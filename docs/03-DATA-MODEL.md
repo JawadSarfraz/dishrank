@@ -280,6 +280,7 @@ model User {
   flags                Flag[]
   claims               OwnerClaim[]
   reviewedClaims       OwnerClaim[]          @relation("claimReviewer")
+  uploads              Upload[]
   menuUploads          MenuUpload[]
   resolvedItems        ReviewItem[]          @relation("resolver")
   createdItems         ReviewItem[]          @relation("creator")

@@ -43,7 +43,7 @@ production `pnpm start` exits with code 1 and names every missing variable.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application). Authorized JavaScript origin `http://localhost:3000`; authorized redirect URI `http://localhost:3000/api/auth/callback/google` |
 | `ADMIN_EMAIL` | your Google account email: it gets role ADMIN on first sign-in |
 | `CRON_SECRET` | output of `openssl rand -hex 32` |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | from the preview Supabase project (local storage uses the preview project) |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | not needed yet: nothing reads them (docs/10); leave them empty |
 | `SUPABASE_S3_*` (four) | optional: dish photo uploads (Phase 3, docs/10 "Photo storage"); without them `/rate` hides the photo step |
 | `ANTHROPIC_*` | optional; used from Phases 1 and 5 |
 
@@ -61,7 +61,7 @@ pnpm format           # prettier (docs/ and seed/ are excluded)
 pnpm db:migrate       # prisma migrate dev
 pnpm db:seed          # seed cities, areas, dish taxonomy from seed/*.json (Phase 1)
 pnpm db:studio        # prisma studio
-pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5]   # stage Overture places for /admin/import
+pnpm overture:sync -- --city=islamabad|rawalpindi|all [--release=latest] [--margin-km=5] [--areas-only]   # stage Overture places for /admin/import (--areas-only only re-places NEW candidates)
 pnpm dev:demo [-- --undo]                                     # local demo data (see below)
 pnpm prod:bootstrap                                           # new production database (docs/DEPLOY-CHECKLIST.md)
 pnpm menu:parse  -- --upload=<menuUploadId>                   # Phase 5

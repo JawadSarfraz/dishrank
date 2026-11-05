@@ -196,7 +196,8 @@ dishrank/
 ├── seed/
 │   ├── cities.json  areas.json (with radiusKm)  dishes.json  dish-categories.json  variant-tags.json  meat-words.json
 ├── config/
-│   └── comment-blocklist.json       # abusive words and phrases that hold a comment for review; the owner edits it
+│   ├── comment-blocklist.json       # abusive words and phrases that hold a comment for review; the owner edits it
+│   └── supabase-root-2021.crt       # Supabase's root CA for the backup's TLS check (the same certificate as src/server/db-ssl.ts)
 ├── docs/                            # the planning kit (specs, plans, prompts)
 ├── scripts/
 │   ├── overture-sync.ts             # stage Overture places as OvertureCandidate rows (docs/07 §1)
@@ -223,7 +224,7 @@ dishrank/
 │   │   │   ├── me/page.tsx
 │   │   │   └── sign-in/page.tsx             # target of the signed-out redirect (?callbackUrl=); a signed-in visitor goes straight on to it (same-site paths only) or home
 │   │   ├── owner/  (layout.tsx and every page call requirePageRole)  page.tsx (your restaurants)  restaurants/[id]/ (dishes, menu upload, weekly report); claims are filed on the restaurant page
-│   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  menus/ (menus/[id]: photo + items)  restaurants/  users/  rankings/
+│   │   ├── admin/  (layout.tsx and every page call requirePageRole)  import/  review/  menus/ (menus/[id]: photo + items)  restaurants/  users/  rankings/  analytics/
 │   │   ├── api/
 │   │   │   ├── v1/ cities/ dishes/ rankings/ restaurants/ ratings/ restaurant-dishes/ proposals/ location-observations/ me/ reports/ disputes/ uploads/ owner/ admin/  (flags/: Phase 5)
 │   │   │   ├── cron/ parse-menus/ recompute-rankings/ mark-stale/   # mark-stale: manual only
@@ -235,8 +236,9 @@ dishrank/
 │   │   ├── ui/            # shadcn
 │   │   ├── ranking/       # RankingBrowser (filter bar + ranked list, client), ShareButton, CityDishGrid, CityPicker, DishSearch
 │   │   ├── rate/          # RateFlow (search → dish → score → done), PhotoPicker, PanelLocationButton, SuggestForms
-│   │   ├── me/            # DeleteRatingButton
-│   │   ├── restaurant/    # ReportProblem, MenuUploadButton (panel, owner, admin only)
+│   │   ├── me/            # DeleteRatingButton, DeleteAccount
+│   │   ├── owner/         # OwnerDishActions: confirm, fix name and price, remove
+│   │   ├── restaurant/    # ReportProblem, MenuUploadButton (panel, owner, admin only), ClaimRestaurant
 │   │   ├── trust/         # DisputeForm, LegalDraftNotice
 │   │   ├── layout/        # SiteHeader (every page: home, rate, my ratings, sign in/out), Footer, OvertureCredit, JsonLd
 │   │   ├── auth/          # Forbidden (shown to signed-in users without the role)
@@ -245,6 +247,7 @@ dishrank/
 │   │   ├── auth.ts                 # Better Auth instance (prismaAdapter, Google, nextCookies), requireUser(), requireRole()
 │   │   ├── db.ts                   # Prisma client singleton on the @prisma/adapter-pg driver adapter
 │   │   ├── errors.ts               # AppError
+│   │   ├── roles.ts  request-ip.ts  log.ts  db-ssl.ts   # role checks and callbackUrl rules; client IP and its hash; one JSON log line per event; Supabase TLS
 │   │   ├── rate-limit.ts           # DB-backed sliding window
 │   │   ├── cron.ts  revalidate.ts  # cron secret guard; pages revalidated after rating writes
 │   │   ├── seo.ts  site.ts         # JSON-LD builders (no aggregateRating); SITE_URL, canonical URLs
@@ -292,7 +295,7 @@ dishrank/
 | Geo | `lat/lng` columns hold our own coordinates: from Overture (`locationSource OVERTURE`) or typed by an admin (`ADMIN`); NULL = location unknown. They are public data and drive the distance features (haversine, ADR-5). No PostGIS in v1. |
 | Search | `pg_trgm` GIN indexes on `restaurants.name`, `restaurants.search_text` and `dish_alias.alias` (one row per dish spelling; matched one alias at a time, docs/05). |
 | Security headers | Every response (`next.config.ts`, `src/lib/security-headers.ts`, Phase 6): a basic Content-Security-Policy (`default-src 'self'`; scripts and styles from this site with `'unsafe-inline'`, because ISR pages cannot carry a per-request nonce; images and `fetch` also to the Supabase Storage S3 endpoint for signed uploads and admin photo links; `frame-ancestors 'none'`, `object-src 'none'`, `form-action 'self'`, `upgrade-insecure-requests` on Vercel), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation for this site only; no camera, microphone or payment) and, on Vercel (always https), HSTS. JSON bodies over 32 KB answer `413 PAYLOAD_TOO_LARGE`; server action bodies are limited to 128 KB. `tests/unit/ops/security-surface.test.ts` checks that every action and handler checks the session (anonymous ones are listed), that client components import no server code but actions and types, and the headers. No third-party script or tracker. |
-| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. Two scheduled crons: parse-menus (01:00 PKT, up to 20 PENDING menu photos) and recompute (02:00 PKT, with stale marking); one run of a job at a time (an unfinished run younger than 30 minutes refuses a second one with 409 `JOB_RUNNING`). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. |
+| Jobs | `/api/cron/*` secured by `Authorization: Bearer CRON_SECRET`, failing closed: 500 when the secret is unset, 401 on mismatch, constant-time compare. Idempotent; log run and external call counts in `job_runs`. Two scheduled crons: parse-menus (01:00 PKT, up to 20 PENDING menu photos) and recompute (02:00 PKT, with stale marking); one run of a job at a time (an unfinished run younger than 30 minutes refuses a second one with 409 `JOB_RUNNING`). `pnpm overture:sync` runs by hand (monthly, after an Overture release) and logs a `JobRun` too. The recompute also deletes expired sessions, and a run that never finished is closed as failed by the next start after 30 minutes (audit 2026-11). |
 | Env | `src/env.ts` parses `process.env` with Zod (schema in `src/env-schema.ts`). `src/instrumentation.ts` imports it in `register()`, so a production server with a missing or malformed required variable fails at startup; `scripts/vercel-build.ts` checks the same schema first, so such a deployment fails its build and never goes live; in development it logs the problems. Server code reads config only from `env`, never `process.env`. |
 | Site mode | `SITE_MODE` (`src/lib/site-mode.ts`): `beta`, the production default until it is set to exactly `live`, puts `noindex, nofollow` on every page (root layout metadata) and every response (`X-Robots-Tag` from `next.config.ts`), makes robots.txt disallow everything, empties the sitemap and shows a small "Beta" label. `live` turns all of that off. It is read at build time: changing it needs a redeploy. Development and tests default to `live`. |
 | Observability | Vercel logs + optional Sentry (free tier). Every service logs `{ action, userId, entityId, durationMs }`. An uptime monitor checks `GET /api/health` (200 only when the database answers within 3 s). |
