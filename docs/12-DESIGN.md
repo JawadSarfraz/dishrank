@@ -81,11 +81,14 @@ The `.dark` block in `globals.css` holds a dark set of the same tokens (not swit
 
 ### Type
 
-Two faces from Google Fonts, self-hosted by `next/font/google` at build time (no request to
-Google from a page), latin subset, only the weights in use (both families are variable fonts, so
-the build fetches one latin file per family, about 41 KB and 29 KB, that covers exactly those
-weights; `display: "fallback"`: a size-adjusted fallback paints at once and the real face swaps in
-only when it arrives within about three seconds, so a slow first load never reflows late):
+Two faces, both SIL Open Font License 1.1, committed in `src/fonts/` as variable WOFF2 files
+(latin subset, one file per family, about 41 KB and 29 KB, taken from the Fontsource builds of the
+Google Fonts releases; provenance and licences in `src/fonts/README.md`) and loaded with
+`next/font/local`, so they are served from this site and neither a page nor a build calls Google
+(fetching them at build time with `next/font/google` fails at random, vercel/next.js#99114). Only
+the weights in the table are used. `display: "fallback"`: a size-adjusted fallback paints at once
+and the real face swaps in only when it arrives within about three seconds, so a slow first load
+never reflows late:
 
 | Role | Face | Weights | Where |
 |---|---|---|---|

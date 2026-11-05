@@ -282,7 +282,7 @@ dishrank/
 │   │   ├── vision/                 # parseMenu.ts (prompt, docs/07 schema, structured output), menu-items.ts (answer → items, prices)
 │   │   └── validation/             # zod schemas shared by actions + API
 │   ├── lib/                        # slug.ts, geo.ts (haversine), format.ts (scores, votes, prices), image.ts, cn.ts, brand.ts (the name, one place), score-band.ts (score colours), pwa-prompt.ts (when to offer the install)
-│   ├── fonts/                      # TTF copies of the two faces for the share images (next/og); the pages use next/font
+│   ├── fonts/                      # the two faces: variable WOFF2 (latin) for the pages via next/font/local, TTF instances for the share images (next/og), OFL licences alongside
 │   ├── generated/prisma/           # Prisma 7 client output (gitignored; `prisma generate`)
 │   ├── env.ts  env-schema.ts       # Zod-validated env; production fails fast at startup (the schema, side-effect free, is also the Vercel build's check)
 │   ├── instrumentation.ts          # register() imports env.ts
