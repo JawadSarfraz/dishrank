@@ -27,7 +27,7 @@ const reasonLabel = (reason: string | null) =>
   SKIP_REASONS.find(([value]) => value === (reason ?? ""))?.[1] ?? "no reason";
 
 const UNREACHABLE = "The request did not reach the server. Check the connection and try again.";
-const selectClass = "h-7 rounded-lg border border-input bg-transparent px-1 text-xs";
+const selectClass = "field field-select h-9 w-auto min-w-0 text-sm";
 
 /** Our restaurant pages open in a new tab, so the list keeps its place and outcomes. */
 function RestaurantLink({ id, children }: { id: string; children: React.ReactNode }) {
@@ -196,7 +196,7 @@ function CandidateCard({
       )}
 
       {(c.likelyRestaurants.length > 0 || c.likelyCandidates.length > 0) && (
-        <div className="flex flex-col gap-1 rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">
+        <div className="flex flex-col gap-1 rounded-lg bg-gold-soft p-3 text-sm text-gold-text">
           <p className="font-medium">Likely duplicate of:</p>
           <ul className="flex flex-col gap-1">
             {c.likelyRestaurants.map((r) => (

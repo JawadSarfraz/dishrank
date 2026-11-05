@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
+import { AdminPagination } from "@/components/admin/AdminPagination";
 import { PanelToggle } from "@/components/admin/PanelToggle";
 import { TrustOverride } from "@/components/admin/TrustOverride";
 import { Forbidden } from "@/components/auth/Forbidden";
@@ -28,39 +29,42 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
   };
 
   return (
-    <main className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Users</h1>
-      <p className="text-sm">
-        Panel members are trusted early raters: trust 1.3, 30 ratings a day and 10 per restaurant,
-        never held by the new-account burst rule, still blocked from their own restaurants
-        (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand
-        (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table.
-      </p>
-      <form className="flex flex-wrap items-end gap-2" role="search">
-        <label className="flex flex-col gap-1 text-sm">
+    <main className="flex flex-col gap-5">
+      <AdminHeader
+        title="Users"
+        help="Panel members are trusted early raters: trust 1.3, 30 ratings a day and 10 per restaurant, never held by the new-account burst rule, still blocked from their own restaurants (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table."
+      />
+      <form className="flex flex-wrap items-end gap-3" role="search">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Email or name
-          <Input name="q" defaultValue={query.q ?? ""} maxLength={120} />
+          <Input
+            name="q"
+            defaultValue={query.q ?? ""}
+            maxLength={120}
+            className="h-10 w-64 max-w-full"
+          />
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex min-h-10 items-center gap-2 text-sm">
           <input
             type="checkbox"
             name="panel"
             value="only"
             defaultChecked={query.panel === "only"}
+            className="size-4 accent-brand"
           />
           Panel only
         </label>
-        <Button type="submit" variant="outline">
+        <Button type="submit" variant="outline" size="sm">
           Search
         </Button>
       </form>
       <p className="text-sm text-muted-foreground">
         {total} users · page {page} of {pages}
       </p>
-      <ul className="flex flex-col divide-y rounded-lg border">
+      <AdminList>
         {items.map((u) => (
-          <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 p-3 text-sm">
-            <div className="flex flex-col">
+          <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div className="flex min-w-0 flex-col gap-0.5">
               <span className="flex flex-wrap items-center gap-2 font-medium">
                 {u.name}
                 {u.isPanel && <Badge>Panel</Badge>}
@@ -79,20 +83,9 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
             </div>
           </li>
         ))}
-        {items.length === 0 && <li className="p-3 text-sm">No users match.</li>}
-      </ul>
-      <nav aria-label="Pages" className="flex gap-4 text-sm">
-        {page > 1 && (
-          <Link href={href(page - 1)} className="underline">
-            Previous
-          </Link>
-        )}
-        {page < pages && (
-          <Link href={href(page + 1)} className="underline">
-            Next
-          </Link>
-        )}
-      </nav>
+        {items.length === 0 && <li className="px-4 py-4 text-muted-foreground">No users match.</li>}
+      </AdminList>
+      <AdminPagination page={page} pages={pages} href={href} />
     </main>
   );
 }

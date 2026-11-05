@@ -1,10 +1,15 @@
+import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Forbidden } from "@/components/auth/Forbidden";
+import { DishIcon } from "@/components/brand/DishIcon";
+import { PageHeader, SectionHeader } from "@/components/layout/Page";
 import { OwnerDishActions } from "@/components/owner/OwnerDishRow";
+import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { MenuUploadButton } from "@/components/restaurant/MenuUploadButton";
 import { Badge } from "@/components/ui/badge";
-import { formatPrice, formatScore } from "@/lib/format";
+import { EmptyState } from "@/components/ui/empty-state";
+import { formatFromPrice, formatScore, formatVotes } from "@/lib/format";
 import { AppError } from "@/server/errors";
 import { requirePageRole } from "@/server/auth";
 import { getOwnerRestaurant } from "@/server/services/owner.service";
@@ -41,117 +46,146 @@ export default async function OwnerRestaurantPage({
 
   return (
     <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <Link href="/owner" className="text-sm underline">
-          ← Your restaurants
+      <div className="flex flex-col gap-3">
+        <Link
+          href="/owner"
+          className="inline-flex min-h-11 w-fit items-center gap-1 text-sm font-medium text-brand underline-offset-4 hover:underline"
+        >
+          <ArrowLeftIcon aria-hidden="true" className="size-4" /> Your restaurants
         </Link>
-        <h1 className="text-2xl font-bold">{r.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          {r.area?.name ?? "no area"}, {r.city.name}
-          {r.status === "ACTIVE" ? (
+        <PageHeader
+          title={r.name}
+          lede={
             <>
-              {" · "}
-              <Link href={`/${r.city.slug}/r/${r.slug}`} className="underline">
-                public page
-              </Link>
+              {r.area?.name ?? "no area"}, {r.city.name}
+              {r.status === "ACTIVE" ? (
+                <>
+                  {" · "}
+                  <Link
+                    href={`/${r.city.slug}/r/${r.slug}`}
+                    className="font-medium text-brand underline-offset-4 hover:underline"
+                  >
+                    public page
+                  </Link>
+                </>
+              ) : (
+                ` · ${r.status.toLowerCase()}`
+              )}
             </>
-          ) : (
-            ` · ${r.status.toLowerCase()}`
-          )}
-        </p>
-      </header>
+          }
+        />
+      </div>
 
-      <section aria-labelledby="dishes" className="flex flex-col gap-2">
-        <h2 id="dishes" className="text-lg font-semibold">
-          Dishes ({dishes.length})
-        </h2>
+      <section aria-labelledby="dishes" className="flex flex-col gap-3">
+        <SectionHeader id="dishes" title={`Dishes (${dishes.length})`} />
         <p className="text-sm text-muted-foreground">
           Confirm the dishes you serve and fix their names and prices. A rank needs enough ratings
           from different diners; you cannot rate your own restaurant.
         </p>
-        <ul className="flex flex-col divide-y rounded-lg border">
-          {dishes.map((d) => (
-            <li key={d.id} className="flex flex-col gap-2 p-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="font-medium">
-                  {d.dish.name}
-                  {d.menuName && d.menuName !== d.dish.name ? (
-                    <span className="font-normal text-muted-foreground"> · “{d.menuName}”</span>
-                  ) : null}
-                </span>
-                <Badge variant={d.status === "OWNER_VERIFIED" ? "default" : "outline"}>
-                  {STATUS_LABEL[d.status] ?? d.status.toLowerCase()}
-                </Badge>
-              </div>
-              <p className="text-sm">
-                {d.rankInCity !== null ? `#${d.rankInCity} in ${r.city.name}` : "Not ranked yet"}
-                {d.score !== null && d.rankInCity !== null
-                  ? ` · score ${formatScore(d.score)}`
-                  : ""}
-                {` · ${d.distinctRaters} vote${d.distinctRaters === 1 ? "" : "s"}`}
-                {d.price !== null ? ` · ${formatPrice(d.price)}` : " · no price"}
-              </p>
-              {d.history.length > 0 && (
-                <details className="text-sm">
-                  <summary className="min-h-11 cursor-pointer py-2.5">Rank by week</summary>
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b text-left">
-                        <th scope="col" className="py-1 pr-2 font-semibold">
-                          Week
-                        </th>
-                        <th scope="col" className="py-1 pr-2 text-right font-semibold">
-                          Rank
-                        </th>
-                        <th scope="col" className="py-1 pr-2 text-right font-semibold">
-                          Score
-                        </th>
-                        <th scope="col" className="py-1 text-right font-semibold">
-                          Votes
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {d.history.map((h) => (
-                        <tr key={h.at.toISOString()} className="border-b">
-                          <td className="py-1 pr-2">{day.format(h.at)}</td>
-                          <td className="py-1 pr-2 text-right tabular-nums">
-                            {h.rank === null ? "not ranked" : `#${h.rank}`}
-                          </td>
-                          <td className="py-1 pr-2 text-right tabular-nums">
-                            {h.score === null ? "–" : formatScore(h.score)}
-                          </td>
-                          <td className="py-1 text-right tabular-nums">{h.votes ?? "–"}</td>
+        {dishes.length === 0 ? (
+          <EmptyState
+            icon={<DishIcon name="plate" size={26} />}
+            title="No dishes listed yet"
+            text="Upload a photo of your menu below and our team adds its dishes."
+            size="compact"
+          />
+        ) : (
+          <ul className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card">
+            {dishes.map((d) => (
+              <li key={d.id} className="flex flex-col gap-3 px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                    <DishIcon slug={d.dish.slug} size={22} />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="font-display text-lg leading-tight font-bold break-anywhere">
+                      {d.dish.name}
+                      {d.menuName && d.menuName !== d.dish.name ? (
+                        <span className="font-sans text-base font-normal text-muted-foreground">
+                          {" "}
+                          · “{d.menuName}”
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <Badge variant={d.status === "OWNER_VERIFIED" ? "default" : "outline"}>
+                        {STATUS_LABEL[d.status] ?? d.status.toLowerCase()}
+                      </Badge>
+                      <span>
+                        {d.rankInCity !== null
+                          ? `#${d.rankInCity} in ${r.city.name}`
+                          : "Not ranked yet"}
+                        {d.price !== null ? ` · ${formatFromPrice(d.price)}` : " · no price"}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end">
+                    {d.score !== null && d.rankInCity !== null ? (
+                      <ScoreBadge score={d.score} votes={d.distinctRaters} layout="stack" />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {formatVotes(d.distinctRaters)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {d.history.length > 0 && (
+                  <details className="group/history rounded-lg bg-muted/60 px-3 text-sm">
+                    <summary className="min-h-11 cursor-pointer list-none py-2.5 font-medium select-none [&::-webkit-details-marker]:hidden">
+                      Rank by week
+                    </summary>
+                    <table className="mb-3 w-full border-collapse">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th scope="col" className="py-1 pr-2 font-medium">
+                            Week
+                          </th>
+                          <th scope="col" className="py-1 pr-2 text-right font-medium">
+                            Rank
+                          </th>
+                          <th scope="col" className="py-1 pr-2 text-right font-medium">
+                            Score
+                          </th>
+                          <th scope="col" className="py-1 text-right font-medium">
+                            Votes
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </details>
-              )}
-              <OwnerDishActions
-                rowId={d.id}
-                dishName={d.dish.name}
-                status={d.status}
-                menuName={d.menuName}
-                price={d.price}
-              />
-            </li>
-          ))}
-          {dishes.length === 0 && (
-            <li className="p-3 text-sm">
-              No dishes listed yet. Upload a photo of your menu and our team adds them.
-            </li>
-          )}
-        </ul>
+                      </thead>
+                      <tbody>
+                        {d.history.map((h) => (
+                          <tr key={h.at.toISOString()} className="border-b last:border-0">
+                            <td className="py-1 pr-2">{day.format(h.at)}</td>
+                            <td className="py-1 pr-2 text-right tabular-nums">
+                              {h.rank === null ? "not ranked" : `#${h.rank}`}
+                            </td>
+                            <td className="py-1 pr-2 text-right tabular-nums">
+                              {h.score === null ? "–" : formatScore(h.score)}
+                            </td>
+                            <td className="py-1 text-right tabular-nums">{h.votes ?? "–"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                )}
+                <OwnerDishActions
+                  rowId={d.id}
+                  dishName={d.dish.name}
+                  status={d.status}
+                  menuName={d.menuName}
+                  price={d.price}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {r.status === "ACTIVE" && <MenuUploadButton restaurantId={r.id} />}
 
       {removed.length > 0 && (
         <section aria-labelledby="removed" className="flex flex-col gap-2">
-          <h2 id="removed" className="text-lg font-semibold">
-            Removed
-          </h2>
+          <SectionHeader id="removed" title="Removed" />
           <p className="text-sm text-muted-foreground">
             Not shown anywhere. To bring one back, tell us on the dispute page.
           </p>

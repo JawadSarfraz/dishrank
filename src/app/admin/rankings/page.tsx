@@ -1,3 +1,4 @@
+import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import { LaunchCityButton, RecomputeButton } from "@/components/admin/RankingsControls";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ type RunSummary = {
   stale?: number;
   trust?: { changed?: number };
   snapshots?: number;
+  sessions?: number;
   error?: string;
 };
 
@@ -31,28 +33,31 @@ export default async function AdminRankingsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Rankings</h1>
+      <AdminHeader title="Rankings" />
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">Nightly recompute</h2>
-        <p className="text-sm">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">Nightly recompute</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
           Runs every night at 02:00 PKT: trust, city averages, every rated row with decay, stale
-          marking, re-rank of every list, the Sunday snapshot and rate-limit cleanup (docs/04).
+          marking, re-rank of every list, the Sunday snapshot, expired sessions and rate-limit
+          cleanup (docs/04).
         </p>
         <RecomputeButton />
         {runs.length === 0 ? (
           <p className="text-sm text-muted-foreground">No runs yet.</p>
         ) : (
-          <ul className="flex flex-col divide-y rounded-lg border text-sm">
+          <AdminList>
             {runs.map((run) => {
               const s = (run.summary ?? {}) as RunSummary;
               const seconds =
                 run.finishedAt &&
                 Math.round((run.finishedAt.getTime() - run.startedAt.getTime()) / 100) / 10;
               return (
-                <li key={run.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3">
+                <li key={run.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                   <span className="font-medium">{dateTime.format(run.startedAt)}</span>
-                  <Badge variant={run.ok ? "secondary" : "destructive"}>
+                  <Badge
+                    variant={run.ok ? "default" : run.ok === null ? "secondary" : "destructive"}
+                  >
                     {run.ok === null ? "running" : run.ok ? "ok" : "failed"}
                   </Badge>
                   {s.trigger && <span>{s.trigger}</span>}
@@ -66,25 +71,29 @@ export default async function AdminRankingsPage() {
                   {s.stale !== undefined && <span>{s.stale} stale</span>}
                   {s.trust && <span>{s.trust.changed ?? 0} trust changes</span>}
                   {s.snapshots ? <span>{s.snapshots} snapshots</span> : null}
+                  {s.sessions ? <span>{s.sessions} sessions cleaned</span> : null}
                   {s.error && <span className="w-full text-destructive">{s.error}</span>}
                 </li>
               );
             })}
-          </ul>
+          </AdminList>
         )}
       </section>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-semibold">City launch</h2>
-        <p className="text-sm">
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">City launch</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
           Until a city is launched, and for {RANKING.bootstrapDays} days after, its pages say
           &quot;Early rankings&quot; and a rank needs {RANKING.bootstrap.minRaters} raters and
           weight {RANKING.bootstrap.minWeight} instead of {RANKING.normal.minRaters} and{" "}
           {RANKING.normal.minWeight.toFixed(1)}. The launch date is set once.
         </p>
-        <ul className="flex flex-col divide-y rounded-lg border text-sm">
+        <AdminList>
           {cities.map((c) => (
-            <li key={c.slug} className="flex flex-wrap items-center justify-between gap-3 p-3">
+            <li
+              key={c.slug}
+              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            >
               <div className="flex flex-col">
                 <span className="font-medium">{c.name}</span>
                 <span className="text-muted-foreground">
@@ -100,7 +109,7 @@ export default async function AdminRankingsPage() {
               )}
             </li>
           ))}
-        </ul>
+        </AdminList>
       </section>
     </main>
   );

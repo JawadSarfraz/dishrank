@@ -7,8 +7,6 @@ import { describeActionError } from "@/components/admin/action-error";
 import { Button } from "@/components/ui/button";
 import { updateOwnerDishAction } from "@/server/actions/owner";
 
-const field = "min-h-11 rounded-lg border border-input bg-transparent px-3 text-base";
-
 export function OwnerDishActions({
   rowId,
   dishName,
@@ -48,6 +46,7 @@ export function OwnerDishActions({
         {status !== "OWNER_VERIFIED" && (
           <Button
             size="sm"
+            variant="secondary"
             disabled={pending}
             onClick={() => send({ action: "confirm" }, "Confirmed: you serve this dish.")}
           >
@@ -89,7 +88,7 @@ export function OwnerDishActions({
               name="menuName"
               defaultValue={menuName ?? dishName}
               maxLength={120}
-              className={field}
+              className="field"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
@@ -101,7 +100,7 @@ export function OwnerDishActions({
               min={1}
               max={1000000}
               defaultValue={price ?? ""}
-              className={`${field} w-32`}
+              className="field w-36"
             />
           </label>
           <Button size="sm" type="submit" disabled={pending}>
@@ -123,7 +122,7 @@ export function OwnerDishActions({
         >
           <label className="flex flex-col gap-1 text-sm">
             Why? (optional, for our team)
-            <input name="reason" maxLength={280} className={field} />
+            <input name="reason" maxLength={280} className="field" />
           </label>
           <p className="text-sm text-muted-foreground">
             The dish leaves your page and the rankings. Only our team can bring it back.

@@ -1,14 +1,16 @@
 import Link from "next/link";
+import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
+import { AdminPagination } from "@/components/admin/AdminPagination";
 import { RemoveOwnerDialog } from "@/components/admin/RestaurantForms";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
 import { requirePageRole } from "@/server/auth";
 import { listRestaurantsForAdmin } from "@/server/services/restaurant.service";
 import { adminRestaurantListQuery } from "@/server/validation";
 
-const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
 const STATUSES = ["ACTIVE", "CLOSED", "HIDDEN", "DUPLICATE"] as const;
 
 export default async function AdminRestaurantsPage({
@@ -32,29 +34,44 @@ export default async function AdminRestaurantsPage({
   };
 
   return (
-    <main className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-bold">Restaurants</h1>
-        <Link href="/admin/restaurants/new" className="text-sm underline">
-          Add restaurant
-        </Link>
-      </div>
-      <form className="flex flex-wrap items-end gap-2" role="search">
-        <label className="flex flex-col gap-1 text-sm">
+    <main className="flex flex-col gap-5">
+      <AdminHeader
+        title="Restaurants"
+        actions={
+          <ButtonLink href="/admin/restaurants/new" size="sm">
+            Add restaurant
+          </ButtonLink>
+        }
+      />
+      <form className="flex flex-wrap items-end gap-3" role="search">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Name or slug
-          <Input name="q" defaultValue={query.q ?? ""} maxLength={80} />
+          <Input
+            name="q"
+            defaultValue={query.q ?? ""}
+            maxLength={80}
+            className="h-10 w-56 max-w-full"
+          />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           City
-          <select name="city" defaultValue={query.city ?? ""} className={selectClass}>
+          <select
+            name="city"
+            defaultValue={query.city ?? ""}
+            className="field field-select h-10 w-auto text-sm"
+          >
             <option value="">All</option>
             <option value="islamabad">Islamabad</option>
             <option value="rawalpindi">Rawalpindi</option>
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label className="flex flex-col gap-1 text-sm font-medium">
           Status
-          <select name="status" defaultValue={query.status ?? ""} className={selectClass}>
+          <select
+            name="status"
+            defaultValue={query.status ?? ""}
+            className="field field-select h-10 w-auto text-sm"
+          >
             <option value="">All</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -63,7 +80,7 @@ export default async function AdminRestaurantsPage({
             ))}
           </select>
         </label>
-        <Button type="submit" variant="outline">
+        <Button type="submit" variant="outline" size="sm">
           Filter
         </Button>
       </form>
@@ -71,11 +88,14 @@ export default async function AdminRestaurantsPage({
       <p className="text-sm text-muted-foreground">
         {total} restaurants · page {page} of {pages}
       </p>
-      <ul className="flex flex-col divide-y rounded-lg border">
+      <AdminList>
         {items.map((r) => (
-          <li key={r.id} className="flex flex-col gap-1 p-3 text-sm">
+          <li key={r.id} className="flex flex-col gap-1 px-4 py-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Link href={`/admin/restaurants/${r.id}`} className="font-medium underline">
+              <Link
+                href={`/admin/restaurants/${r.id}`}
+                className="font-medium text-brand underline-offset-4 hover:underline"
+              >
                 {r.name}
               </Link>
               {r.status !== "ACTIVE" && <Badge variant="outline">{r.status}</Badge>}
@@ -98,21 +118,11 @@ export default async function AdminRestaurantsPage({
             )}
           </li>
         ))}
-        {items.length === 0 && <li className="p-3 text-sm">No restaurants match.</li>}
-      </ul>
-
-      <nav aria-label="Pages" className="flex gap-4 text-sm">
-        {page > 1 && (
-          <Link href={href(page - 1)} className="underline">
-            Previous
-          </Link>
+        {items.length === 0 && (
+          <li className="px-4 py-4 text-muted-foreground">No restaurants match.</li>
         )}
-        {page < pages && (
-          <Link href={href(page + 1)} className="underline">
-            Next
-          </Link>
-        )}
-      </nav>
+      </AdminList>
+      <AdminPagination page={page} pages={pages} href={href} />
     </main>
   );
 }

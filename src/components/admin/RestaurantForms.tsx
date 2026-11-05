@@ -21,7 +21,7 @@ import {
 import { describeActionError } from "./action-error";
 import { RestaurantPicker, type PickedRestaurant } from "./RestaurantPicker";
 
-const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
+const selectClass = "field field-select h-10 text-sm";
 
 export type EditableRestaurant = {
   id: string;
@@ -115,7 +115,7 @@ export function RestaurantEditForm({
           required
           maxLength={300}
           rows={2}
-          className="rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+          className="field h-10 text-sm"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
@@ -333,7 +333,7 @@ export function RemoveOwnerDialog({
               required
               maxLength={500}
               rows={3}
-              className="rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+              className="field h-10 text-sm"
             />
           </label>
           <Button type="submit" variant="destructive" disabled={pending} className="self-start">

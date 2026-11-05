@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { slugify } from "@/lib/slug";
 
-export const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
+export const selectClass = "field field-select h-10 text-sm";
 
 export type NewDishFields = { slug: string; name: string; categoryId: string; aliases: string[] };
 
@@ -49,7 +49,7 @@ export function CreateDishForm({
   const [slug, setSlug] = useState(slugify(defaultName));
   return (
     <form
-      className="flex flex-col gap-2 rounded-md bg-muted/40 p-3"
+      className="flex flex-col gap-2 rounded-lg bg-muted/60 p-3"
       onSubmit={(e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);

@@ -74,7 +74,7 @@ export function ReviewItemCard({
   }
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border p-3 text-sm">
+    <article className="flex flex-col gap-3 rounded-xl border bg-card p-4 text-sm shadow-card">
       <header className="flex flex-wrap items-center gap-2">
         <Badge variant="outline">{item.type.replace(/_/g, " ").toLowerCase()}</Badge>
         {item.type === "SUSPICIOUS_RATINGS" && (
@@ -107,7 +107,7 @@ export function ReviewItemCard({
       )}
 
       {item.type === "SUSPICIOUS_RATINGS" && (
-        <ul className="flex flex-col divide-y rounded-md border">
+        <ul className="flex flex-col divide-y rounded-lg border">
           {item.ratings.map((r) => (
             <li key={r.id} className="flex flex-col gap-1 p-2">
               <span>
@@ -328,7 +328,7 @@ export function ReviewItemCard({
               required
               maxLength={500}
               rows={2}
-              className="rounded-lg border border-input bg-transparent px-2 py-1 text-sm"
+              className="field h-10 text-sm"
             />
           </label>
           <Button

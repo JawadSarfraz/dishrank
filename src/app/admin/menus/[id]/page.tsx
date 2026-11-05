@@ -1,5 +1,7 @@
+import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminHeader, AdminList, AdminNote } from "@/components/admin/AdminPage";
 import { MenuParseButton } from "@/components/admin/MenuParseButton";
 import { MenuReviewRow } from "@/components/admin/MenuItemActions";
 import { Forbidden } from "@/components/auth/Forbidden";
@@ -33,6 +35,8 @@ function ItemLine({ item }: { item: Item }) {
   );
 }
 
+const link = "font-medium text-brand underline-offset-4 hover:underline";
+
 export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/menus/[id]">) {
   const { id } = await params;
   const user = await requirePageRole("ADMIN", `/admin/menus/${id}`);
@@ -45,42 +49,47 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
   const canParse = upload.status === "PENDING" || upload.status === "FAILED";
 
   return (
-    <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <Link href={`/admin/menus?status=${upload.status}`} className="text-sm underline">
-          ← Menu photos
-        </Link>
-        <h1 className="text-2xl font-bold">
-          {r.name}
-          <span className="text-base font-normal text-muted-foreground">
-            {" "}
-            · {r.area?.name ?? "no area"}, {r.city.name}
+    <main className="flex flex-col gap-5">
+      <Link
+        href={`/admin/menus?status=${upload.status}`}
+        className={`inline-flex min-h-11 w-fit items-center gap-1 text-sm ${link}`}
+      >
+        <ArrowLeftIcon aria-hidden="true" className="size-4" /> Menu photos
+      </Link>
+      <AdminHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {r.name}
+            <Badge variant="outline">{upload.status.toLowerCase()}</Badge>
           </span>
-        </h1>
-        <p className="flex flex-wrap items-center gap-2 text-sm">
-          <Badge variant="outline">{upload.status.toLowerCase()}</Badge>
-          <span className="text-muted-foreground">
-            {dateTime.format(upload.createdAt)} by {upload.uploadedBy?.email ?? "a deleted account"}
-          </span>
-          <Link href={`/admin/restaurants/${r.id}`} className="underline">
-            restaurant
-          </Link>
-          {r.status === "ACTIVE" && (
-            <Link href={`/${r.city.slug}/r/${r.slug}`} className="underline">
-              public page
+        }
+        help={
+          <>
+            {r.area?.name ?? "no area"}, {r.city.name} · {dateTime.format(upload.createdAt)} by{" "}
+            {upload.uploadedBy?.email ?? "a deleted account"} ·{" "}
+            <Link href={`/admin/restaurants/${r.id}`} className={link}>
+              restaurant
             </Link>
-          )}
+            {r.status === "ACTIVE" && (
+              <>
+                {" · "}
+                <Link href={`/${r.city.slug}/r/${r.slug}`} className={link}>
+                  public page
+                </Link>
+              </>
+            )}
+          </>
+        }
+      />
+      {upload.error && (
+        <p role="alert" className="text-sm text-destructive">
+          {upload.error}
         </p>
-        {upload.error && (
-          <p role="alert" className="text-sm text-destructive">
-            {upload.error}
-          </p>
-        )}
-      </header>
+      )}
 
       {canParse &&
         (data.parsingEnabled ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-3">
             <MenuParseButton
               uploadId={upload.id}
               label={upload.status === "FAILED" ? "Parse again" : "Parse now"}
@@ -90,13 +99,13 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
             </p>
           </div>
         ) : (
-          <p role="status" className="rounded-lg border px-3 py-2 text-sm">
+          <AdminNote>
             Reading menus is not set up (ANTHROPIC_API_KEY and ANTHROPIC_VISION_MODEL).
-          </p>
+          </AdminNote>
         ))}
 
       <div className="grid gap-6 md:grid-cols-2">
-        <section aria-label="Photo" className="md:sticky md:top-4 md:self-start">
+        <section aria-label="Photo" className="md:sticky md:top-20 md:self-start">
           {photoUrl ? (
             <a href={photoUrl} target="_blank" rel="noopener noreferrer">
               {/* A private photo through a 10-minute signed link; never public. */}
@@ -104,22 +113,22 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
               <img
                 src={photoUrl}
                 alt={`Menu photo of ${r.name}`}
-                className="w-full rounded-lg border"
+                className="w-full rounded-xl border bg-card shadow-card"
               />
             </a>
           ) : (
-            <p className="text-sm">Photo storage is not set up.</p>
+            <AdminNote>Photo storage is not set up.</AdminNote>
           )}
         </section>
 
         <div className="flex flex-col gap-6">
           <section aria-labelledby="review" className="flex flex-col gap-2">
-            <h2 id="review" className="text-lg font-semibold">
+            <h2 id="review" className="text-lg font-bold">
               Needs review ({data.needsReview.length})
             </h2>
-            <ul className="flex flex-col divide-y rounded-lg border">
+            <AdminList>
               {data.needsReview.map((item) => (
-                <li key={item.id} className="flex flex-col gap-2 p-3 text-sm">
+                <li key={item.id} className="flex flex-col gap-2 px-4 py-3">
                   <ItemLine item={item} />
                   {item.review && item.review.status === "OPEN" ? (
                     <MenuReviewRow
@@ -136,18 +145,18 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
                 </li>
               ))}
               {data.needsReview.length === 0 && (
-                <li className="p-3 text-sm">Nothing waits for a decision.</li>
+                <li className="px-4 py-3 text-muted-foreground">Nothing waits for a decision.</li>
               )}
-            </ul>
+            </AdminList>
           </section>
 
           <section aria-labelledby="matched" className="flex flex-col gap-2">
-            <h2 id="matched" className="text-lg font-semibold">
+            <h2 id="matched" className="text-lg font-bold">
               Matched ({data.matched.length})
             </h2>
-            <ul className="flex flex-col divide-y rounded-lg border">
+            <AdminList>
               {data.matched.map((item) => (
-                <li key={item.id} className="flex flex-col gap-0.5 p-3 text-sm">
+                <li key={item.id} className="flex flex-col gap-0.5 px-4 py-3">
                   <ItemLine item={item} />
                   <span className="text-muted-foreground">
                     → {item.matchedDish?.name ?? "?"} · {item.matchMethod.toLowerCase()}{" "}
@@ -156,30 +165,34 @@ export default async function AdminMenuUploadPage({ params }: PageProps<"/admin/
                   </span>
                 </li>
               ))}
-              {data.matched.length === 0 && <li className="p-3 text-sm">None yet.</li>}
-            </ul>
+              {data.matched.length === 0 && (
+                <li className="px-4 py-3 text-muted-foreground">None yet.</li>
+              )}
+            </AdminList>
           </section>
 
           <section aria-labelledby="ignored" className="flex flex-col gap-2">
-            <h2 id="ignored" className="text-lg font-semibold">
+            <h2 id="ignored" className="text-lg font-bold">
               Ignored ({data.ignored.length})
             </h2>
-            <ul className="flex flex-col divide-y rounded-lg border">
+            <AdminList>
               {data.ignored.map((item) => (
-                <li key={item.id} className="p-3 text-sm">
+                <li key={item.id} className="px-4 py-3">
                   <ItemLine item={item} />
                 </li>
               ))}
-              {data.ignored.length === 0 && <li className="p-3 text-sm">None.</li>}
-            </ul>
+              {data.ignored.length === 0 && (
+                <li className="px-4 py-3 text-muted-foreground">None.</li>
+              )}
+            </AdminList>
           </section>
 
           {upload.parses.length > 0 && (
             <section aria-labelledby="parses" className="flex flex-col gap-2">
-              <h2 id="parses" className="text-lg font-semibold">
+              <h2 id="parses" className="text-lg font-bold">
                 Parse attempts
               </h2>
-              <ul className="flex flex-col gap-1 text-sm">
+              <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
                 {upload.parses.map((p) => (
                   <li key={p.id}>
                     {dateTime.format(p.startedAt)} · {p.trigger} · {p.model} ·{" "}

@@ -1,5 +1,7 @@
+import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import {
   MergeRestaurantDialog,
   RestaurantEditForm,
@@ -9,6 +11,8 @@ import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { requirePageRole } from "@/server/auth";
 import { getRestaurantForAdmin } from "@/server/services/restaurant.service";
+
+const section = "flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-card";
 
 export default async function AdminRestaurantPage({
   params,
@@ -23,39 +27,52 @@ export default async function AdminRestaurantPage({
   const merged = r.status === "DUPLICATE";
 
   return (
-    <main className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <Link href="/admin/restaurants" className="text-sm underline">
-          ← Restaurants
-        </Link>
-        <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold">
-          {r.name}{" "}
-          <Badge variant={r.status === "ACTIVE" ? "secondary" : "outline"}>{r.status}</Badge>
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {r.area?.name ?? "no area"}, {r.city.name} · slug {r.slug}
-          {r.status === "ACTIVE" && (
-            <>
-              {" · "}
-              <Link href={`/${r.city.slug}/r/${r.slug}`} className="underline">
-                public page
-              </Link>
-            </>
-          )}
-        </p>
-        {merged && mergedInto && (
-          <p className="text-sm">
-            Merged into{" "}
-            <Link href={`/admin/restaurants/${mergedInto.id}`} className="underline">
-              {mergedInto.name}
-            </Link>
-            ; its URL redirects there.
-          </p>
-        )}
-      </header>
+    <main className="flex flex-col gap-5">
+      <Link
+        href="/admin/restaurants"
+        className="inline-flex min-h-11 w-fit items-center gap-1 text-sm font-medium text-brand underline-offset-4 hover:underline"
+      >
+        <ArrowLeftIcon aria-hidden="true" className="size-4" /> Restaurants
+      </Link>
+      <AdminHeader
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {r.name}
+            <Badge variant={r.status === "ACTIVE" ? "default" : "outline"}>{r.status}</Badge>
+          </span>
+        }
+        help={
+          <>
+            {r.area?.name ?? "no area"}, {r.city.name} · slug {r.slug}
+            {r.status === "ACTIVE" && (
+              <>
+                {" · "}
+                <Link
+                  href={`/${r.city.slug}/r/${r.slug}`}
+                  className="font-medium text-brand underline-offset-4 hover:underline"
+                >
+                  public page
+                </Link>
+              </>
+            )}
+            {merged && mergedInto && (
+              <>
+                {" · merged into "}
+                <Link
+                  href={`/admin/restaurants/${mergedInto.id}`}
+                  className="font-medium text-brand underline-offset-4 hover:underline"
+                >
+                  {mergedInto.name}
+                </Link>
+                ; its URL redirects there.
+              </>
+            )}
+          </>
+        }
+      />
 
-      <section className="flex flex-col gap-1 text-sm" aria-label="Source and location">
-        <h2 className="text-lg font-semibold">Source and location</h2>
+      <section className={`${section} text-sm`} aria-label="Source and location">
+        <h2 className="text-lg font-bold">Source and location</h2>
         <p>
           {r.source === "OVERTURE"
             ? "Created from an Overture Maps place"
@@ -71,7 +88,7 @@ export default async function AdminRestaurantPage({
                 href={`https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lng}#map=18/${r.lat}/${r.lng}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                className="font-medium text-brand underline-offset-4 hover:underline"
               >
                 Check on OpenStreetMap
               </a>
@@ -84,8 +101,8 @@ export default async function AdminRestaurantPage({
 
       {!merged && (
         <>
-          <section className="flex flex-col gap-3" aria-label="Edit">
-            <h2 className="text-lg font-semibold">Edit</h2>
+          <section className={section} aria-label="Edit">
+            <h2 className="text-lg font-bold">Edit</h2>
             <RestaurantEditForm
               restaurant={{
                 id: r.id,
@@ -102,28 +119,30 @@ export default async function AdminRestaurantPage({
               areas={areas.map((a) => ({ id: a.id, name: a.name }))}
             />
           </section>
-          <section className="flex flex-col gap-3" aria-label="Status and merge">
-            <h2 className="text-lg font-semibold">Status</h2>
+          <section className={section} aria-label="Status and merge">
+            <h2 className="text-lg font-bold">Status</h2>
             <RestaurantStatusForm id={r.id} status={r.status} />
             <MergeRestaurantDialog source={{ id: r.id, name: r.name }} cityId={r.cityId} />
           </section>
         </>
       )}
 
-      <section className="flex flex-col gap-2" aria-label="Dishes">
-        <h2 className="text-lg font-semibold">Dishes ({dishes.length})</h2>
-        <ul className="flex flex-col divide-y rounded-lg border text-sm">
+      <section className="flex flex-col gap-3" aria-label="Dishes">
+        <h2 className="text-lg font-bold">Dishes ({dishes.length})</h2>
+        <AdminList>
           {dishes.map((d) => (
-            <li key={d.id} className="flex flex-wrap justify-between gap-2 p-2">
-              <span>{d.dish.name}</span>
+            <li key={d.id} className="flex flex-wrap justify-between gap-2 px-4 py-2.5">
+              <span className="font-medium">{d.dish.name}</span>
               <span className="text-muted-foreground">
                 {d.status} · {d.source} · {d.distinctRaters} raters
                 {d.price !== null ? ` · Rs ${d.price}` : ""}
               </span>
             </li>
           ))}
-          {dishes.length === 0 && <li className="p-2">No dishes yet.</li>}
-        </ul>
+          {dishes.length === 0 && (
+            <li className="px-4 py-3 text-muted-foreground">No dishes yet.</li>
+          )}
+        </AdminList>
       </section>
     </main>
   );

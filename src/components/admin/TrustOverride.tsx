@@ -54,7 +54,7 @@ export function TrustOverride({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="trust"
-        className="h-8 w-20 rounded-lg border border-input bg-transparent px-2 text-sm"
+        className="field h-10 w-24 text-sm"
       />
       <Button
         type="submit"

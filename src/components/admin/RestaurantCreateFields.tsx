@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const selectClass = "h-8 rounded-lg border border-input bg-transparent px-2 text-sm";
+const selectClass = "field field-select h-10 text-sm";
 
 export type CreateFieldsValues = {
   name: string;
@@ -88,7 +88,7 @@ export function RestaurantCreateFields({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 rounded-md bg-muted/40 p-3">
+    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg bg-muted/60 p-3">
       <p className="text-xs font-medium">{note}</p>
       <label htmlFor={fieldId("name")} className="flex flex-col gap-1 text-sm">
         Name (as on the signboard)
@@ -134,7 +134,7 @@ export function RestaurantCreateFields({
           rows={2}
           autoComplete="off"
           defaultValue={prefill?.address?.slice(0, 300) ?? ""}
-          className="rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
+          className="field h-10 text-sm"
         />
       </label>
       <div className="flex flex-wrap gap-2">

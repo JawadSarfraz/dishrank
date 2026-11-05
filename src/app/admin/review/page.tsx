@@ -1,6 +1,8 @@
-import Link from "next/link";
+import { AdminHeader, AdminTabs } from "@/components/admin/AdminPage";
 import { ReviewItemCard } from "@/components/admin/ReviewItemCard";
 import { Forbidden } from "@/components/auth/Forbidden";
+import { ButtonLink } from "@/components/ui/button-link";
+import { EmptyState } from "@/components/ui/empty-state";
 import { requirePageRole } from "@/server/auth";
 import { getRestaurantFormOptions } from "@/server/services/import.service";
 import { getReviewQueue, REVIEW_PAGE_TYPES } from "@/server/services/review.service";
@@ -33,67 +35,70 @@ export default async function AdminReviewPage({ searchParams }: PageProps<"/admi
     const qs = params.toString();
     return qs ? `/admin/review?${qs}` : "/admin/review";
   };
+  const openCount = Object.values(queue.counts).reduce((a, b) => a + (b ?? 0), 0);
 
   return (
-    <main className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Review queue</h1>
-      <p className="text-sm">
-        Held ratings do not count until approved. Suggestions are never public until you create
-        them. Reports and disputes change nothing by themselves: act on /admin/restaurants, then
-        mark them done. Assigning a dish to a menu item marks the dish as on the restaurant&apos;s
-        menu; /admin/menus shows each photo with all its items. An owner claim is approved only
-        after you checked it by phone.
-      </p>
-      <nav aria-label="Item types" className="flex flex-wrap gap-3 text-sm">
-        <Link href={tab()} className={query.type ? "underline" : "font-semibold"}>
-          All open ({Object.values(queue.counts).reduce((a, b) => a + (b ?? 0), 0)})
-        </Link>
-        {REVIEW_PAGE_TYPES.map((type) => (
-          <Link
-            key={type}
-            href={tab(type)}
-            className={query.type === type ? "font-semibold" : "underline"}
-          >
-            {LABELS[type]} ({queue.counts[type] ?? 0})
-          </Link>
-        ))}
-      </nav>
-      <nav aria-label="Status" className="flex gap-3 text-sm">
-        {(["OPEN", "RESOLVED", "REJECTED"] as const).map((s) => (
-          <Link
-            key={s}
-            href={`/admin/review?${new URLSearchParams({ ...(query.type ? { type: query.type } : {}), status: s })}`}
-            className={query.status === s ? "font-semibold" : "underline"}
-          >
-            {s.toLowerCase()}
-          </Link>
-        ))}
-      </nav>
-      <ul className="flex flex-col gap-3">
-        {queue.items.map((item) => (
-          <li key={item.id}>
-            <ReviewItemCard
-              item={item}
-              categories={queue.categories}
-              dishes={queue.dishes}
-              formCities={options.cities}
-              launchDishes={options.launchDishes}
-            />
-          </li>
-        ))}
-        {queue.items.length === 0 && <li className="text-sm">Nothing here.</li>}
-      </ul>
+    <main className="flex flex-col gap-5">
+      <AdminHeader
+        title="Review queue"
+        help="Held ratings do not count until approved. Suggestions are never public until you create them. Reports and disputes change nothing by themselves: act on Restaurants, then mark them done. Assigning a dish to a menu item marks the dish as on the restaurant's menu. An owner claim is approved only after you checked it by phone."
+      />
+      <AdminTabs
+        label="Item types"
+        items={[
+          { href: tab(), label: `All open (${openCount})`, active: !query.type },
+          ...REVIEW_PAGE_TYPES.map((type) => ({
+            href: tab(type),
+            label: `${LABELS[type]} (${queue.counts[type] ?? 0})`,
+            active: query.type === type,
+          })),
+        ]}
+      />
+      <AdminTabs
+        label="Status"
+        items={(["OPEN", "RESOLVED", "REJECTED"] as const).map((s) => ({
+          href: `/admin/review?${new URLSearchParams({ ...(query.type ? { type: query.type } : {}), status: s })}`,
+          label: s.toLowerCase(),
+          active: query.status === s,
+        }))}
+      />
+      {queue.items.length === 0 ? (
+        <EmptyState
+          title="Nothing here"
+          text={
+            query.status === "OPEN"
+              ? "No open items of this kind. Diners' reports, suggestions and held ratings appear here."
+              : "No decided items of this kind yet."
+          }
+          size="compact"
+        />
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {queue.items.map((item) => (
+            <li key={item.id}>
+              <ReviewItemCard
+                item={item}
+                categories={queue.categories}
+                dishes={queue.dishes}
+                formCities={options.cities}
+                launchDishes={options.launchDishes}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       {queue.nextCursor && (
-        <Link
+        <ButtonLink
+          variant="outline"
+          className="w-fit"
           href={`/admin/review?${new URLSearchParams({
             ...(query.type ? { type: query.type } : {}),
             status: query.status,
             cursor: queue.nextCursor,
           })}`}
-          className="text-sm underline"
         >
           More
-        </Link>
+        </ButtonLink>
       )}
     </main>
   );

@@ -3,7 +3,7 @@ import { Forbidden } from "@/components/auth/Forbidden";
 import { requirePageRole } from "@/server/auth";
 
 export const metadata: Metadata = {
-  title: "Owner · DishRank",
+  title: "Owner",
   robots: { index: false, follow: false },
 };
 
@@ -13,6 +13,8 @@ export default async function OwnerLayout({ children }: LayoutProps<"/owner">) {
   if (!user) return <Forbidden />;
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8">{children}</div>
+    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
+      {children}
+    </div>
   );
 }

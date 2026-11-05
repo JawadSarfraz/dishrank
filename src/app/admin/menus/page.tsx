@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { AdminHeader, AdminList, AdminNote, AdminTabs } from "@/components/admin/AdminPage";
 import { Forbidden } from "@/components/auth/Forbidden";
+import { ButtonLink } from "@/components/ui/button-link";
 import { requirePageRole } from "@/server/auth";
 import { listMenuUploadsForAdmin } from "@/server/services/menu.service";
 import { menuUploadsQuery } from "@/server/validation";
@@ -26,44 +28,40 @@ export default async function AdminMenusPage({ searchParams }: PageProps<"/admin
   const data = await listMenuUploadsForAdmin(user, query);
 
   return (
-    <main className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Menu photos</h1>
+    <main className="flex flex-col gap-5">
+      <AdminHeader
+        title="Menu photos"
+        help={`Read in the last 24 hours: ${data.parsesToday} of ${data.dailyCap}. Every night up to 20 waiting photos are read; open one to read it now.`}
+      />
       {!data.parsingEnabled && (
-        <p role="status" className="rounded-lg border px-3 py-2 text-sm">
+        <AdminNote>
           Reading menus is not set up (ANTHROPIC_API_KEY and ANTHROPIC_VISION_MODEL). Uploads are
           kept and wait here until it is.
-        </p>
+        </AdminNote>
       )}
-      <p className="text-sm text-muted-foreground">
-        Read in the last 24 hours: {data.parsesToday} of {data.dailyCap}. Every night up to 20
-        waiting photos are read; open one to read it now.
-      </p>
-      <nav aria-label="Status" className="flex flex-wrap gap-3 text-sm">
-        {STATUSES.map(([status, label]) => (
-          <Link
-            key={status}
-            href={`/admin/menus?status=${status}`}
-            className={query.status === status ? "font-semibold" : "underline"}
-          >
-            {label} ({data.counts[status] ?? 0})
-          </Link>
-        ))}
-      </nav>
-      <ul className="flex flex-col divide-y rounded-lg border">
+      <AdminTabs
+        label="Status"
+        items={STATUSES.map(([status, label]) => ({
+          href: `/admin/menus?status=${status}`,
+          label: `${label} (${data.counts[status] ?? 0})`,
+          active: query.status === status,
+        }))}
+      />
+      <AdminList>
         {data.uploads.map((u) => (
           <li key={u.id}>
             <Link
               href={`/admin/menus/${u.id}`}
-              className="flex min-h-11 flex-col justify-center px-3 py-2 hover:bg-muted/50"
+              className="flex min-h-14 flex-col justify-center gap-0.5 px-4 py-2 hover:bg-muted"
             >
-              <span className="font-medium underline">
+              <span className="font-medium">
                 {u.restaurant.name}
                 <span className="font-normal text-muted-foreground">
                   {" "}
                   · {u.restaurant.area?.name ?? "no area"}
                 </span>
               </span>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-muted-foreground">
                 {dateTime.format(u.createdAt)} by {u.uploadedBy?.email ?? "a deleted account"}
                 {u._count.items > 0
                   ? ` · ${u.matched} matched, ${u.needsReview} to review, ${u.ignored} ignored`
@@ -73,15 +71,18 @@ export default async function AdminMenusPage({ searchParams }: PageProps<"/admin
             </Link>
           </li>
         ))}
-        {data.uploads.length === 0 && <li className="px-3 py-2 text-sm">Nothing here.</li>}
-      </ul>
+        {data.uploads.length === 0 && (
+          <li className="px-4 py-4 text-muted-foreground">Nothing here.</li>
+        )}
+      </AdminList>
       {data.nextCursor && (
-        <Link
+        <ButtonLink
+          variant="outline"
+          className="w-fit"
           href={`/admin/menus?status=${query.status}&cursor=${data.nextCursor}`}
-          className="text-sm underline"
         >
           More
-        </Link>
+        </ButtonLink>
       )}
     </main>
   );
