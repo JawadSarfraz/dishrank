@@ -15,6 +15,6 @@ export async function GET(request: Request) {
     revalidatePath("/", "layout");
     return Response.json({ ok, summary }, { status: ok ? 200 : 500 });
   } catch (error) {
-    return cronFailure(error);
+    return cronFailure(error, "/api/cron/recompute-rankings");
   }
 }

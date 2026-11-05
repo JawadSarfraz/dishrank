@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     );
     return jsonData(row, { status: row.created ? 201 : 200 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/restaurant-dishes");
   }
 }

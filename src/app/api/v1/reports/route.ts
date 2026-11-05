@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     const result = await reportProblem(actor, parseInput(reportInput, await readJson(request)));
     return jsonData(result, { status: 201 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/reports");
   }
 }

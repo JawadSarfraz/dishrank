@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
+import { recordServerError } from "@/server/error-log";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 
@@ -28,7 +29,7 @@ export function requireCronSecret(request: Request, secret: string | undefined):
  * is going, otherwise 500 INTERNAL. The details stay in the JobRun and the log: an unexpected
  * error's text (a database host, an SQL fragment) is never sent back (audit 2026-11, A-07).
  */
-export function cronFailure(error: unknown): Response {
+export async function cronFailure(error: unknown, route: string): Promise<Response> {
   if (error instanceof AppError) {
     return Response.json(
       { ok: false, error: { code: error.code, message: error.message } },
@@ -40,6 +41,7 @@ export function cronFailure(error: unknown): Response {
     { error: error instanceof Error ? error.message : String(error) },
     "error",
   );
+  await recordServerError({ route, error });
   return Response.json(
     { ok: false, error: { code: "INTERNAL", message: "The job failed; see its JobRun" } },
     { status: 500 },

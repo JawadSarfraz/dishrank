@@ -27,6 +27,6 @@ export async function POST(
     for (const page of result.dishPages) revalidateDishPages(page);
     return jsonData(result);
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/admin/review-queue/[id]/resolve");
   }
 }

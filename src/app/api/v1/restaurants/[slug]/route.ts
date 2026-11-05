@@ -22,6 +22,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/v1/restauran
     const { restaurant, dishes, claimed } = result;
     return jsonData({ restaurant, dishes, claimed });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/restaurants/[slug]");
   }
 }

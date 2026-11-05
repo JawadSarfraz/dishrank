@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     const input = parseInput(locationObservationInput, await readJson(request));
     return jsonData(await recordLocationObservation(actor, input), { status: 201 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/location-observations");
   }
 }

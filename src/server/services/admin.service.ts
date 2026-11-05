@@ -1,6 +1,7 @@
 import { countMenuUploadsByStatus } from "@/server/repositories/menu.repo";
 import { countOpenReviewItems } from "@/server/repositories/moderation.repo";
-import { listRecentJobRuns } from "@/server/repositories/ops.repo";
+import { ERROR_LOG } from "@/server/error-log";
+import { listRecentJobRuns, listRecentServerErrors } from "@/server/repositories/ops.repo";
 import { countNewCandidates } from "@/server/repositories/overture.repo";
 import { countRestaurantsByStatus } from "@/server/repositories/restaurant.repo";
 import { countUsersByRole } from "@/server/repositories/user.repo";
@@ -11,16 +12,25 @@ import { REVIEW_PAGE_TYPES } from "./review.service";
 /** Admin home numbers. Checks the role itself, so a page that forgets its guard still gets FORBIDDEN. */
 export async function getAdminOverview(actor: SessionUser | null) {
   assertRole(actor, "ADMIN");
-  const [usersByRole, openByType, restaurantsByStatus, newCandidates, menusByStatus, [lastRun]] =
-    await Promise.all([
-      countUsersByRole(),
-      countOpenReviewItems(REVIEW_PAGE_TYPES),
-      countRestaurantsByStatus(),
-      countNewCandidates(),
-      countMenuUploadsByStatus(),
-      listRecentJobRuns(RECOMPUTE_JOB, 1),
-    ]);
+  const [
+    usersByRole,
+    openByType,
+    restaurantsByStatus,
+    newCandidates,
+    menusByStatus,
+    [lastRun],
+    serverErrors,
+  ] = await Promise.all([
+    countUsersByRole(),
+    countOpenReviewItems(REVIEW_PAGE_TYPES),
+    countRestaurantsByStatus(),
+    countNewCandidates(),
+    countMenuUploadsByStatus(),
+    listRecentJobRuns(RECOMPUTE_JOB, 1),
+    listRecentServerErrors(ERROR_LOG.shown),
+  ]);
   return {
+    serverErrors,
     usersByRole,
     openReviewItems: Object.values(openByType).reduce((sum, n) => sum + (n ?? 0), 0),
     restaurantsByStatus,

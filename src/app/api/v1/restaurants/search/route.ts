@@ -13,6 +13,6 @@ export async function GET(request: Request) {
     const params = Object.fromEntries(new URL(request.url).searchParams);
     return jsonData(await searchRestaurants(parseInput(restaurantSearchQuery, params)));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/restaurants/search");
   }
 }

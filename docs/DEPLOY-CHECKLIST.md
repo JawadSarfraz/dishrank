@@ -1,8 +1,64 @@
-# Deploy checklist: Kahan Khayen private beta
+# Deploy checklist: Kahan Khayen
+
+Production runs on https://kahankhayen.com. **Going public? Jump to [Go live](#go-live).** The steps
+below it set up a new environment from nothing.
 
 Do the steps in order. Keep a password manager open: several secrets are shown only once.
-`<domain>` means your production domain from step 5, for example `dishrank.vercel.app`.
+`<domain>` means your production domain, `kahankhayen.com` today (on a new project, from step 5).
 Why things are set up this way: `docs/10-DEPLOYMENT.md`.
+
+## Go live
+
+What is left on 2026-11-06. No new environment variable is needed for any of it. Do it in this order.
+
+**Before the switch**
+
+1. Push `main`. The build runs the three new migrations. When it is ready,
+   `https://kahankhayen.com/api/health` shows `{"ok":true}`.
+2. Check Vercel → Settings → Environment Variables: `BETTER_AUTH_URL` and `NEXT_PUBLIC_SITE_URL` are
+   both `https://kahankhayen.com`, with no trailing slash. They decide the sign-in callback, canonical
+   links and the invite links.
+3. **Auto-list on production.** `/admin/import` → **Auto-list**. Read the dry run: the counts per city,
+   area and category, why the others stay NEW, the tidied names. The numbers differ a little from your
+   laptop if production's Overture release differs; refresh it first with `pnpm prod:bootstrap` if it
+   is more than a month old. Then **Apply** and keep the page open until it says Done (a stopped run
+   carries on when you press Apply again). Running it twice changes nothing.
+4. Spot-check: `/admin/restaurants` → Listing **Auto-listed, not checked**. **Looks right** for the
+   good ones; open the wrong ones and fix, hide or merge them. It does not have to be finished before
+   launch: a page says "our team has not checked it yet" until you have.
+5. Open a dish page on your phone: "Places to try", the area and Near me filters, and **Rate the places
+   you know**. Rate two dishes you have really eaten.
+6. Optional: `/admin/users` → **Panel invite links** → create one and send it to people you trust. Copy
+   it when it is shown: only once.
+
+**The switch**
+
+7. Vercel → Environment Variables: `SITE_MODE` = `live`, then Deployments → latest → **Redeploy**
+   (it is read at build time). Check: no **Beta** label; `https://kahankhayen.com/robots.txt` no longer
+   says `Disallow: /`; a Gmail not on `BETA_ALLOWED_EMAILS` can sign up in a private tab.
+8. Vercel → Settings → Domains → `www.kahankhayen.com`: change the redirect to `kahankhayen.com` from
+   **307** to **308** (permanent).
+9. **Launch date:** `/admin/rankings` → **Launch Islamabad** and **Launch Rawalpindi**. It is set once,
+   so press it on the day you announce. Early rankings (fewer raters needed) go on for 60 days after it.
+10. Google Auth Platform (console.cloud.google.com) → **Audience** → **Publish app**, so anyone can sign
+    in without being a test user. First check **Branding**: the app name is Kahan Khayen, home page
+    `https://kahankhayen.com`, privacy `/privacy`, terms `/terms`, and `kahankhayen.com` is an authorized
+    domain. Sign-in asks only for name and e-mail, the basic scopes; if Google still asks for a
+    verification step, follow what the console says.
+11. **Google Search Console** (search.google.com/search-console) → Add property → **Domain** →
+    `kahankhayen.com`, confirm with the DNS TXT record it gives you, then Sitemaps → submit
+    `https://kahankhayen.com/sitemap.xml`. Only pages with real ratings are in it, so it starts short.
+12. Smoke test on your phone in Chrome or Safari: the home page, a sign-in, a rating, and `/admin` shows
+    **No server errors** at the bottom.
+
+**A week later: clean up the old address**
+
+13. Vercel → Settings → Domains → `dishrank-beta.vercel.app`: change the redirect from **307** to
+    **308**.
+14. Only then, in Google Auth Platform: under **Clients** remove the JavaScript origin
+    `https://dishrank-beta.vercel.app` and the redirect URI
+    `https://dishrank-beta.vercel.app/api/auth/callback/google`, and under **Branding** remove its
+    authorized domain.
 
 ## 1. Supabase project (Mumbai)
 
@@ -74,8 +130,8 @@ pnpm prod:bootstrap
    for **Production**. Deploy. The build stops at its environment check, naming
    `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` as missing: expected, they come
    in step 8, and a failed build never goes live.
-6. Settings → **Domains** shows your production domain, for example `dishrank.vercel.app` (Vercel
-   adds a suffix if the name is taken). That is `<domain>`.
+6. Settings → **Domains** shows your production domain: your own (`kahankhayen.com`) once it is
+   added there, else a `*.vercel.app` address. That is `<domain>`.
 
 ## 6. Environment variables (Vercel → Settings → Environment Variables)
 
@@ -240,8 +296,10 @@ keeps serving).
 
 ## Later
 
-- Invite someone: add the Gmail to `BETA_ALLOWED_EMAILS`, then Redeploy.
-- Go public: `SITE_MODE=live`, then Redeploy.
+- Invite someone to the panel: a link on `/admin/users` (no redeploy). While still in beta, adding a
+  Gmail to `BETA_ALLOWED_EMAILS` and redeploying lets them in without the panel.
+- Never change `IP_HASH_SECRET` lightly: it also keys the ban list, so a new value lets banned accounts
+  sign up again (docs/10).
 - Supabase Free pauses a project after a week of low activity; if its warning e-mail arrives, open
   the dashboard. Plan Pro (Supabase's own daily backups) before a wider launch.
 - Hobby is for non-commercial use: move Vercel to Pro before charging anyone.

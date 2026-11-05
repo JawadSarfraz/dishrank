@@ -1,6 +1,7 @@
 // The nightly recompute (docs/04 recomputeAll). /api/cron/recompute-rankings (02:00 PKT),
 // `pnpm rankings:recompute` and "Recompute now" on /admin/rankings all run recomputeAll; the
 // manual /api/cron/mark-stale runs only steps 4 and 5. Every run writes one JobRun.
+import { ERROR_LOG } from "@/server/error-log";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { RATE_LIMITS } from "@/server/rate-limit";
@@ -18,6 +19,7 @@ import {
 import {
   deleteExpiredSessionsBefore,
   deleteRateLimitBucketsBefore,
+  deleteServerErrorsBefore,
   finishJobRun,
 } from "@/server/repositories/ops.repo";
 import { lockCityDish } from "@/server/repositories/ranking.repo";
@@ -50,6 +52,8 @@ export type RecomputeSummary = {
   rateLimitBuckets: number;
   /** Expired sessions deleted (their sign-in IP address and browser go with them). */
   sessions: number;
+  /** Error log rows past their 30 days. */
+  serverErrors: number;
   durationMs: number;
 };
 
@@ -189,6 +193,7 @@ export async function recomputeAll(options: { trigger: RecomputeTrigger; now?: D
     snapshots: 0,
     rateLimitBuckets: 0,
     sessions: 0,
+    serverErrors: 0,
     durationMs: 0,
   };
   try {
@@ -213,6 +218,9 @@ export async function recomputeAll(options: { trigger: RecomputeTrigger; now?: D
       new Date(now.getTime() - BUCKET_KEEP_MS),
     );
     summary.sessions = await deleteExpiredSessionsBefore(now);
+    summary.serverErrors = await deleteServerErrorsBefore(
+      new Date(now.getTime() - ERROR_LOG.keepDays * DAY_MS),
+    );
   } catch (error) {
     summary.durationMs = Date.now() - started;
     await finishJobRun(job.id, {

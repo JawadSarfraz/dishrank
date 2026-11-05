@@ -14,6 +14,6 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/v1/ratin
     revalidateDishPages(deleted);
     return jsonData({ id: deleted.id });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/ratings/[id]");
   }
 }

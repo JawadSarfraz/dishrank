@@ -1,6 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
-import { AdminHeader } from "@/components/admin/AdminPage";
+import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { requirePageRole } from "@/server/auth";
 import { getAdminOverview } from "@/server/services/admin.service";
@@ -94,6 +94,32 @@ export default async function AdminOverviewPage() {
           </li>
         ))}
       </ul>
+      <section aria-labelledby="server-errors" className="flex flex-col gap-2">
+        <h2 id="server-errors" className="text-lg font-bold">
+          Server errors
+        </h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          The last 50 unexpected errors, kept for 30 days: the route, the error and its digest, no
+          personal data. The digest finds the full story in the Vercel log, which keeps an hour.
+        </p>
+        <AdminList>
+          {o.serverErrors.map((e) => (
+            <li key={e.id} className="flex flex-col gap-0.5 px-4 py-2">
+              <span className="font-medium break-anywhere">
+                {e.route} · {e.name}
+              </span>
+              <span className="break-anywhere">{e.message}</span>
+              <span className="text-muted-foreground">
+                {dateTime.format(e.createdAt)}
+                {e.digest ? ` · digest ${e.digest}` : ""}
+              </span>
+            </li>
+          ))}
+          {o.serverErrors.length === 0 && (
+            <li className="px-4 py-4 text-muted-foreground">No server errors. Good.</li>
+          )}
+        </AdminList>
+      </section>
     </main>
   );
 }

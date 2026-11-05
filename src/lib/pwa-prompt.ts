@@ -10,7 +10,7 @@ const KEYS = {
   installed: "dishrank.pwa.installed",
 } as const;
 
-// DECISION-PENDING: the thresholds below (second rating or second visit, 30 days) are the first guess.
+// Decided 2026-11-06: the thresholds below, as built (second rating or second visit, 30 days).
 export const INSTALL_PROMPT = {
   /** Shown again this long after "Not now". */
   dismissForMs: 30 * 86_400_000,

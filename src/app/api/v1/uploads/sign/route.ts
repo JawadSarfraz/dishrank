@@ -11,6 +11,6 @@ export async function POST(request: Request) {
       await signPhotoUpload(actor, parseInput(uploadSignInput, await readJson(request))),
     );
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/uploads/sign");
   }
 }

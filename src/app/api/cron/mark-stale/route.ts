@@ -15,6 +15,6 @@ export async function GET(request: Request) {
     revalidatePath("/", "layout");
     return Response.json({ ok, summary });
   } catch (error) {
-    return cronFailure(error);
+    return cronFailure(error, "/api/cron/mark-stale");
   }
 }

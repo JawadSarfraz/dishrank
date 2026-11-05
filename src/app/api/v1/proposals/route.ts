@@ -10,6 +10,6 @@ export async function POST(request: Request) {
     const result = await propose(actor, parseInput(proposalInput, await readJson(request)));
     return jsonData(result, { status: result.duplicate ? 200 : 201 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/proposals");
   }
 }

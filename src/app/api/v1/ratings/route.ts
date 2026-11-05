@@ -21,6 +21,6 @@ export async function POST(request: Request) {
     // A held rating is still a 200: `held: true` says it waits for review (docs/06).
     return jsonData(result, { status: result.created ? 201 : 200 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/ratings");
   }
 }

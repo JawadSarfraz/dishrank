@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     );
     return new Response(null, { status: 204 });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/events");
   }
 }

@@ -1,4 +1,5 @@
 // Server actions answer `{ data }` or `{ error: { code, message, details? } }` (docs/06), never throw.
+import { recordServerError } from "@/server/error-log";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 
@@ -24,6 +25,7 @@ export async function runAction<T>(name: string, fn: () => Promise<T>): Promise<
       { name, error: error instanceof Error ? error.message : String(error) },
       "error",
     );
+    await recordServerError({ route: `action:${name}`, error });
     return { error: { code: "INTERNAL", message: "Something went wrong. Try again." } };
   }
 }

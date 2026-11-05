@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     const { items, nextCursor, counts } = await getReviewQueue(actor, query);
     return Response.json({ data: items, nextCursor, counts });
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/admin/review-queue");
   }
 }

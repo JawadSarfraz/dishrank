@@ -24,12 +24,12 @@ export async function GET(request: Request) {
   }
   try {
     const uploads = await cleanupUnusedUploads();
-    if (failure) return cronFailure(failure);
+    if (failure) return cronFailure(failure, "/api/cron/parse-menus");
     return Response.json(
       { ok: parsed!.ok, summary: parsed!.summary, uploads },
       { status: parsed!.ok ? 200 : 500 },
     );
   } catch (error) {
-    return cronFailure(failure ?? error);
+    return cronFailure(failure ?? error, "/api/cron/parse-menus");
   }
 }

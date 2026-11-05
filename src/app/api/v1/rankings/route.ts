@@ -25,6 +25,6 @@ export async function GET(request: Request) {
     if (!ranking) throw new AppError("NOT_FOUND", "City or dish not found", 404);
     return jsonData(ranking);
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/rankings");
   }
 }

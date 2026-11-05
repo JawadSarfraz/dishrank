@@ -21,6 +21,6 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/v1/admin/u
     for (const page of result.dishPages) revalidateDishPages(page);
     return jsonData(result);
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/admin/users/[id]");
   }
 }

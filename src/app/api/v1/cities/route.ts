@@ -10,6 +10,6 @@ export async function GET(request: Request) {
     // Ids are included: a restaurant proposal (POST /api/v1/proposals) needs cityId and areaId.
     return jsonData(await listCities());
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/cities");
   }
 }

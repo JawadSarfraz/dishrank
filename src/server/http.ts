@@ -1,4 +1,5 @@
 // Route handler helpers: the docs/06 response envelope `{ data }` / `{ error: { code, message, details? } }`.
+import { recordServerError } from "@/server/error-log";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 
@@ -6,7 +7,8 @@ export function jsonData(data: unknown, init?: ResponseInit): Response {
   return Response.json({ data }, init);
 }
 
-export function jsonError(error: unknown): Response {
+/** `route` is the handler's pattern, for the error log: an unexpected error lands there. */
+export async function jsonError(error: unknown, route: string): Promise<Response> {
   if (error instanceof AppError) {
     const body = {
       code: error.code,
@@ -16,6 +18,7 @@ export function jsonError(error: unknown): Response {
     return Response.json({ error: body }, { status: error.status });
   }
   logEvent("api.error", { error: error instanceof Error ? error.message : String(error) }, "error");
+  await recordServerError({ route, error });
   return Response.json(
     { error: { code: "INTERNAL", message: "Something went wrong" } },
     { status: 500 },

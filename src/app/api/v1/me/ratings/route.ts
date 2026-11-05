@@ -11,6 +11,6 @@ export async function GET(request: Request) {
     // Paginated answers are `{ data, nextCursor }` (docs/06).
     return Response.json(await listMyRatings(actor, query));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/me/ratings");
   }
 }

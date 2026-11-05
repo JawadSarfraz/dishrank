@@ -16,6 +16,6 @@ export async function GET(request: Request) {
     await assertRateLimit(`ip:${ip}:api`, RATE_LIMITS.api);
     return jsonData(await listDishes(query));
   } catch (error) {
-    return jsonError(error);
+    return jsonError(error, "/api/v1/dishes");
   }
 }

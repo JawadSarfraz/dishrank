@@ -41,6 +41,30 @@ export async function finishJobRun(
   return db.jobRun.update({ where: { id }, data });
 }
 
+export async function insertServerError(data: {
+  route: string;
+  name: string;
+  message: string;
+  digest: string | null;
+}) {
+  await db.serverError.create({ data, select: { id: true } });
+}
+
+/** The latest unexpected server errors, newest first (/admin). */
+export async function listRecentServerErrors(take: number) {
+  return db.serverError.findMany({
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take,
+    select: { id: true, route: true, name: true, message: true, digest: true, createdAt: true },
+  });
+}
+
+/** Nightly cleanup. Returns how many were deleted. */
+export async function deleteServerErrorsBefore(before: Date) {
+  const { count } = await db.serverError.deleteMany({ where: { createdAt: { lt: before } } });
+  return count;
+}
+
 /** GET /api/health: the trivial query that shows the database answers. */
 export async function pingDatabase() {
   await db.$queryRaw`SELECT 1`;
