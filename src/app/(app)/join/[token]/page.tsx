@@ -27,6 +27,7 @@ export default async function JoinPanelPage({ params }: PageProps<"/join/[token]
   if (view.kind === "closed") {
     return (
       <Main width="narrow" className="justify-center py-12">
+        <h1 className="sr-only">Join the panel</h1>
         <EmptyState
           title="This invite link can't be used"
           text={`${view.message} Ask whoever sent it for a new one. You can still rate dishes on ${BRAND.name} with an ordinary account.`}

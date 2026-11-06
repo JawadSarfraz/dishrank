@@ -1,10 +1,12 @@
+// min-h-dvh here and in its page: the cached page swaps this skeleton for the content on load, and
+// the footer must stay below the fold in both, or the swap moves it (a layout shift on long lists).
 import { Main } from "@/components/layout/Page";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** The ranking page's shape while it renders for the first time. */
 export default function Loading() {
   return (
-    <Main className="gap-5" aria-busy="true" aria-label="Loading">
+    <Main className="min-h-dvh gap-5" aria-busy="true" aria-label="Loading">
       <Skeleton className="h-5 w-40" />
       <div className="flex items-start gap-3">
         <Skeleton className="size-11 rounded-xl" />

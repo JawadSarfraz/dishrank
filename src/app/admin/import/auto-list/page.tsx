@@ -133,29 +133,35 @@ export default async function AutoListPage() {
         </section>
       ))}
 
-      <section className="flex flex-col gap-2" aria-label="Categories">
-        <h2 className="text-lg font-bold">By category</h2>
-        <Counts rows={p.categories} />
-      </section>
+      {p.categories.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Categories">
+          <h2 className="text-lg font-bold">By category</h2>
+          <Counts rows={p.categories} />
+        </section>
+      )}
 
-      <section className="flex flex-col gap-2" aria-label="Dish links">
-        <h2 className="text-lg font-bold">Dish links</h2>
-        <Counts rows={p.dishes} />
-      </section>
+      {p.dishes.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Dish links">
+          <h2 className="text-lg font-bold">Dish links</h2>
+          <Counts rows={p.dishes} />
+        </section>
+      )}
 
-      <section className="flex flex-col gap-2" aria-label="Tidied names">
-        <h2 className="text-lg font-bold">
-          Tidied names ({Math.min(p.renamed.length, p.renamedCount)} of {p.renamedCount})
-        </h2>
-        <AdminList>
-          {p.renamed.map((r) => (
-            <li key={r.from} className="flex flex-col px-4 py-2">
-              <span className="text-muted-foreground break-anywhere">{r.from}</span>
-              <span className="font-medium break-anywhere">{r.to}</span>
-            </li>
-          ))}
-        </AdminList>
-      </section>
+      {p.renamed.length > 0 && (
+        <section className="flex flex-col gap-2" aria-label="Tidied names">
+          <h2 className="text-lg font-bold">
+            Tidied names ({p.renamed.length} of {p.renamedCount})
+          </h2>
+          <AdminList>
+            {p.renamed.map((r) => (
+              <li key={r.from} className="flex flex-col px-4 py-2">
+                <span className="text-muted-foreground break-anywhere">{r.from}</span>
+                <span className="font-medium break-anywhere">{r.to}</span>
+              </li>
+            ))}
+          </AdminList>
+        </section>
+      )}
 
       {p.heldByName.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Held back by their name">

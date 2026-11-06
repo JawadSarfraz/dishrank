@@ -408,14 +408,13 @@ export async function getRanking(
 /** Places to try on one page at most; the area filter and Near me work over these in the browser. */
 export const PLACES_TO_TRY_LIMIT = 200;
 
+/** Only what the row needs: every field of every row goes into the page's HTML. */
 export type PlaceToTry = {
-  restaurantDishId: string;
   slug: string;
   name: string;
   area: { slug: string; name: string } | null;
   lat: number | null;
   lng: number | null;
-  fromMapData: boolean;
 };
 
 /**
@@ -434,14 +433,13 @@ export async function getRankingPage(options: RankingOptions, now: Date = new Da
     ...loaded.ranking,
     insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
     placesToTryTotal: untried.length,
+    placesFromMapData: untried.every((r) => r.restaurant.source === "OVERTURE"),
     placesToTry: untried.slice(0, PLACES_TO_TRY_LIMIT).map((r): PlaceToTry => ({
-      restaurantDishId: r.id,
       slug: r.restaurant.slug,
       name: r.restaurant.name,
       area: r.restaurant.area,
       lat: rounded(r.restaurant.lat),
       lng: rounded(r.restaurant.lng),
-      fromMapData: r.restaurant.source === "OVERTURE",
     })),
   };
 }

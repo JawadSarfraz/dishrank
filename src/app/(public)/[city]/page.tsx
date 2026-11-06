@@ -38,7 +38,7 @@ export default async function CityPage({ params }: PageProps<"/[city]">) {
   const { city } = overview;
 
   return (
-    <Main className="gap-8">
+    <Main className="min-h-dvh gap-8">
       <div className="flex flex-col gap-4 pt-2 sm:pt-4">
         <CityPicker cities={overview.cities} current={city.slug} />
         <PageHeader

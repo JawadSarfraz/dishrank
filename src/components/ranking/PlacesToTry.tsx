@@ -19,10 +19,13 @@ const MORE = 20;
 export function PlacesToTry({
   rows,
   total,
+  fromMapData,
   citySlug,
   dishSlug,
 }: {
   rows: PlaceToTry[];
+  /** Every place here comes from Overture, so the label may say so. */
+  fromMapData: boolean;
   /** More places than `rows` carries (the page sends at most PLACES_TO_TRY_LIMIT). */
   total: number;
   citySlug: string;
@@ -53,7 +56,6 @@ export function PlacesToTry({
 
   const shown = list.slice(0, limit);
   const left = list.length - shown.length;
-  const allFromMapData = rows.every((r) => r.fromMapData);
 
   return (
     <section aria-labelledby="places-to-try" className="flex flex-col gap-3">
@@ -62,7 +64,7 @@ export function PlacesToTry({
           Places to try
         </h2>
         <p className="text-sm text-muted-foreground">
-          {allFromMapData ? "Not ranked yet · from open map data" : "Not ranked yet"}
+          {fromMapData ? "Not ranked yet · from open map data" : "Not ranked yet"}
         </p>
       </div>
       <div role="group" aria-label="Filter places" className="flex flex-wrap items-center gap-2">
@@ -114,7 +116,7 @@ export function PlacesToTry({
       ) : (
         <ul className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card">
           {shown.map((row) => (
-            <li key={row.restaurantDishId} className="flex items-center gap-3 px-3 py-2 sm:px-4">
+            <li key={row.slug} className="flex items-center gap-3 px-3 py-2 sm:px-4">
               <div className="flex min-w-0 flex-1 flex-col">
                 <Link
                   href={`/${citySlug}/r/${row.slug}`}

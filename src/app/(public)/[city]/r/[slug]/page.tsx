@@ -79,7 +79,7 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
   const rateHere = `/rate?city=${restaurant.city.slug}&r=${restaurant.slug}`;
 
   return (
-    <Main className="gap-6">
+    <Main className="min-h-dvh gap-6">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
         <Link
           href={`/${restaurant.city.slug}`}

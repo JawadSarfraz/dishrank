@@ -97,7 +97,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const { city, slug } = await params;
   const ranking = await load(city, slug);
   if (!ranking) notFound();
-  const { eligible, insufficient, placesToTry, placesToTryTotal, thresholds, mode } = ranking;
+  const { eligible, insufficient, placesToTry, thresholds, mode } = ranking;
   const shareText =
     eligible.length > 0
       ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
@@ -105,7 +105,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const rateHref = `/rate?city=${ranking.city.slug}`;
 
   return (
-    <Main className="gap-5">
+    <Main className="min-h-dvh gap-5">
       <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
         <Link
           href={`/${ranking.city.slug}`}
@@ -188,7 +188,8 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         <PlacesToTry
           citySlug={ranking.city.slug}
           dishSlug={ranking.dish.slug}
-          total={placesToTryTotal}
+          total={ranking.placesToTryTotal}
+          fromMapData={ranking.placesFromMapData}
           rows={placesToTry}
         />
       )}
