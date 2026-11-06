@@ -111,6 +111,12 @@ export async function getQuickRatePlaces(
   return {
     city: { slug: city.slug, name: city.name },
     dish: { id: dish.id, slug: dish.slug, name: dish.name },
+    /** Every rating of this dish here: a place found by search may be off the list below. */
+    mine: mine.map((r) => ({
+      restaurantId: r.restaurantDish.restaurantId,
+      score: r.score,
+      status: r.status,
+    })),
     places: rows.map((row): QuickRatePlace => {
       const own = mineAt.get(row.restaurant.id);
       return {

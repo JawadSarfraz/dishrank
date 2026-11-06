@@ -43,7 +43,7 @@ export function CityDishGrid({ overview }: { overview: CityOverview }) {
                     : "Not enough votes yet"}
                 </span>
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-brand">
-                  Be the first to rate <ArrowRightIcon className="size-4" aria-hidden="true" />
+                  Rate one you know <ArrowRightIcon className="size-4" aria-hidden="true" />
                 </span>
               </span>
             )}

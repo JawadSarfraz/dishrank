@@ -46,12 +46,13 @@ export default function PrivacyPage() {
         <p>
           When you rate a dish we keep your score, the optional taste, portion and value scores,
           your comment and your photo, with a scrambled (hashed) form of your IP address that helps
-          us spot abuse. Your scores count toward the public rankings without your name. Comments
-          and photos are checked by our team and may be shown on public pages; your e-mail address
-          is never shown. When you upload a photo on {BRAND.name}, the app re-saves it in your
-          browser first, which removes the location and camera details stored inside the file. A
-          photo is stored under a random name that says nothing about you; a photo you upload but
-          never use is deleted after a day.
+          us spot abuse. Your scores count toward the public rankings without your name. A comment
+          with a phone number, a link or an e-mail address is held for our team to check. Comments
+          and photos are not shown on public pages today; if that changes, this page will say so
+          first. Your e-mail address is never shown. When you upload a photo on {BRAND.name}, the
+          app re-saves it in your browser first, which removes the location and camera details
+          stored inside the file. A photo is stored under a random name that says nothing about you;
+          a photo you upload but never use is deleted after a day.
         </p>
 
         <h2>Locations</h2>
@@ -61,9 +62,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           Panel members (trusted raters invited by our team; if you join through an invite link, we
-          keep which link you used) can choose to share their location while
-          they are at a restaurant. We keep that location with the restaurant, not with the rating,
-          and use it only to correct where the restaurant is on the map.
+          keep which link you used) can choose to share their location while they are at a
+          restaurant. We keep that location with the restaurant, not with the rating, and use it
+          only to correct where the restaurant is on the map.
         </p>
 
         <h2>Restaurant owners</h2>

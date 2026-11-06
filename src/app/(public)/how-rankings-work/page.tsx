@@ -83,7 +83,8 @@ export default function HowRankingsWorkPage() {
           {normal.minWeight.toFixed(1)} (see above), and the dish is confirmed:{" "}
           {RANKING.promoteRaters} different people have rated it, or we have seen it on the menu, or
           the owner has confirmed it. Everything else is listed under &quot;Not enough votes
-          yet&quot;, with how many more ratings it needs. It never gets a number.
+          yet&quot;, with how many more ratings it needs, and places nobody has rated yet are under
+          &quot;Places to try&quot;. Neither ever gets a number.
         </p>
         <p>
           <strong>Early rankings.</strong> While a city is new on {BRAND.name} (before its launch
