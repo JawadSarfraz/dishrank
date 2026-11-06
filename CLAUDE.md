@@ -60,7 +60,7 @@ pnpm icons:build                                              # app icons, favic
 ## Non-negotiable rules
 
 1. **No scraping.** Never scrape Google Maps, foodpanda, Instagram, or any site, and never import a scraped dataset (Overture's AllThePlaces records are left out). Restaurant candidates come only from Overture Maps Places (Meta and Microsoft records), staged by `pnpm overture:sync` (`scripts/overture-sync.ts`, `src/server/services/overture/*`).
-2. **Listings.** A restaurant goes public through an admin's review on `/admin/import`, or through the admin-run Auto-list (`docs/07` §2a, owner 2026-11-06): fixed rules, a dry run first, spot-checked afterwards, and its page says so until an admin has looked at it. Public copy never claims a person checked every listing. The Auto-list only creates; it never changes a restaurant that exists. We never use Google Places. Overture data (Meta, Microsoft) may prefill the form; we credit it on a data sources page.
+2. **Listings.** A restaurant goes public through an admin's review on `/admin/import`, or through the admin-run Auto-list (`docs/07` §2a, owner 2026-11-06): fixed rules, a dry run first, spot-checked afterwards, and its page says so until an admin has looked at it. Public copy never claims a person checked every listing. The Auto-list only creates: the one thing it does to a restaurant that exists is add a missing dish link to one of its own that no admin has checked or edited. We never use Google Places. Overture data (Meta, Microsoft) may prefill the form; we credit it on a data sources page.
 3. **Rankings use only our own ratings.** No imported scores from anywhere.
 4. **Thin data never ranks.** Eligibility rules in `docs/04-RANKING.md` are enforced in the query, not just in the UI.
 5. **No free-text dish creation by users.** Users pick from `dishes`. Unknown names become a `ReviewItem` for admin.
@@ -69,6 +69,7 @@ pnpm icons:build                                              # app icons, favic
 8. **Mobile-first and light.** Public pages are ISR (revalidate 3600s), usable at 360px width on 3G: minimal client JS, lazy images, no heavy chart libs on public pages.
 9. **No factual claims about hygiene, adulteration, or health anywhere in UI copy.** Ratings are opinions. Comments are moderated; the dispute page is linked in the footer.
 10. **Secrets** only via env vars; `.env.example` lists every variable with a comment. `src/env.ts` validates them with Zod; a production server fails at startup when a required one is missing or malformed. Cron endpoints refuse every request when `CRON_SECRET` is missing.
+11. **Processes.** Never stop or kill a process you didn't start. Stop only your own servers, by PID or port, never by name or pattern (`pkill -f next-server` would also hit the owner's dev server).
 
 ## Conventions
 

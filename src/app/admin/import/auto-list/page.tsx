@@ -47,8 +47,9 @@ export default async function AutoListPage() {
             A dry run: nothing has changed yet. Apply creates these as public restaurants (source
             OVERTURE), marks their candidates CREATED and links a dish only where the name or
             category clearly says so. Every other candidate stays NEW on the import page. It is safe
-            to run again: it never changes a restaurant that exists, and it finds nothing it already
-            did. Nothing here gives a score: a place ranks only from ratings on this site.
+            to run again: it finds nothing it already did, and the only thing it does to a
+            restaurant that exists is add a missing dish link to one of its own that nobody has
+            checked. Nothing here gives a score: a place ranks only from ratings on this site.
           </>
         }
       />
