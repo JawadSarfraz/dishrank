@@ -93,7 +93,12 @@ describe("Auto-list apply (test DB)", () => {
       areas: [{ name: "F-7", count: 1 }],
     });
     expect(preview.categories).toEqual([{ name: "pizza restaurant", count: 1 }]);
-    expect(preview.dishes).toEqual([{ name: "Pizza", count: 1 }]);
+    expect(preview.dishes.find((d) => d.name === "Pizza")).toEqual({
+      name: "Pizza",
+      listed: 0,
+      onNew: 1,
+      added: 0,
+    });
     expect(preview.held).toMatchObject([{ reason: "LOW_CONFIDENCE", count: 1 }]);
     expect(await db.restaurant.count()).toBe(0);
     expect(await db.jobRun.count()).toBe(0);
@@ -267,6 +272,89 @@ describe("Auto-list apply (test DB)", () => {
     expect(
       (await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).checkedAt,
     ).not.toBeNull();
+  });
+
+  it("the back-fill adds missing links only: nothing else changes, and a re-run adds none", async () => {
+    await candidate("Haleem Ghar");
+    await candidate("Butt Karahi", { ...metresNorth(3000) });
+    await candidate("Fixture Pizza", { ...metresNorth(6000), category: "pizza_restaurant" });
+    await candidate("Checked Haleem Place", { ...metresNorth(9000) });
+    await applyAutoListBatch(admin, {});
+    const byName = (name: string) => db.restaurant.findFirstOrThrow({ where: { name } });
+
+    // As if these restaurants were listed before the dish rules grew.
+    const haleem = await byName("Haleem Ghar");
+    await db.restaurantDish.deleteMany({ where: { restaurantId: haleem.id } });
+    const butt = await byName("Butt Karahi");
+    const chickenKarahi = await db.dish.findUniqueOrThrow({ where: { slug: "chicken-karahi" } });
+    const muttonKarahi = await db.dish.findUniqueOrThrow({ where: { slug: "mutton-karahi" } });
+    await db.restaurantDish.deleteMany({
+      where: { restaurantId: butt.id, dishId: muttonKarahi.id },
+    });
+    // An owner or admin removed this one: it must not come back or change.
+    await db.restaurantDish.updateMany({
+      where: { restaurantId: butt.id, dishId: chickenKarahi.id },
+      data: { status: "REMOVED", confidence: 0.9 },
+    });
+    // This one has a life of its own by now.
+    const pizza = await byName("Fixture Pizza");
+    await db.restaurantDish.updateMany({
+      where: { restaurantId: pizza.id },
+      data: { status: "USER_CONFIRMED", source: "MENU_PHOTO", price: 1450 },
+    });
+    // An admin looked at this one: it is left alone.
+    const checked = await byName("Checked Haleem Place");
+    await db.restaurantDish.deleteMany({ where: { restaurantId: checked.id } });
+    await markRestaurantChecked(admin, checked.id);
+    // Made by hand, whatever its name says.
+    const hand = await makeRestaurant("Hand Haleem Corner", { ...metresNorth(12_000) });
+
+    const rowsBefore = await db.restaurantDish.findMany({ orderBy: { id: "asc" } });
+    const restaurantsBefore = await db.restaurant.findMany({ orderBy: { id: "asc" } });
+
+    const preview = await previewAutoList(admin);
+    expect(preview.backfill).toEqual({ links: 2, restaurants: 2, leftAlone: 1 });
+    const count = (name: string) => preview.dishes.find((d) => d.name === name)!;
+    expect(count("Haleem")).toMatchObject({ added: 1, onNew: 0, listed: 0 });
+    expect(count("Mutton Karahi")).toMatchObject({ added: 1 });
+    expect(count("Chicken Karahi")).toMatchObject({ added: 0, listed: 0 });
+    expect(await db.restaurantDish.count()).toBe(rowsBefore.length); // the dry run wrote nothing
+
+    const result = await applyAutoListBatch(admin, {});
+    expect(result).toMatchObject({ created: 0, dishLinksAdded: 2, remaining: 0 });
+    expect(result.paths).toEqual(
+      expect.arrayContaining([
+        "/islamabad/best-haleem",
+        "/islamabad/best-mutton-karahi",
+        `/islamabad/r/${haleem.slug}`,
+        "/islamabad",
+        "/",
+      ]),
+    );
+
+    // Every row that existed is exactly as it was, and so is every restaurant.
+    const rowsAfter = await db.restaurantDish.findMany({ orderBy: { id: "asc" } });
+    expect(rowsAfter.filter((row) => rowsBefore.some((b) => b.id === row.id))).toEqual(rowsBefore);
+    expect(await db.restaurant.findMany({ orderBy: { id: "asc" } })).toEqual(restaurantsBefore);
+
+    const added = rowsAfter.filter((row) => !rowsBefore.some((b) => b.id === row.id));
+    expect(added.map((row) => row.restaurantId).sort()).toEqual([butt.id, haleem.id].sort());
+    for (const row of added) {
+      expect(row).toMatchObject({
+        status: "CANDIDATE",
+        source: "AUTO_LIST",
+        confidence: 0.3,
+        ratingCount: 0,
+        rankInCity: null,
+      });
+    }
+    expect(await db.restaurantDish.count({ where: { restaurantId: checked.id } })).toBe(0);
+    expect(await db.restaurantDish.count({ where: { restaurantId: hand.id } })).toBe(0);
+
+    // Safe to re-run.
+    expect((await previewAutoList(admin)).backfill.links).toBe(0);
+    expect(await applyAutoListBatch(admin, {})).toMatchObject({ created: 0, dishLinksAdded: 0 });
+    expect(await db.restaurantDish.count()).toBe(rowsAfter.length);
   });
 
   it("leaves a candidate alone that an admin skipped, and its duplicates", async () => {

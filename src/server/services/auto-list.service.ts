@@ -2,7 +2,9 @@
 // /admin/import/auto-list shows a dry run and Apply creates the clear ones from fixed rules. It only
 // ever creates restaurants from NEW candidates: it never changes a restaurant that exists, whoever
 // made it, and running it again finds nothing it has already done. It gives no rank and no score
-// (CLAUDE.md rule 3): a dish link is a CANDIDATE row that ranks only through real ratings.
+// (CLAUDE.md rule 3): a dish link is a CANDIDATE row that ranks only through real ratings. When the
+// dish rules grow, Apply also back-fills the links its own unchecked restaurants are missing: it adds
+// rows only, and a row that exists, of any status, stays as it is.
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { listCitiesWithAreas } from "@/server/repositories/geo.repo";
@@ -13,9 +15,15 @@ import {
   lockCandidate,
   updateCandidate,
 } from "@/server/repositories/overture.repo";
-import { insertCandidateDish } from "@/server/repositories/restaurant-dish.repo";
+import { countListedRowsPerDish } from "@/server/repositories/public.repo";
 import {
+  insertCandidateDish,
+  insertMissingCandidateDishes,
+} from "@/server/repositories/restaurant-dish.repo";
+import {
+  countCheckedAutoListed,
   findRestaurantByOvertureId,
+  listAutoListedForBackfill,
   listRestaurantsForAutoList,
 } from "@/server/repositories/restaurant.repo";
 import { listLaunchDishes } from "@/server/repositories/taxonomy.repo";
@@ -25,6 +33,7 @@ import type { AutoListApplyInput } from "@/server/validation";
 import {
   AUTO_LIST,
   HOLD_REASONS,
+  autoListDishes,
   planAutoList,
   type AutoListPick,
   type HoldReason,
@@ -56,6 +65,33 @@ async function loadPlan() {
   return { ...plan, candidates, cities, release: sync?.release ?? null };
 }
 
+/**
+ * The dish links the current rules give restaurants the Auto-list already created, minus every link
+ * they have, of any status. Worked out from the name it listed them under and Overture's category.
+ */
+async function planBackfill(launchDishes: readonly { id: string; slug: string }[]) {
+  const dishId = new Map(launchDishes.map((d) => [d.slug, d.id]));
+  const restaurants = await listAutoListedForBackfill();
+  return restaurants.flatMap((r) => {
+    const has = new Set(r.dishes.map((d) => d.dishId));
+    return autoListDishes(r.name, r.candidates[0]?.category ?? null).flatMap((dishSlug) => {
+      const id = dishId.get(dishSlug);
+      return id && !has.has(id)
+        ? [
+            {
+              restaurantId: r.id,
+              slug: r.slug,
+              cityId: r.cityId,
+              citySlug: r.city.slug,
+              dishId: id,
+              dishSlug,
+            },
+          ]
+        : [];
+    });
+  });
+}
+
 function countBy<T>(items: readonly T[], key: (item: T) => string) {
   const counts = new Map<string, number>();
   for (const item of items) counts.set(key(item), (counts.get(key(item)) ?? 0) + 1);
@@ -67,11 +103,15 @@ function countBy<T>(items: readonly T[], key: (item: T) => string) {
 /** The dry run on /admin/import/auto-list: nothing is written. */
 export async function previewAutoList(actor: SessionUser | null) {
   assertRole(actor, "ADMIN");
-  const [{ picks, held, candidates, cities, release }, launchDishes, runs] = await Promise.all([
-    loadPlan(),
-    listLaunchDishes(),
-    listRecentJobRuns(AUTO_LIST_JOB, 5),
-  ]);
+  const [{ picks, held, candidates, cities, release }, launchDishes, runs, listed, leftAlone] =
+    await Promise.all([
+      loadPlan(),
+      listLaunchDishes(),
+      listRecentJobRuns(AUTO_LIST_JOB, 5),
+      countListedRowsPerDish(),
+      countCheckedAutoListed(),
+    ]);
+  const backfill = await planBackfill(launchDishes);
   const areaName = new Map(cities.flatMap((c) => c.areas.map((a) => [a.id, a.name] as const)));
   const dishName = new Map(launchDishes.map((d) => [d.slug, d.name]));
   const pickIds = new Set(picks.map((p) => p.id));
@@ -104,10 +144,16 @@ export async function previewAutoList(actor: SessionUser | null) {
       };
     }),
     categories: countBy(picks, (p) => (p.category ?? "").replace(/_/g, " ")),
-    dishes: countBy(
-      picks.flatMap((p) => p.dishSlugs),
-      (slug) => dishName.get(slug) ?? slug,
-    ),
+    dishes: launchDishes.map((dish) => {
+      const onNew = picks.filter((p) => p.dishSlugs.includes(dish.slug)).length;
+      const added = backfill.filter((link) => link.dishId === dish.id).length;
+      return { name: dish.name, listed: listed.get(dish.id) ?? 0, onNew, added };
+    }),
+    backfill: {
+      links: backfill.length,
+      restaurants: new Set(backfill.map((link) => link.restaurantId)).size,
+      leftAlone,
+    },
     held: (Object.keys(HOLD_REASONS) as HoldReason[])
       .map((reason) => ({
         reason,
@@ -207,6 +253,22 @@ export async function applyAutoListBatch(
   const batch = picks.slice(0, input.limit ?? AUTO_LIST.batchSize);
 
   const paths = new Set<string>();
+  // First the links its earlier restaurants are missing: one insert, so the first request does it.
+  const backfill = await planBackfill([...dishIds].map(([slug, id]) => ({ id, slug })));
+  const dishLinksAdded = await insertMissingCandidateDishes(
+    backfill.map(({ restaurantId, dishId, cityId }) => ({
+      restaurantId,
+      dishId,
+      cityId,
+      source: "AUTO_LIST" as const,
+      confidence: AUTO_LIST.dishConfidence,
+    })),
+  );
+  for (const link of backfill) {
+    paths.add(`/${link.citySlug}/best-${link.dishSlug}`);
+    paths.add(`/${link.citySlug}/r/${link.slug}`);
+    paths.add(`/${link.citySlug}`).add("/");
+  }
   const createdIds: string[] = [];
   let dishLinks = 0;
   let skipped = 0;
@@ -245,6 +307,7 @@ export async function applyAutoListBatch(
     floor: AUTO_LIST.minConfidence,
     created: createdIds.length,
     dishLinks,
+    dishLinksAdded,
     skipped,
     failed,
     remaining,
@@ -252,5 +315,13 @@ export async function applyAutoListBatch(
   };
   await finishJobRun(run.id, { ok: failed === 0, summary, finishedAt: new Date() });
   logEvent("autolist.apply", { ...summary, restaurantIds: createdIds });
-  return { created: createdIds.length, dishLinks, skipped, failed, remaining, paths: [...paths] };
+  return {
+    created: createdIds.length,
+    dishLinks,
+    dishLinksAdded,
+    skipped,
+    failed,
+    remaining,
+    paths: [...paths],
+  };
 }

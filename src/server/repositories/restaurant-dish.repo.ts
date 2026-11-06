@@ -31,6 +31,28 @@ export async function insertCandidateDish(
 }
 
 /**
+ * New CANDIDATE rows from the Auto-list's back-fill (docs/07 §2a). Insert only: a (restaurant, dish)
+ * row that exists, of any status, stays exactly as it is. Returns how many were added.
+ */
+export async function insertMissingCandidateDishes(
+  rows: readonly {
+    restaurantId: string;
+    dishId: string;
+    cityId: string;
+    source: SourceType;
+    confidence: number;
+  }[],
+  client: Client = db,
+) {
+  if (rows.length === 0) return 0;
+  const { count } = await client.restaurantDish.createMany({
+    data: rows.map((row) => ({ ...row, status: "CANDIDATE" as const })),
+    skipDuplicates: true,
+  });
+  return count;
+}
+
+/**
  * The (restaurant, dish) row, created as CANDIDATE with the given source when absent. Safe under
  * concurrent calls (INSERT … ON CONFLICT DO NOTHING); `created` tells whether this call added it.
  */

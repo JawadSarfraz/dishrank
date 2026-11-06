@@ -139,9 +139,12 @@ Owner, 2026-11-06: public launch within days and no panel phase; reviewing every
 | karahi, karhai, kadai… | Chicken Karahi and Mutton Karahi; one after "chicken" or "mutton"; none after "beef", "fish" or "namkeen" |
 | nihari, nehari, nahari | Beef Nihari, not after "chicken" |
 | tikka | Chicken Tikka, not after "beef", "mutton", "fish", "paneer" |
+| any alias in `seed/dishes.json`, through the import pre-ticks' matcher and safeguards ("Sabzi Mandi", "Mandi Road" and "Mutton Mandi" are not Chicken Mandi; "nashta" says nothing) | Haleem, Chicken Mandi, Kabuli Pulao, Chapli Kabab, Chicken Malai Boti, Namkeen Gosht, Halwa Puri |
 | kabab, kebab | Beef Seekh Kabab; Chapli Kabab after "chapli"; none after "chicken", "reshmi", "doner", "shami", "bun", "pulao", "adana", or with "mutton", "chicken" or "fish" anywhere in the name |
 
 **Running it.** /admin/import → **Auto-list** shows the dry run: counts per city, area, category and dish, why the others stay `NEW`, the confidence bands, sample name clean-ups. Apply creates restaurants strongest first, one transaction each, 100 per request (the page calls until none are left, under `user:{id}:admin-write`), and each request writes a `JobRun` named `auto-list`. Restaurants get `source OVERTURE`, `status ACTIVE`, `overtureId`, Overture's address, phone, website and coordinates, `locationSource OVERTURE` and `autoListedAt`; candidates become `CREATED` with `autoListedAt`, `reviewedByUserId` (who pressed Apply) and `reviewedAt`.
+
+**Back-fill.** When the dish rules grow, Apply first adds the links the current rules give restaurants it created earlier, and the dry run counts them per dish. It adds rows only: a row that exists, of any status, stays as it is, so a dish an owner or admin removed does not come back. Only auto-listed restaurants that are still `ACTIVE` and that no admin has checked or edited (DECISION-PENDING: "Looks right" counts as checked, because the two cannot be told apart).
 
 **Safe to re-run.** It reads only `NEW` candidates, inserts only; the plan is worked out again on every call, so a stopped run carries on and a finished one finds nothing. A candidate an admin decided on meanwhile is skipped under its row lock.
 

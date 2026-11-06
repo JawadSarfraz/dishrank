@@ -63,6 +63,36 @@ export async function listRestaurantsForAutoList(client: Client = db) {
   return rows.map(({ area, ...r }) => ({ ...r, areaName: area?.name ?? null }));
 }
 
+/**
+ * What the Auto-list's back-fill may add dish links to: its own restaurants, still ACTIVE, that no
+ * admin has checked or edited. Every dish row counts, of any status: a removed one is not added back.
+ */
+export async function listAutoListedForBackfill(client: Client = db) {
+  return client.restaurant.findMany({
+    where: { autoListedAt: { not: null }, checkedAt: null, status: "ACTIVE" },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      cityId: true,
+      city: { select: { slug: true } },
+      candidates: {
+        where: { autoListedAt: { not: null } },
+        take: 1,
+        select: { category: true },
+      },
+      dishes: { select: { dishId: true } },
+    },
+  });
+}
+
+/** Auto-listed restaurants an admin has checked or edited: the back-fill leaves them alone. */
+export async function countCheckedAutoListed(client: Client = db) {
+  return client.restaurant.count({
+    where: { autoListedAt: { not: null }, checkedAt: { not: null }, status: "ACTIVE" },
+  });
+}
+
 /** Slugs equal to `base` or starting with it, to pick a free `base-N`. */
 export async function listSlugsStartingWith(base: string, client: Client = db) {
   const rows = await client.restaurant.findMany({

@@ -170,6 +170,14 @@ describe("autoListDishes: only what the name or category clearly says", () => {
     ["Chapli Kabab House", "restaurant", ["chapli-kabab"]],
     ["Burger Point", "restaurant", ["beef-burger", "zinger-burger"]],
     ["Fixture", "burger_restaurant", ["beef-burger", "zinger-burger"]],
+    // Any alias of the seven dishes the word list missed.
+    ["Haleem Ghar", "restaurant", ["haleem"]],
+    ["Bait Al Arab Mandi", "restaurant", ["chicken-mandi"]],
+    ["Baba Balochi Sajji and Kabuli Pulao", "restaurant", ["kabuli-pulao"]],
+    ["Siddique Halwa Puri Shop", "restaurant", ["halwa-puri"]],
+    ["Namkeen Rosh House", "restaurant", ["namkeen-gosht"]],
+    ["Malai Boti Corner", "restaurant", ["chicken-malai-boti"]],
+    ["Shahjahan Chapli Kebab", "restaurant", ["chapli-kabab"]],
     // The name decides over its category.
     ["Beef Burger Spot", "burger_restaurant", ["beef-burger"]],
     ["Zinger Point", "burger_restaurant", ["zinger-burger"]],
@@ -188,8 +196,12 @@ describe("autoListDishes: only what the name or category clearly says", () => {
     ["Doner Kebab", "restaurant"],
     ["Mutton Tikka House", "restaurant"],
     ["Chipizza", "restaurant"], // whole words only
-    ["Haleem Ghar", "restaurant"], // not on the owner's list
-    ["Bait Al Arab Mandi", "restaurant"],
+    // The import pre-ticks' safeguards: a market, a road, another dish, a word for a meal.
+    ["Shinwari Namak Mandi", "restaurant"],
+    ["Sabzi Mandi Cafe", "restaurant"],
+    ["Mandi Road Grill", "restaurant"],
+    ["Mutton Mandi House", "restaurant"],
+    ["Shahi Lahori Nashta Center", "restaurant"],
     ["Savour Foods", "pakistani_restaurant"],
   ])("%s (%s) links nothing", (name, category) => {
     expect(autoListDishes(name, category)).toEqual([]);

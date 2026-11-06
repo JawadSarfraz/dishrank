@@ -9,10 +9,27 @@ export type DishAliasRow = { alias: string; dishSlug: string };
 /** "nashta" (breakfast) does not say the place serves halwa puri. */
 const SKIPPED_ALIASES = new Set(["nashta"]);
 
-/** "Sabzi Mandi", "Mandi Road": a market or a road, not the Arabic dish. */
+/**
+ * "Sabzi Mandi", "Mandi Road": a market or a road, not the Arabic dish. "Mutton Mandi" is the dish,
+ * but another one than Chicken Mandi.
+ */
 const NOT_A_DISH: Record<string, { before: readonly string[]; after: readonly string[] }> = {
   mandi: {
-    before: ["sabzi", "sabz", "bakar", "bakra", "namak", "ganj", "gawal", "cow", "fruit", "ghalla"],
+    before: [
+      "sabzi",
+      "sabz",
+      "bakar",
+      "bakra",
+      "namak",
+      "ganj",
+      "gawal",
+      "cow",
+      "fruit",
+      "ghalla",
+      "mutton",
+      "lamb",
+      "goat",
+    ],
     after: ["road", "rd", "more", "morr", "mor", "station", "bazar", "bazaar"],
   },
 };

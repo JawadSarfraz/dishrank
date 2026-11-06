@@ -60,7 +60,15 @@ export default async function AutoListPage() {
           {p.release ? ` (release ${p.release})` : ""}. {p.dishLinks} dish links on {p.withDishLink}{" "}
           of them. {p.renamedCount} names tidied.
         </p>
-        <AutoListApply toCreate={p.toCreate} />
+        <p className="text-sm">
+          {p.backfill.links} dish links to add to {p.backfill.restaurants} restaurants already
+          auto-listed: only added, never changed or removed
+          {p.backfill.leftAlone > 0
+            ? `; ${p.backfill.leftAlone} an admin has checked or edited are left alone`
+            : ""}
+          .
+        </p>
+        <AutoListApply toCreate={p.toCreate} toLink={p.backfill.links} />
       </section>
 
       {p.runs.length > 0 && (
@@ -140,12 +148,39 @@ export default async function AutoListPage() {
         </section>
       )}
 
-      {p.dishes.length > 0 && (
-        <section className="flex flex-col gap-2" aria-label="Dish links">
-          <h2 className="text-lg font-bold">Dish links</h2>
-          <Counts rows={p.dishes} />
-        </section>
-      )}
+      <section className="flex flex-col gap-2" aria-label="Dish links">
+        <h2 className="text-lg font-bold">Dish links per launch dish</h2>
+        <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <th scope="col" className="px-4 py-2 font-medium">
+                  Dish
+                </th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">
+                  Listed now
+                </th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">
+                  On new restaurants
+                </th>
+                <th scope="col" className="px-4 py-2 text-right font-medium">
+                  Added to listed ones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {p.dishes.map((d) => (
+                <tr key={d.name}>
+                  <td className="px-4 py-2">{d.name}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{d.listed}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{d.onNew}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{d.added}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {p.renamed.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Tidied names">

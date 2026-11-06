@@ -116,6 +116,16 @@ export async function listCityDishSummaries(cityId: string, client: Client = db)
   return { counts, tops, untried };
 }
 
+/** Dish rows listed on the public pages, per dish in every city (the Auto-list's dry run). */
+export async function countListedRowsPerDish(client: Client = db) {
+  const rows = await client.restaurantDish.groupBy({
+    by: ["dishId"],
+    where: { status: { in: LISTED_STATUSES }, restaurant: { status: "ACTIVE" } },
+    _count: { _all: true },
+  });
+  return new Map(rows.map((r) => [r.dishId, r._count._all]));
+}
+
 /**
  * For the sitemap: (city, dish) lists that rank at least one restaurant, and ACTIVE restaurants with
  * a counted rating on a listed dish (the pages that are not noindex), each with its latest rating.

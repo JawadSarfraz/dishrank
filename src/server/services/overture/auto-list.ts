@@ -3,7 +3,9 @@
 // rows and writes the result. A name is only ever shortened or re-cased, never made up, and a place
 // these rules cannot judge stays NEW for /admin/import.
 import type { LatLng } from "@/lib/geo";
+import seedDishes from "../../../../seed/dishes.json";
 import { cleanText, indexOfPhrase, tokenize } from "../matching/normalize";
+import { suggestDishes } from "./dish-hints";
 import {
   NearbyIndex,
   metresBetween,
@@ -406,6 +408,24 @@ const DISH_RULES: readonly DishRule[] = [
 ];
 
 /**
+ * Launch dishes the rules above do not cover: any alias in seed/dishes.json as whole words, through
+ * the import pre-ticks' own matcher and safeguards ("Sabzi Mandi" is a market, "nashta" says nothing
+ * about halwa puri). No category names these dishes.
+ */
+const ALIAS_HINT_DISHES: ReadonlySet<string> = new Set([
+  "chapli-kabab",
+  "chicken-malai-boti",
+  "chicken-mandi",
+  "haleem",
+  "halwa-puri",
+  "kabuli-pulao",
+  "namkeen-gosht",
+]);
+const ALIAS_HINTS = seedDishes
+  .filter((dish) => ALIAS_HINT_DISHES.has(dish.slug))
+  .flatMap((dish) => [dish.name, ...dish.aliases].map((alias) => ({ alias, dishSlug: dish.slug })));
+
+/**
  * Overture categories that clearly say a launch dish, unless the name speaks to it itself: then the
  * name decides ("Beef Burger Spot" is not a Zinger Burger, "Bubble Tea House" serves no chai).
  */
@@ -437,6 +457,7 @@ export function autoListDishes(name: string, category: string | null): string[] 
       for (const slug of rule.after?.[before] ?? rule.dishes) found.add(slug);
     }
   });
+  for (const slug of suggestDishes(name, [], ALIAS_HINTS)) found.add(slug);
   return [...found].sort();
 }
 
