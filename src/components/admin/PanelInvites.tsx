@@ -38,6 +38,7 @@ function CreateInvite({ defaults }: { defaults: { maxUses: number; days: number 
           label: form.get("label"),
           maxUses: Number(form.get("maxUses")),
           expiresInDays: Number(form.get("expiresInDays")),
+          next: String(form.get("next") ?? "").trim() || undefined,
         });
         if (res.error) setError(describeActionError(res.error));
         else setLink(res.data.url);
@@ -92,6 +93,15 @@ function CreateInvite({ defaults }: { defaults: { maxUses: number; days: number 
             max={90}
             defaultValue={defaults.days}
             className="h-10 w-24"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Open after joining (optional)
+          <Input
+            name="next"
+            maxLength={300}
+            placeholder="/islamabad/best-zinger-burger?rate=1"
+            className="h-10 w-80 max-w-full"
           />
         </label>
         <Button type="submit" size="sm" disabled={pending}>

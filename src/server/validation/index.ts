@@ -2,6 +2,7 @@
 // Rules that need the database or the session (ownership, roles, rate limits) are enforced in
 // services, not here.
 import { z } from "zod";
+import { safeNextPath } from "@/server/roles";
 import { TRUST } from "@/server/services/ranking.constants";
 import {
   CandidateSkipReason,
@@ -341,6 +342,15 @@ export const panelInviteCreateInput = z.strictObject({
   label: text(80),
   maxUses: z.int().min(1).max(500).optional(),
   expiresInDays: z.int().min(1).max(90).optional(),
+  /** Opened after joining, e.g. a dish's quick rate: /islamabad/best-zinger-burger?rate=1. */
+  next: z
+    .string()
+    .trim()
+    .refine(
+      (value) => safeNextPath(value) !== null,
+      "Use a path on this site, such as /islamabad/best-pizza?rate=1",
+    )
+    .optional(),
 });
 export type PanelInviteCreateInput = z.infer<typeof panelInviteCreateInput>;
 

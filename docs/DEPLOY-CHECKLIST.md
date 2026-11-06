@@ -32,7 +32,9 @@ What is left on 2026-11-06. No new environment variable is needed for any of it.
    with a real Google sign-in before sending it to anyone:** open it in a private tab, **Continue with
    Google** with a second account, and you should read "You're on the panel"; `/admin/users` then lists
    that account under the link. This round trip through Google could not be run in the tests, which
-   stop at Google's door. Turn the panel off for the test account afterwards.
+   stop at Google's door. Turn the panel off for the test account afterwards. For a WhatsApp link that
+   also opens a dish's quick rate, fill in **Open after joining**, for example
+   `/islamabad/best-zinger-burger?rate=1`.
 
 **The switch**
 

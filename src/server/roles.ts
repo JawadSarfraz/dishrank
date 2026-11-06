@@ -62,6 +62,19 @@ export function safeCallbackPath(value: unknown): string {
   }
 }
 
+/** Pages an invite link's `next` must not open: they would loop, or are no page at all. */
+const NOT_A_NEXT = /^\/(?:join|sign-in|api)(?:[/?#]|$)/;
+
+/**
+ * Where a panel invite link goes after joining (docs/07 §7a): a path on this site, or null. The same
+ * rules as a sign-in's callback, so a link can never send a friend to another site.
+ */
+export function safeNextPath(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 300) return null;
+  const path = signedInRedirectPath(value);
+  return path === "/" || NOT_A_NEXT.test(path) ? null : path;
+}
+
 /**
  * Where /sign-in sends a visitor who is signed in already: the callbackUrl when it is a path on
  * this site (safeCallbackPath), home otherwise, and never /sign-in itself (one hop, no loop). The

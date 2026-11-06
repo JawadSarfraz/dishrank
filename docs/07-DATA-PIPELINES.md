@@ -98,7 +98,7 @@ Goal: about 40 places reviewed in 15 minutes.
 
 Owner, 2026-11-06: public launch within days and no panel phase; reviewing every place by hand is too slow for one person. An admin runs this; nothing runs it on a schedule. Pure rules in `src/server/services/overture/auto-list.ts`, the writes in `auto-list.service.ts`.
 
-**It never** imports a rating, score or review, gives a rank, or changes a restaurant that exists. Rule 3 stands: a place ranks only from ratings on Kahan Khayen.
+**It never** imports a rating, score or review, gives a rank, or changes a restaurant that exists; its own unchecked restaurants can only gain dish links (back-fill, below). Rule 3 stands: a place ranks only from ratings on Kahan Khayen.
 
 **Who is listed.** A `NEW` candidate is created when all of these hold; otherwise it stays `NEW` on /admin/import, and the preview counts it under its reason:
 
@@ -258,6 +258,8 @@ Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.3 unl
 2. Better Auth's `user.create.before` hook lets a new, verified account past `BETA_ALLOWED_EMAILS` when that cookie holds a usable link and the sign-in names that path, so a cookie left by an abandoned sign-in gives nothing to the next person on that browser. A banned e-mail stays refused, link or not.
 3. Its `session.create.after` hook redeems the link under the same test and clears the cookie; a problem there never blocks the sign-in. `/join/welcome` then reads "You're on the panel", or says the link could not be used.
 4. Someone already signed in joins with one tap (`joinPanelAction`, `user:{id}:panel-join`).
+
+A link may carry a `next` path, set in the create form or as `?next=` on the link: `/join/<token>?next=%2Fislamabad%2Fbest-zinger-burger%3Frate%3D1` signs a friend in and opens that dish's quick rate. It must be a path on this site (`safeNextPath`, the sign-in callback's rules; not `/join`, `/sign-in` or `/api`), and anything else is ignored. It travels through Google in the fixed return path, `/join/welcome?next=…`, and holds no secret.
 
 Redeeming runs under the link's row lock, then the user's, so the limit holds however many sign in at once. Someone already on the panel, or already counted on this link, uses up no place. Turning a member off on /admin/users is remembered (`User.panelRemovedAt`): no link puts them back, and turning them on again clears it. In beta, step 2 checks the link without taking a place, so when several people return from Google at the same moment for a link's last place, those who miss it keep an ordinary account without the panel (accepted: each held the link, and live mode has no allowlist). Revoking or expiring a link stops new joins; people who joined stay on the panel until an admin turns them off. /admin/users lists each link with its state and who joined; deleting an account removes that person from the list (the used count stays).
 

@@ -12,10 +12,13 @@ import { TRUST } from "@/server/services/ranking.constants";
 export function JoinView({
   view,
   token,
+  next,
   googleEnabled,
 }: {
   view: Exclude<Awaited<ReturnType<typeof getJoinPageState>>, { kind: "member" }>;
   token: string | null;
+  /** Already checked (safeNextPath): where to go on, whether or not the link could be used. */
+  next: string | null;
   googleEnabled: boolean;
 }) {
   if (view.kind === "closed" || !token) {
@@ -25,7 +28,7 @@ export function JoinView({
         <EmptyState
           title="This invite link can't be used"
           text={view.kind === "closed" ? view.message : undefined}
-          action={{ href: "/", label: `Go to ${BRAND.name}` }}
+          action={{ href: next ?? "/", label: next ? "Go on" : `Go to ${BRAND.name}` }}
         />
       </Main>
     );
@@ -48,7 +51,7 @@ export function JoinView({
         <li>You can&apos;t rate a restaurant you own or work for.</li>
       </ul>
       {googleEnabled || view.signedInAs ? (
-        <JoinPanel token={token} signedInAs={view.signedInAs} />
+        <JoinPanel token={token} signedInAs={view.signedInAs} next={next} />
       ) : (
         <p role="alert">Google sign-in is not configured yet.</p>
       )}

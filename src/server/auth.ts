@@ -19,7 +19,7 @@ import {
 import { SITE_MODE, newAccountDecision } from "./site";
 import { panelInviteToken } from "./validation";
 import { BRAND } from "@/lib/brand";
-import { JOIN_WELCOME_PATH } from "@/lib/panel-invite";
+import { isJoinWelcomeUrl } from "@/lib/panel-invite";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -33,7 +33,7 @@ async function panelInviteOf(ctx: { getCookie(key: string): string | null } | nu
   const parsed = panelInviteToken.safeParse(ctx?.getCookie(PANEL_INVITE.cookie));
   if (!parsed.success) return null;
   const state = await getOAuthState().catch(() => null);
-  return state?.callbackURL === JOIN_WELCOME_PATH ? parsed.data : null;
+  return isJoinWelcomeUrl(state?.callbackURL) ? parsed.data : null;
 }
 
 /** Google sign-in is offered only when both credentials are set (src/env.ts requires them in production). */

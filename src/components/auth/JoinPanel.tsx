@@ -5,12 +5,21 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
-import { JOIN_WELCOME_PATH } from "@/lib/panel-invite";
+import { joinWelcomeUrl } from "@/lib/panel-invite";
 import { joinPanelAction, startPanelInviteAction } from "@/server/actions/panel-invite";
 
 const UNREACHABLE = "The request did not reach the server. Check the connection and try again.";
 
-export function JoinPanel({ token, signedInAs }: { token: string; signedInAs: string | null }) {
+export function JoinPanel({
+  token,
+  signedInAs,
+  next,
+}: {
+  token: string;
+  signedInAs: string | null;
+  /** Already checked by the page (safeNextPath): opened after joining. */
+  next: string | null;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,10 +34,11 @@ export function JoinPanel({ token, signedInAs }: { token: string; signedInAs: st
         return;
       }
       // The invite goes in the cookie alone: this path is what Better Auth stores for the way back.
+      const callbackURL = joinWelcomeUrl(next);
       const { error: signInError } = await authClient.signIn.social({
         provider: "google",
-        callbackURL: JOIN_WELCOME_PATH,
-        errorCallbackURL: `/sign-in?callbackUrl=${encodeURIComponent(JOIN_WELCOME_PATH)}`,
+        callbackURL,
+        errorCallbackURL: `/sign-in?callbackUrl=${encodeURIComponent(callbackURL)}`,
       });
       if (signInError) {
         setError(signInError.message ?? "Google sign-in is not available right now.");

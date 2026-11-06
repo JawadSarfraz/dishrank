@@ -4,11 +4,13 @@ import {
   assertRole,
   hasRole,
   safeCallbackPath,
+  safeNextPath,
   signedInRedirectPath,
   toRole,
   type SessionUser,
 } from "@/server/roles";
 import { getAdminOverview } from "@/server/services/admin.service";
+import { panelInviteCreateInput } from "@/server/validation";
 
 const user = (role: SessionUser["role"]): SessionUser => ({
   id: "u1",
@@ -102,5 +104,48 @@ describe("helpers", () => {
     expect(signedInRedirectPath("/\u0643")).toBe("/%D9%83");
     expect(signedInRedirectPath("/rate?d=\u0643")).toBe("/rate?d=%D9%83");
     expect(signedInRedirectPath("/\uFFFD")).toBe("/%EF%BF%BD");
+  });
+});
+
+describe("an invite link's next path stays on this site", () => {
+  it.each([
+    "/islamabad/best-zinger-burger?rate=1",
+    "/rawalpindi",
+    "/rate?city=islamabad",
+    "/joinus", // only /join itself is refused
+  ])("keeps %s", (path) => expect(safeNextPath(path)).toBe(path));
+
+  it.each([
+    "https://evil.example",
+    "http://evil.example/islamabad",
+    "//evil.example",
+    "/\\evil.example",
+    "/%2f%2fevil.example",
+    "/%5cevil.example",
+    "/.//evil.example",
+    "/\t/evil.example",
+    "javascript:alert(1)",
+    "evil.example",
+    "",
+    "/",
+    "/join/abc",
+    "/join",
+    "/sign-in?callbackUrl=/x",
+    "/api/v1/cities",
+    `/${"x".repeat(300)}`,
+  ])("refuses %s", (path) => expect(safeNextPath(path)).toBeNull());
+
+  it("refuses anything that is not one string", () => {
+    expect(safeNextPath(undefined)).toBeNull();
+    expect(safeNextPath(["/islamabad", "https://evil.example"])).toBeNull();
+    expect(safeNextPath(null)).toBeNull();
+  });
+
+  it("the create form refuses a foreign next and takes a local one", () => {
+    const form = (next: string) => panelInviteCreateInput.safeParse({ label: "Group", next });
+    expect(form("https://evil.example").success).toBe(false);
+    expect(form("//evil.example").success).toBe(false);
+    expect(form("/islamabad/best-pizza?rate=1").success).toBe(true);
+    expect(panelInviteCreateInput.safeParse({ label: "Group" }).success).toBe(true);
   });
 });

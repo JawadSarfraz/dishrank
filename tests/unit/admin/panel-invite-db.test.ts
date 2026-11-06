@@ -1,6 +1,7 @@
 // Panel invite links (docs/07 §7a, test DB): grant, limits, revoke, and the sign-in hooks.
 import { createHash } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { joinWelcomeUrl, panelInvitePath } from "@/lib/panel-invite";
 import { db } from "@/server/db";
 import { auth } from "@/server/auth";
 import { setPanel } from "@/server/services/admin-users.service";
@@ -220,6 +221,31 @@ describe("panel invite links (test DB)", () => {
           "",
           expect.objectContaining({ maxAge: 0 }),
         );
+      } finally {
+        oauth.callbackURL = "/join/welcome";
+      }
+    });
+
+    it("a return path with a next still counts as the join flow; a look-alike does not", async () => {
+      const { token } = await createPanelInvite(admin, { label: "Now" });
+      const url = joinWelcomeUrl("/islamabad/best-zinger-burger?rate=1");
+      expect(url).toBe("/join/welcome?next=%2Fislamabad%2Fbest-zinger-burger%3Frate%3D1");
+      expect(panelInvitePath(token, "/islamabad/best-pizza?rate=1")).toBe(
+        `/join/${token}?next=%2Fislamabad%2Fbest-pizza%3Frate%3D1`,
+      );
+
+      oauth.callbackURL = url;
+      try {
+        const diner = await makeUser("Diner");
+        await hooks.session!.create!.after!({ userId: diner.id } as never, ctxWith(token).ctx);
+        expect(await userOf(diner.id)).toMatchObject({ isPanel: true });
+
+        for (const lookAlike of ["/join/welcomed", "https://evil.example/join/welcome", "/"]) {
+          oauth.callbackURL = lookAlike;
+          const other = await makeUser("Other");
+          await hooks.session!.create!.after!({ userId: other.id } as never, ctxWith(token).ctx);
+          expect(await userOf(other.id), lookAlike).toMatchObject({ isPanel: false });
+        }
       } finally {
         oauth.callbackURL = "/join/welcome";
       }

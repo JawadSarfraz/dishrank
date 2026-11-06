@@ -1,9 +1,11 @@
 "use server";
 // /admin/users actions: auth → rate limit → validate → service → revalidate.
 import { refresh } from "next/cache";
+import { panelInvitePath } from "@/lib/panel-invite";
 import { requireRole } from "@/server/auth";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import { revalidateDishPages } from "@/server/revalidate";
+import { safeNextPath } from "@/server/roles";
 import { setPanel, setTrustOverride } from "@/server/services/admin-users.service";
 import { createPanelInvite, revokePanelInvite } from "@/server/services/panel-invite.service";
 import { absoluteUrl } from "@/server/site";
@@ -35,12 +37,13 @@ export async function createPanelInviteAction(input: unknown) {
   return runAction("panel_invite.create", async () => {
     const actor = await requireRole("ADMIN");
     await assertRateLimit(`user:${actor.id}:admin-write`, RATE_LIMITS.adminWrite);
-    const { invite, token } = await createPanelInvite(
-      actor,
-      parseInput(panelInviteCreateInput, input),
-    );
+    const parsed = parseInput(panelInviteCreateInput, input);
+    const { invite, token } = await createPanelInvite(actor, parsed);
     refresh();
-    return { id: invite.id, url: absoluteUrl(`/join/${token}`) };
+    return {
+      id: invite.id,
+      url: absoluteUrl(panelInvitePath(token, safeNextPath(parsed.next))),
+    };
   });
 }
 
