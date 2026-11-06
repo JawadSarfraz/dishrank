@@ -28,8 +28,11 @@ What is left on 2026-11-06. No new environment variable is needed for any of it.
    launch: a page says "our team has not checked it yet" until you have.
 5. Open a dish page on your phone: "Places to try", the area and Near me filters, and **Rate the places
    you know**. Rate two dishes you have really eaten.
-6. Optional: `/admin/users` → **Panel invite links** → create one and send it to people you trust. Copy
-   it when it is shown: only once.
+6. `/admin/users` → **Panel invite links** → create one; copy it when it is shown, only once. **Test it
+   with a real Google sign-in before sending it to anyone:** open it in a private tab, **Continue with
+   Google** with a second account, and you should read "You're on the panel"; `/admin/users` then lists
+   that account under the link. This round trip through Google could not be run in the tests, which
+   stop at Google's door. Turn the panel off for the test account afterwards.
 
 **The switch**
 

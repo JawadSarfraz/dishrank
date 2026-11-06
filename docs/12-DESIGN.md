@@ -147,7 +147,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N places to try" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
 | Trust box | `components/ranking/TrustBox.tsx` | Brand-soft card with three points; the rater count is the city's live threshold. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed card: icon, one-line title, one sentence, one action. Used on every empty list. |
-| Skeleton | `components/ui/skeleton.tsx`, `loading.tsx` files | The city, ranking and restaurant pages show their shape while rendering. |
+| Skeleton | `components/ui/skeleton.tsx`, `loading.tsx` files | The city, ranking and restaurant pages show their shape while rendering. The cached page swaps it for the content on load, so it and its page both have `min-h-dvh`: the footer stays below the fold in both, or a long list moves it (CLS). |
 | Toasts | `components/ui/toast.tsx` (Base UI) | Share → "Link copied"; sign-out failure. The viewport sits above the install card. |
 | Disclosure | `components/ui/disclosure.tsx` | A native `<details>` as a card: report a problem, claim, suggest, add details, delete account. |
 | Badge | `components/ui/badge.tsx` | default (brand-soft), secondary, outline, destructive, gold (unused by design; kept for the medals' siblings). |
@@ -223,8 +223,8 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 - Tap targets at least 44 px on every public control; the score buttons are 56 px.
 - Visible keyboard focus: a 2 px brand outline on every element, plus the components' rings.
 - Public pages stay ISR (`revalidate = 3600`) with the session read in the browser.
-- Lighthouse mobile (2026-11-05, live-mode production build, demo data): ranking page 94, restaurant
-  page 93 for performance; accessibility, best practices and SEO 100 on both. Details and the
+- Lighthouse mobile (2026-11-06, live-mode production build, real Auto-list data, no ratings): ranking
+  page 92, restaurant page 92, home 92; accessibility and best practices 100 on the ranking page. Details and the
   measurement caveat in docs/11 (Performance).
 
 ## Dark theme later
