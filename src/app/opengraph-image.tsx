@@ -1,10 +1,12 @@
 // The default share image for pages without their own (home, city, restaurant and trust pages):
-// the wordmark, the tagline and the two cities, in the brand colours (docs/12-DESIGN.md).
+// the wordmark, the tagline, the two cities and the site's address, in the brand colours
+// (docs/12-DESIGN.md).
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ImageResponse } from "next/og";
 import { URDU_NAME } from "@/components/brand/urdu-name";
 import { BRAND } from "@/lib/brand";
+import { SITE_HOST } from "@/server/site";
 
 export const alt = `${BRAND.name} (${BRAND.urduName}): ${BRAND.taglineEnglish}`;
 export const size = { width: 1200, height: 630 };
@@ -67,6 +69,15 @@ export function OgWordmark({ scale = 1 }: { scale?: number }) {
   );
 }
 
+/** The site's address at the end of a row: a forwarded image still says where it came from. */
+export function OgSiteAddress({ fontSize }: { fontSize: number }) {
+  return (
+    <div style={{ display: "flex", marginLeft: "auto", fontSize, color: "#0e6b4a" }}>
+      {SITE_HOST}
+    </div>
+  );
+}
+
 export default async function Image() {
   const [displayFont, bodyFont] = await Promise.all([display, body]);
   return new ImageResponse(
@@ -115,6 +126,7 @@ export default async function Image() {
             {city}
           </div>
         ))}
+        <OgSiteAddress fontSize={30} />
       </div>
     </div>,
     {

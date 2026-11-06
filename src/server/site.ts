@@ -12,6 +12,9 @@ export const SITE_URL = (
 
 export const absoluteUrl = (path: string) => `${SITE_URL}${path}`;
 
+/** "kahankhayen.com": the address as people read it, drawn on every share image. */
+export const SITE_HOST = new URL(SITE_URL).host;
+
 /** The year in Pakistan, for titles such as "Best Chicken Karahi in Islamabad (2026)". */
 export const yearInPakistan = (now: Date = new Date()) =>
   new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Karachi" }).format(now);

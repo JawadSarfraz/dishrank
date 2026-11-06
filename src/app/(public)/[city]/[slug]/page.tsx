@@ -22,6 +22,7 @@ import { formatScore, formatVotes } from "@/lib/format";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
 import { getRankingPage } from "@/server/services/ranking.service";
+import { shareImagePath } from "@/server/services/share-image";
 import { yearInPakistan } from "@/server/site";
 
 export const revalidate = 3600;
@@ -60,11 +61,14 @@ function summaryOf(r: Ranking) {
   return waiting > 0 ? `${ranked} · ${waiting} more collecting votes` : ranked;
 }
 
-/** "1. Butt Karahi (8.3), 2. …" for share text and descriptions. */
+/** "1. Butt Karahi (8.3), 2. …" for share text and descriptions; votes in early rankings. */
 const topThree = (r: Ranking) =>
   r.eligible
     .slice(0, 3)
-    .map((row) => `${row.rank}. ${row.restaurant.name} (${formatScore(row.score)})`)
+    .map((row) => {
+      const detail = r.mode === "bootstrap" ? formatVotes(row.votes) : formatScore(row.score);
+      return `${row.rank}. ${row.restaurant.name} (${detail})`;
+    })
     .join(", ");
 
 export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">): Promise<Metadata> {
@@ -76,6 +80,7 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
     ranking.eligible.length > 0
       ? `${summaryOf(ranking)}. Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`
       : `${summaryOf(ranking)} Rate ${ranking.dish.name} to help rank the restaurants.`;
+  const image = shareImagePath(ranking);
   return {
     title,
     description,
@@ -86,8 +91,16 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
       url: pathOf(ranking),
       type: "website",
       siteName: BRAND.name,
+      images: [
+        { url: image, width: 1200, height: 630, alt: `${titleOf(ranking)} on ${BRAND.name}` },
+      ],
     },
-    twitter: { card: "summary_large_image", title: `${title} · ${BRAND.name}`, description },
+    twitter: {
+      card: "summary_large_image",
+      title: `${title} · ${BRAND.name}`,
+      description,
+      images: [image],
+    },
     // A page that ranks nobody yet stays out of search results (it is still linked and crawled).
     ...(ranking.eligible.length === 0 ? { robots: { index: false, follow: true } } : {}),
   };
@@ -98,10 +111,11 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const ranking = await load(city, slug);
   if (!ranking) notFound();
   const { eligible, insufficient, placesToTry, thresholds, mode } = ranking;
-  const shareText =
+  const shareLead =
     eligible.length > 0
       ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
       : `${titleOf(ranking)}: help rank them on ${BRAND.name}`;
+  const shareText = `${shareLead}\n\n${BRAND.shareCall}`;
   const rateHref = `/rate?city=${ranking.city.slug}`;
 
   return (
@@ -149,6 +163,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         <RankingBrowser
           citySlug={ranking.city.slug}
           dishSlug={ranking.dish.slug}
+          early={mode === "bootstrap"}
           rows={eligible.map((row) => ({
             rank: row.rank,
             slug: row.restaurant.slug,

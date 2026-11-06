@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // The share images read their fonts from src/fonts at request time (src/app/opengraph-image.tsx).
   outputFileTracingIncludes: {
     "/opengraph-image": ["./src/fonts/*.ttf"],
-    "/[city]/[slug]/opengraph-image": ["./src/fonts/*.ttf"],
+    "/[city]/[slug]/share-image": ["./src/fonts/*.ttf"],
   },
   // Security headers on every response (src/lib/security-headers.ts, docs/11), and in beta
   // (SITE_MODE, docs/10) X-Robots-Tag noindex too. Read at build time: a change needs a redeploy.

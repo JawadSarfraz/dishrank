@@ -81,10 +81,13 @@ export function RankingBrowser({
   rows,
   citySlug,
   dishSlug,
+  early,
 }: {
   rows: BrowserRow[];
   citySlug: string;
   dishSlug: string;
+  /** Early rankings: with few votes the scores sit close together, so the votes lead. */
+  early: boolean;
 }) {
   const filters = parse(useSyncExternalStore(subscribe, readSearch, serverSearch));
   const { here, locating, locate } = useNearMe();
@@ -290,7 +293,11 @@ export function RankingBrowser({
                 )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
-                <ScoreBadge score={r.score} votes={r.votes} size="lg" layout="stack" />
+                {early ? (
+                  <ScoreBadge score={r.score} votes={r.votes} size="sm" layout="votes-first" />
+                ) : (
+                  <ScoreBadge score={r.score} votes={r.votes} size="lg" layout="stack" />
+                )}
                 <Link
                   href={`/rate?city=${citySlug}&r=${r.slug}&d=${dishSlug}`}
                   className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"

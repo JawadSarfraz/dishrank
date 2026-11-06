@@ -1,16 +1,16 @@
 // The ranking page's share image (WhatsApp, Facebook): dish, city and a podium of the top three,
-// 1200 × 630, in the brand colours (docs/12-DESIGN.md). Rendered on each request (crawlers fetch
-// it rarely). Satori (next/og) needs an explicit flex display on every element with text.
+// 1200 × 630, in the brand colours (docs/12-DESIGN.md). A route of its own, not opengraph-image, so
+// the page can put a version in the URL (src/server/services/share-image.ts). Rendered on each
+// request (crawlers fetch it rarely). Satori (next/og) needs an explicit flex display on every
+// element with text.
 import { ImageResponse } from "next/og";
-import { OgWordmark, ogFont } from "@/app/opengraph-image";
+import { OgSiteAddress, OgWordmark, ogFont } from "@/app/opengraph-image";
 import { BRAND } from "@/lib/brand";
-import { formatScore, formatVotes } from "@/lib/format";
-import { SCORE_BAND_HEX, scoreBand } from "@/lib/score-band";
+import { formatVotes } from "@/lib/format";
+import { SCORE_BAND_HEX } from "@/lib/score-band";
+import { SLUG_PATTERN } from "@/lib/slug";
 import { getRankingPage } from "@/server/services/ranking.service";
-
-export const alt = `${BRAND.name}: restaurants ranked for one dish`;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+import { shareImageFacts } from "@/server/services/share-image";
 
 const display = ogFont("bricolage-grotesque-800.ttf");
 const body = ogFont("geist-500.ttf");
@@ -21,13 +21,27 @@ const MEDAL: Record<number, { bg: string; ink: string }> = {
   3: { bg: "#d9a77b", ink: "#16201b" },
 };
 
-function Podium({
-  row,
-  first,
-}: {
-  row: { rank: number; name: string; area: string | null; score: number; votes: number };
-  first: boolean;
-}) {
+type Row = ReturnType<typeof shareImageFacts>["top"][number];
+
+function ScoreChip({ row, fontSize, padding }: { row: Row; fontSize: number; padding: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        padding,
+        borderRadius: 12,
+        background: SCORE_BAND_HEX[row.band],
+        color: "#ffffff",
+        fontFamily: "Bricolage Grotesque",
+        fontSize,
+      }}
+    >
+      {row.score}
+    </div>
+  );
+}
+
+function Podium({ row, first, early }: { row: Row; first: boolean; early: boolean }) {
   const medal = MEDAL[row.rank] ?? { bg: "#eef1ee", ink: "#16201b" };
   return (
     <div
@@ -75,54 +89,50 @@ function Podium({
           {row.name.length > 30 ? `${row.name.slice(0, 29)}…` : row.name}
         </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", fontSize: 24, color: "#5e6963" }}>
-          {[row.area, formatVotes(row.votes)].filter(Boolean).join(" · ")}
+      {early ? (
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div
+              style={{
+                display: "flex",
+                fontFamily: "Bricolage Grotesque",
+                fontSize: first ? 40 : 34,
+                lineHeight: 1.1,
+              }}
+            >
+              {formatVotes(row.votes)}
+            </div>
+            {row.area && (
+              <div style={{ display: "flex", fontSize: 22, color: "#5e6963" }}>{row.area}</div>
+            )}
+          </div>
+          <ScoreChip row={row} fontSize={22} padding="3px 10px" />
         </div>
-        <div
-          style={{
-            display: "flex",
-            padding: "6px 16px",
-            borderRadius: 12,
-            background: SCORE_BAND_HEX[scoreBand(row.score)],
-            color: "#ffffff",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: first ? 40 : 34,
-          }}
-        >
-          {formatScore(row.score)}
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", fontSize: 24, color: "#5e6963" }}>
+            {[row.area, formatVotes(row.votes)].filter(Boolean).join(" · ")}
+          </div>
+          <ScoreChip row={row} fontSize={first ? 40 : 34} padding="6px 16px" />
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-export default async function Image({
-  params,
-}: {
-  params: Promise<{ city: string; slug: string }>;
-}) {
-  const [{ city, slug }, displayFont, bodyFont] = await Promise.all([params, display, body]);
+export async function GET(_request: Request, ctx: RouteContext<"/[city]/[slug]/share-image">) {
+  const { city, slug } = await ctx.params;
   const dishSlug = slug.startsWith("best-") ? slug.slice("best-".length) : "";
-  const ranking = dishSlug ? await getRankingPage({ citySlug: city, dishSlug }) : null;
-  const title = ranking ? `Best ${ranking.dish.name} in ${ranking.city.name}` : BRAND.name;
-  const top = (ranking?.eligible.slice(0, 3) ?? []).map((row) => ({
-    rank: row.rank,
-    name: row.restaurant.name,
-    area: row.restaurant.area?.name ?? null,
-    score: row.score,
-    votes: row.votes,
-  }));
+  const ranking =
+    SLUG_PATTERN.test(dishSlug) && SLUG_PATTERN.test(city)
+      ? await getRankingPage({ citySlug: city, dishSlug })
+      : null;
+  if (!ranking) return new Response(null, { status: 404 });
+  const [displayFont, bodyFont] = await Promise.all([display, body]);
+  const { title, early, summary, top } = shareImageFacts(ranking);
   // Podium order: silver, gold, bronze (the first in the middle, taller).
   const podium =
     top.length === 3 ? [top[1]!, top[0]!, top[2]!] : top.length === 2 ? [top[0]!, top[1]!] : top;
-  const votes = ranking?.eligible.reduce((sum, row) => sum + row.votes, 0) ?? 0;
-  const places = ranking?.placesToTryTotal ?? 0;
-  const summary = ranking
-    ? ranking.eligible.length > 0
-      ? `${ranking.eligible.length} ranked from ${formatVotes(votes)} · ranked by diners`
-      : `${places > 0 ? `${places} ${places === 1 ? "place" : "places"} to try` : "Not enough votes yet"}. Rate one you know.`
-    : "";
 
   return new ImageResponse(
     <div
@@ -140,7 +150,7 @@ export default async function Image({
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <OgWordmark scale={0.5} />
-        {ranking?.mode === "bootstrap" && (
+        {early && (
           <div
             style={{
               display: "flex",
@@ -155,6 +165,7 @@ export default async function Image({
             Early rankings
           </div>
         )}
+        <OgSiteAddress fontSize={26} />
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <div
@@ -173,7 +184,7 @@ export default async function Image({
       {podium.length > 0 ? (
         <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
           {podium.map((row) => (
-            <Podium key={row.rank} row={row} first={row.rank === 1} />
+            <Podium key={row.rank} row={row} first={row.rank === 1} early={early} />
           ))}
         </div>
       ) : (
@@ -193,7 +204,8 @@ export default async function Image({
       )}
     </div>,
     {
-      ...size,
+      width: 1200,
+      height: 630,
       fonts: [
         { name: "Bricolage Grotesque", data: displayFont, weight: 800, style: "normal" },
         { name: "Geist", data: bodyFont, weight: 500, style: "normal" },

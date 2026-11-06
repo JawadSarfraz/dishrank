@@ -806,7 +806,7 @@ function DoneStep({
     ? {
         path: listPath,
         label: "Share this ranking",
-        text: `${result.restaurant.name} is #${result.rank} for ${result.dish.name} in ${cityName} on ${BRAND.name} (${formatScore(result.score!)} · ${formatVotes(result.votes)})`,
+        text: `${result.restaurant.name} is #${result.rank} for ${result.dish.name} in ${cityName} on ${BRAND.name} (${formatScore(result.score!)} · ${formatVotes(result.votes)})\n\n${BRAND.shareCall}`,
       }
     : {
         path: restaurantPath,

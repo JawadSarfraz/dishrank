@@ -35,7 +35,10 @@ export function ScorePill({
   );
 }
 
-/** Score + votes, in a row (inline) or stacked right-aligned (a ranking row's score column). */
+/**
+ * Score + votes, in a row (inline), stacked right-aligned (a ranking row's score column), or stacked
+ * with the votes large and the score under them (a ranking row in early rankings).
+ */
 export function ScoreBadge({
   score,
   votes,
@@ -46,9 +49,20 @@ export function ScoreBadge({
   score: number;
   votes: number;
   size?: keyof typeof SIZES;
-  layout?: "inline" | "stack";
+  layout?: "inline" | "stack" | "votes-first";
   className?: string;
 }) {
+  if (layout === "votes-first") {
+    return (
+      <span className={cn("inline-flex flex-col items-end gap-1", className)}>
+        <span className="font-display text-lg leading-tight font-bold whitespace-nowrap tabular-nums">
+          {formatVotes(votes)}
+        </span>
+        <span className="sr-only">Score </span>
+        <ScorePill score={score} size={size} />
+      </span>
+    );
+  }
   return (
     <span
       className={cn(

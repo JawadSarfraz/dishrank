@@ -137,9 +137,9 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Footer | `components/layout/Footer.tsx` | Wordmark, tagline, the six trust links (dispute included, rule 9), one line "scores are opinions". |
 | Button, ButtonLink | `components/ui/button.tsx`, `button-link.tsx` | default (brand), outline, secondary (brand-soft), ghost, destructive, link; sizes default 44 px, lg 48 px, sm 40 px and xs 32 px for dense admin rows only. A link that looks like a button is a real `<a>` (ButtonLink). |
 | Fields | `.field`, `.field-select` utilities | 44 px, 16 px text, white, brand focus ring; selects carry their own chevron. `Input` wraps the same look for forms. |
-| ScoreBadge, ScorePill | `components/ranking/ScoreBadge.tsx` | The score in its band colour, display bold, tabular; `ScoreBadge` always adds the vote count (inline or stacked). Sizes sm/md/lg/xl. |
+| ScoreBadge, ScorePill | `components/ranking/ScoreBadge.tsx` | The score in its band colour, display bold, tabular; `ScoreBadge` always adds the vote count (inline, stacked, or votes first: the votes large and the score small under them). Sizes sm/md/lg/xl. |
 | RankDisc | `components/ranking/RankDisc.tsx` | Gold, silver and bronze discs for 1–3 (ink text), paper for the rest; `aria-label="Rank n"`. |
-| Rank rows | `components/ranking/RankingBrowser.tsx` | Disc, name (display 700), area and distance, "from Rs 1,900" and variant chips, then the stacked score and "Rate this". Rank 1 gets a gold-soft tint that fades to white. |
+| Rank rows | `components/ranking/RankingBrowser.tsx` | Disc, name (display 700), area and distance, "from Rs 1,900" and variant chips, then the stacked score and "Rate this". While a city is in early rankings the row leads with rank and votes and the score stays, smaller: with few votes the scores sit close together. Rank 1 gets a gold-soft tint that fades to white. |
 | Filter bar | same | "Filters" opens a bottom sheet (`components/ui/sheet.tsx`, Base UI dialog) with area, minimum score and minimum votes and a "Show n restaurants" close; sort is a native select in the bar; "Near me" asks for the location only when tapped. Filters stay in the URL. |
 | Waiting list | `components/ranking/WaitingList.tsx` | "Not enough votes yet" rows with votes, what is still needed, a progress bar toward the live rater threshold and a Rate button that deep-links into the flow. |
 | Places to try | `components/ranking/PlacesToTry.tsx` | Rows with no votes: name, area and distance, a Rate button; never a disc or a score, in A–Z order so it cannot read as a ranking. "Not ranked yet · from open map data" (the second part only when every row is from Overture); an area select and "Near me" in the browser; 10 rows, then "Show more". |
@@ -190,12 +190,18 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   the review cards keep their one-tap decisions.
 - **Trust pages.** `Prose` (`components/layout/Prose.tsx`): one reading column, brand links,
   tables for the trust levels.
-- **Share images** (`app/opengraph-image.tsx`, `app/(public)/[city]/[slug]/opengraph-image.tsx`).
-  Paper background, the two-line wordmark (`OgWordmark`: mark, name, Urdu outlines), the title in
-  Bricolage Grotesque, and a podium of the
-  top three (gold, silver and bronze discs, the first in the middle and taller, each with its
-  score band colour and votes); "Rate it on Kahan Khayen" when nothing ranks. 1200 × 630, readable
-  as a WhatsApp preview.
+- **Share images** (`app/opengraph-image.tsx`, `app/(public)/[city]/[slug]/share-image/route.tsx`).
+  Paper background, the two-line wordmark (`OgWordmark`: mark, name, Urdu outlines), the site's
+  address from `NEXT_PUBLIC_SITE_URL` (`OgSiteAddress`, so a forwarded image says where it came
+  from), the title in Bricolage Grotesque, and a podium of the top three (gold, silver and bronze
+  discs, the first in the middle and taller, each with its score band colour and votes); "Rate it
+  on Kahan Khayen" when nothing ranks. In early rankings each card leads with rank and votes and
+  the score is small. 1200 × 630, readable as a WhatsApp preview. The dish image's URL carries a
+  version, a hash of what it draws (`server/services/share-image.ts`), so a changed ranking is a
+  new URL and WhatsApp and Facebook do not keep the old picture; the page sets the image with
+  `og:image:width` and `height` so Facebook can show it on the first share.
+- **Share text.** The dish page and the success step's ranking share end with `BRAND.shareCall`
+  ("Aap ki rai? Jo 3 jagah try ki hain, unhein rate karein:") and the link after it.
 
 ## Installable (PWA)
 
