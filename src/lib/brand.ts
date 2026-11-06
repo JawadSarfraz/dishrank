@@ -14,7 +14,7 @@ export const BRAND = {
   tagline: "Har dish ka pehla number",
   /** The English line that goes with the tagline. */
   taglineEnglish: "Restaurants ranked dish by dish, by people who ate there.",
-  /** Roman Urdu: "Your opinion? Rate the 3 places you've tried." Share texts end with it, then the link. */
+  /** Roman Urdu: "Your opinion? Rate the 3 places you've tried." Then comes the link. */
   shareCall: "Aap ki rai? Jo 3 jagah try ki hain, unhein rate karein:",
   description:
     "The best restaurants for each dish in Islamabad and Rawalpindi, ranked by diners who ate there.",

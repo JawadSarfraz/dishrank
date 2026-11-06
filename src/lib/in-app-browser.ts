@@ -7,7 +7,7 @@ export type InAppBrowser = {
   os: "android" | "ios" | "other";
 };
 
-/** Instagram and Messenger first: their user agents can carry Facebook's FB_IAB and FBAN marks too. */
+/** Instagram and Messenger first: their user agents can carry Facebook's FB_IAB and FBAN too. */
 const APPS: readonly [InAppBrowser["app"], RegExp][] = [
   ["instagram", /\bInstagram\b/i],
   ["messenger", /Orca-Android|Messenger(?:Lite)?ForiOS|FBAN\/FBMessenger|FB_IAB\/MESSENGER/i],

@@ -60,6 +60,15 @@ Going live is two things: `SITE_MODE=live` and Search Console. Nothing else has 
     `https://dishrank-beta.vercel.app/api/auth/callback/google`, and under **Branding** remove its
     authorized domain.
 
+**Before the first Facebook or Instagram post**
+
+The in-app browser step was tested with their user agents, not in the real apps, and app updates change
+how links behave. On one Android phone and one iPhone, open a dish link from a real post and a real
+story: **Open in Chrome** (Android) or **•••** then **Open in Safari** (iPhone) must land on the same
+page, a tapped score must still be there, and the sign-in must finish. `/admin/analytics` then shows it
+under **In-app: completed**. Send one dish link to yourself on WhatsApp as well and check the preview.
+Facebook keeps a page's tags for a while: run the link through its Sharing Debugger before posting.
+
 **Separate decisions, for later (not part of going live)**
 
 - **End early rankings.** `/admin/rankings` → **End early rankings in 60 days**, per city. Do not press

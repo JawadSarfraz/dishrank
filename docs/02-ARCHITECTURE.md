@@ -219,7 +219,7 @@ dishrank/
 │   │   │   ├── page.tsx                         # /
 │   │   │   ├── [city]/page.tsx                  # /islamabad
 │   │   │   ├── [city]/[slug]/page.tsx           # /islamabad/best-chicken-karahi: no partial segments in Next.js, so only "best-" slugs answer
-│   │   │   ├── [city]/[slug]/opengraph-image.tsx  # dish, city, top 3
+│   │   │   ├── [city]/[slug]/share-image/route.tsx  # dish, city, top 3; versioned URL
 │   │   │   ├── [city]/r/[slug]/page.tsx         # restaurant page
 │   │   │   ├── how-rankings-work/  dispute/  about/ (about/data: data sources and credits)  privacy/  terms/
 │   │   │   └── layout.tsx                       # public footer

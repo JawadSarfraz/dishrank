@@ -54,7 +54,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [x] No N+1 on restaurant page (one query with include). ✅ `getPublicRestaurant` in `restaurant.service.ts`: one query for the restaurant and one for all its dish rows, none per dish.
 
 ## SEO
-- [x] Unique title/description per ranking page; canonical; OG image. ✅ `src/app/(public)/[city]/[slug]/page.tsx`, `opengraph-image.tsx`.
+- [x] Unique title/description per ranking page; canonical; OG image. ✅ `src/app/(public)/[city]/[slug]/page.tsx`, `share-image/route.tsx`.
 - [ ] JSON-LD ItemList (ranking) and Restaurant (restaurant page) validate. ✅ code: `src/server/seo.ts`. ⏳ owner: Google's Rich Results Test on one live ranking page and one restaurant page (after `SITE_MODE=live`).
 - [x] `sitemap.xml` and `robots.txt` present; non-public routes disallowed. ✅ `src/app/sitemap.ts`, `src/app/robots.ts`, `src/server/site.ts` (/admin, /owner, /me, /rate, /sign-in, /api).
 - [x] While `SITE_MODE=beta`: every page noindex, an `X-Robots-Tag` header on every response, robots.txt `Disallow: /`, the "Beta" label; `SITE_MODE=live` at launch removes all of it. ✅ `src/lib/site-mode.ts`, `tests/unit/ops/site-mode.test.ts`.

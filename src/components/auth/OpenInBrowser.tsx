@@ -4,7 +4,7 @@
 // browsers, where Google refuses its sign-in. The page itself goes on in the phone's browser: on
 // Android by an intent:// link to the same address, on iPhone by the app's own menu, which no link
 // can reach. Either way the address keeps everything the visitor did, such as a tapped score.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { chromeIntentUrl, escapedPageUrl, type InAppBrowser } from "@/lib/in-app-browser";
@@ -20,7 +20,19 @@ const APP_NAMES: Record<InAppBrowser["app"], string> = {
 export function OpenInBrowser({ browser }: { browser: InAppBrowser }) {
   // Rendered only in the browser (useInAppBrowser is null on the server).
   const [pageUrl] = useState(() => escapedPageUrl(window.location.href));
-  useEffect(() => trackEvent({ name: "in_app_sign_in_started" }), []);
+  const box = useRef<HTMLDivElement>(null);
+
+  // Counted once it is on screen: a closed Disclosure ("Suggest a restaurant") mounts it unseen.
+  useEffect(() => {
+    if (!box.current) return;
+    const seen = new IntersectionObserver((entries, observer) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      trackEvent({ name: "in_app_sign_in_started" });
+    });
+    seen.observe(box.current);
+    return () => seen.disconnect();
+  }, []);
 
   async function copyLink() {
     trackEvent({ name: "in_app_left_browser" });
@@ -39,7 +51,7 @@ export function OpenInBrowser({ browser }: { browser: InAppBrowser }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-3 text-sm">
+    <div ref={box} className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-3 text-sm">
       <p>
         <span className="font-medium">
           Google sign-in doesn&apos;t work in {APP_NAMES[browser.app]}.
