@@ -143,7 +143,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Filter bar | same | "Filters" opens a bottom sheet (`components/ui/sheet.tsx`, Base UI dialog) with area, minimum score and minimum votes and a "Show n restaurants" close; sort is a native select in the bar; "Near me" asks for the location only when tapped. Filters stay in the URL. |
 | Waiting list | `components/ranking/WaitingList.tsx` | "Not enough votes yet" rows with votes, what is still needed, a progress bar toward the live rater threshold and a Rate button that deep-links into the flow. |
 | Places to try | `components/ranking/PlacesToTry.tsx` | Rows with no votes: name, area and distance, a Rate button; never a disc or a score, in A–Z order so it cannot read as a ranking. "Not ranked yet · from open map data" (the second part only when every row is from Overture); an area select and "Near me" in the browser; 10 rows, then "Show more". |
-| Quick rate | `components/ranking/QuickRate.tsx`, `QuickRatePanel.tsx` | "Rate the places you know": a button on the static page; the list and its code load when opened. Each row has 10 score buttons of 44 px height (5 across below 640 px, 10 from there up, so each stays at least 44 px wide), and one tap saves. A rating given earlier shows "You gave it n · Change". |
+| Quick rate | `components/ranking/QuickRate.tsx`, `QuickRatePanel.tsx` | "Rate the places you know": a button on the static page; the list and its code load when opened. Each row has 10 score buttons of 44 px height (5 across below 640 px, 10 from there up, so each stays at least 44 px wide), and one tap saves. A rating given earlier shows "You gave it n · Change". Signed out the list is the same, and a tap opens the rate flow's score step with that score filled in. |
 | Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N places to try" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
 | Trust box | `components/ranking/TrustBox.tsx` | Brand-soft card with three points; the rater count is the city's live threshold. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed card: icon, one-line title, one sentence, one action. Used on every empty list. |
@@ -172,13 +172,15 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 - **Rate flow.** Steps; Where did you eat? (city pills, search, result cards, Suggest a
   restaurant); What did you eat? (pills with Change, "On the menu here" and "Popular dishes"
   chips, search, Propose a dish); How was it? (the 1–10 grid, 56 px buttons, scale hints, Add
-  details with sub-scores, comment and photo, Submit); still four taps after the search.
+  details with sub-scores, comment and photo, Submit); still four taps after the search. Signed
+  out, the tapped score goes into the address and into the sign-in's return address, so it is
+  filled in afterwards and one tap submits it.
 - **Success.** "Thanks, your rating is in." Your score as a large ink number (never dark on
   green). Ranked: "What your rating did: X stays #1 / enters the list at #4 / moves up from #3 to
   #2 …, now from n votes" plus the row's score badge and the Early rankings chip. Not ranked yet: a
   progress bar and "2 of 4 raters so far: needs 2 more ratings to rank before X gets a rank". Then
-  "Rate another dish here", Share (the ranking when ranked, the restaurant otherwise), "Rate
-  somewhere else" and "My ratings". The second saved rating may bring up the install card.
+  "Rate another dish here", "Rate more places for <dish>" (back to the dish page's list), Share
+  (the ranking when ranked, the restaurant otherwise), "Rate somewhere else" and "My ratings". The second saved rating may bring up the install card.
 - **Sign in.** The wordmark (lg), "Sign in", one sentence on why, "Continue with Google", terms and privacy
   links; fixed texts for the beta and ban refusals. Inside the Facebook, Instagram, Messenger and
   TikTok browsers, where Google refuses its sign-in, every sign-in step shows `OpenInBrowser`

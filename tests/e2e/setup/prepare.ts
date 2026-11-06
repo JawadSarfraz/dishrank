@@ -58,6 +58,20 @@ async function main() {
       await addAdminDishesTx(created, [karahi.id], tx);
       return created;
     });
+    const zinger = await db.dish.findUniqueOrThrow({ where: { slug: "zinger-burger" } });
+    await inTransaction(async (tx) => {
+      const created = await insertRestaurantTx(
+        {
+          name: E2E.quickRated,
+          areaId: area.id,
+          address: "E2E address",
+          source: "MANUAL",
+          location: null,
+        },
+        tx,
+      );
+      await addAdminDishesTx(created, [zinger.id], tx);
+    });
     // Pizza: one restaurant ranked by 5 established raters (Islamabad is not launched, so early
     // ranking thresholds apply), one with the dish listed and no votes yet.
     const pizza = await db.dish.findUniqueOrThrow({ where: { slug: "pizza" } });
@@ -177,6 +191,7 @@ async function main() {
       menuUploadId: upload.id,
       restaurant: { name: restaurant.name, slug: restaurant.slug },
       dish: { name: karahi.name },
+      quickRated: { name: E2E.quickRated },
       pizza: {
         ranked: { name: ranked!.restaurant.name, slug: ranked!.restaurant.slug },
         unranked: { name: unranked!.restaurant.name, slug: unranked!.restaurant.slug },

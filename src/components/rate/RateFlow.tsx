@@ -2,7 +2,8 @@
 
 // The rating flow (docs/01 D4/D5, docs/08 Phase 3): restaurant → dish → score → done, four taps
 // after typing the search. Each step lives in the URL (?city=&r=&d=), so the back button, a sign-in
-// return and an edit from /me all open at the right step.
+// return and an edit from /me all open at the right step. A score tapped before signing in lives
+// there too (?score=), so it is filled in afterwards and one tap submits it.
 import { CheckIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
@@ -10,12 +11,14 @@ import { DishIcon } from "@/components/brand/DishIcon";
 import { SignInButton } from "@/components/auth/SignInButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Disclosure } from "@/components/ui/disclosure";
 import { describeActionError } from "@/components/admin/action-error";
 import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { ShareButton } from "@/components/ranking/ShareButton";
 import { BRAND } from "@/lib/brand";
 import { formatNeeded, formatScore, formatVotes } from "@/lib/format";
+import { withPendingScore } from "@/lib/pending-score";
 import { PWA_EVENTS, noteRating } from "@/lib/pwa-prompt";
 import { myRatingAction, submitRatingAction } from "@/server/actions/rating";
 import type { RatingResult } from "@/server/services/rating.service";
@@ -109,6 +112,12 @@ export function RateFlow({ data }: { data: RatePageData }) {
   // a restaurant picked before never clears the placeholder of the one on screen.
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null);
   const [seen] = useState(() => initialSeen(data));
+  // Kept with the first entry's restaurant and dish: it must not fill the step of another one.
+  const [pending] = useState(
+    data.pendingScore === null
+      ? null
+      : { score: data.pendingScore, step: `${data.restaurant?.id}:${data.dish?.id}` },
+  );
   const city = data.cities.find((c) => c.slug === citySlug) ?? data.cities[0];
   const step = done ? "done" : !restaurant ? "restaurant" : !dish ? "dish" : "score";
   const move = useCallback(
@@ -217,6 +226,7 @@ export function RateFlow({ data }: { data: RatePageData }) {
           restaurant={restaurant}
           dish={dish}
           existing={existing}
+          pendingScore={pending?.step === `${restaurant.id}:${dish.id}` ? pending.score : null}
           signedIn={data.signedIn}
           userName={data.userName}
           isPanel={data.isPanel}
@@ -558,6 +568,7 @@ function ScoreStep({
   restaurant,
   dish,
   existing,
+  pendingScore,
   signedIn,
   userName,
   isPanel,
@@ -570,6 +581,8 @@ function ScoreStep({
   restaurant: RateRestaurant;
   dish: DishRef;
   existing: Existing | null;
+  /** Tapped before signing in: it wins over an earlier rating's score. */
+  pendingScore: number | null;
   signedIn: boolean;
   userName: string | null;
   isPanel: boolean;
@@ -580,7 +593,9 @@ function ScoreStep({
   /** `entry`: the address when the save started; `score`: what the diner gave. */
   onDone: (result: RatingResult, entry: string, score: number) => void;
 }) {
-  const [score, setScore] = useState<number | null>(existing?.score ?? null);
+  // What the diner tapped here, else a score tapped before signing in, else the earlier rating's.
+  const [picked, setPicked] = useState<number | null>(null);
+  const score = picked ?? pendingScore ?? existing?.score ?? null;
   const [subs, setSubs] = useState<Record<string, number | null>>({
     taste: existing?.taste ?? null,
     portion: existing?.portion ?? null,
@@ -601,7 +616,6 @@ function ScoreStep({
     if (!existing) return;
     if (!photoTouched.current) setPhotoPath(existing.photoPath);
     if (touched.current) return;
-    setScore(existing.score);
     setSubs({ taste: existing.taste, portion: existing.portion, value: existing.value });
     setComment(existing.comment ?? "");
   }, [existing]);
@@ -667,7 +681,12 @@ function ScoreStep({
               aria-label={`${n} out of 10`}
               onClick={() => {
                 touched.current = true;
-                setScore(n);
+                setPicked(n);
+                // Signed out: into the address, for the move out of an in-app browser as well.
+                if (!signedIn) {
+                  const here = `${window.location.pathname}${window.location.search}`;
+                  window.history.replaceState(null, "", withPendingScore(here, n));
+                }
               }}
               className="min-h-14 rounded-xl border border-border bg-card font-display text-xl font-bold transition-[color,background-color,border-color,transform] active:translate-y-px aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-white aria-pressed:shadow-[0_2px_0_var(--brand-ink)]"
             >
@@ -755,8 +774,14 @@ function ScoreStep({
         </div>
       ) : (
         <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-card">
-          <p className="text-sm">Sign in to save your rating. You will come back to this step.</p>
-          <SignInButton callbackURL={callbackUrl} />
+          <p className="text-sm">
+            {score === null
+              ? "Sign in to save your rating. You will come back to this step."
+              : `Sign in to save your ${score}. You will come back here with it filled in.`}
+          </p>
+          <SignInButton
+            callbackURL={score === null ? callbackUrl : withPendingScore(callbackUrl, score)}
+          />
         </div>
       )}
       {error && (
@@ -903,6 +928,13 @@ function DoneStep({
         <Button type="button" size="lg" onClick={onSameRestaurant} className="w-full">
           Rate another dish here
         </Button>
+        <ButtonLink
+          variant="outline"
+          href={`${listPath}?rate=1`}
+          className="h-auto min-h-12 w-full py-2 whitespace-normal"
+        >
+          Rate more places for {result.dish.name}
+        </ButtonLink>
         {counted && (
           <ShareButton
             city={result.restaurant.citySlug}

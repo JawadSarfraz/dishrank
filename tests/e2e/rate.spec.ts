@@ -71,3 +71,36 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   await expect(page.getByText(dish.name).first()).toBeVisible();
   test.info().annotations.push({ type: "elapsed", description: `${elapsed} ms, ${taps} taps` });
 });
+
+test("a score tapped before sign-in is there afterwards, one tap from saved", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const { cookie, quickRated } = fixture();
+  await page.goto("/islamabad/best-zinger-burger");
+  await page.getByRole("button", { name: "Rate the places you know" }).tap();
+  await page.getByRole("button", { name: `8 out of 10 for ${quickRated.name}` }).tap();
+  await expect(page).toHaveURL(/\/rate\?.*score=8/);
+  await expect(page.getByRole("button", { name: "8 out of 10" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  // Google is never called here: what matters is the address it would send the diner back to.
+  await page.route("**/api/auth/sign-in/social", (route) => route.abort());
+  const signIn = page.waitForRequest("**/api/auth/sign-in/social");
+  await page.getByRole("button", { name: "Continue with Google" }).tap();
+  const { callbackURL } = (await signIn).postDataJSON() as { callbackURL: string };
+  expect(callbackURL).toContain("score=8");
+
+  await context.addCookies([{ ...cookie, url: baseURL! }]);
+  await page.goto(callbackURL);
+  await expect(page.getByRole("button", { name: "8 out of 10" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Submit rating" }).tap();
+  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
+  await expect(page.getByLabel("Your score 8 out of 10")).toBeVisible();
+});

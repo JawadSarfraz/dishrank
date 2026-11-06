@@ -17,6 +17,8 @@ export const E2E = {
   /** The ranking-page journey: Pizza in Islamabad, one ranked restaurant and one without votes. */
   ranked: "E2E Pizza Point",
   unranked: "E2E Pizza Corner",
+  /** The score that survives sign-in: Zinger Burger, listed here and rated by nobody else. */
+  quickRated: "E2E Zinger Stop",
   /** The menu journey: a parsed menu photo with items waiting for an admin. */
   menuRestaurant: "E2E Menu Grill",
 } as const;
@@ -28,5 +30,6 @@ export type E2EFixture = {
   menuUploadId: string;
   restaurant: { name: string; slug: string };
   dish: { name: string };
+  quickRated: { name: string };
   pizza: { ranked: { name: string; slug: string }; unranked: { name: string; slug: string } };
 };

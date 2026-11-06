@@ -4,11 +4,15 @@
 // screen, plus a search for a place that is not listed. Every score goes to POST /api/v1/ratings, the
 // same RatingService as the rate flow with all its rules and limits. A fetch, not a server action, so
 // a tap does not re-render the whole page. A rating the diner gave earlier is never replaced from
-// here: it may have a comment and a photo, so "Change" opens the full form.
+// here: it may have a comment and a photo, so "Change" opens the full form. A signed-out diner's tap
+// opens the rate flow's score step with that score filled in: it offers the sign-in, in any browser,
+// and the score is still there after it.
 import { SearchIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { withPendingScore } from "@/lib/pending-score";
 import { PWA_EVENTS, noteRating } from "@/lib/pwa-prompt";
 import { quickRatePlacesAction } from "@/server/actions/rating";
 import type { QuickRateData, QuickRatePlace } from "@/server/services/rate-page.service";
@@ -111,6 +115,7 @@ export default function QuickRatePanel({
   citySlug: string;
   dishSlug: string;
 }) {
+  const router = useRouter();
   const [data, setData] = useState<QuickRateData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [rows, setRows] = useState<QuickRatePlace[]>([]);
@@ -199,6 +204,10 @@ export default function QuickRatePanel({
 
   async function rate(place: QuickRatePlace, score: number) {
     if (!data) return;
+    if (!data.signedIn) {
+      router.push(withPendingScore(`/rate?city=${citySlug}&r=${place.slug}&d=${dishSlug}`, score));
+      return;
+    }
     const id = place.restaurantId;
     // The same score again changes nothing, and every submission counts toward the daily limits.
     if (states[id]?.saved?.score === score) return;
@@ -272,8 +281,10 @@ export default function QuickRatePanel({
           Rate the places you know
         </h2>
         <p className="text-sm">
-          Only rate places where you&apos;ve had {data.dish.name}. One tap saves your score, 1 to
-          10.
+          Only rate places where you&apos;ve had {data.dish.name}.{" "}
+          {data.signedIn
+            ? "One tap saves your score, 1 to 10."
+            : "Tap your score, 1 to 10. You sign in once, and your score stays."}
         </p>
         {savedCount > 0 && (
           <p role="status" className="text-sm font-medium text-brand">

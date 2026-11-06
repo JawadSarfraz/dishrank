@@ -2,7 +2,8 @@
 // Rate-flow actions: auth → validate → service → revalidate (CLAUDE.md conventions). Rate limits
 // live in the services, so the /api/v1 handlers get the same ones.
 import { headers } from "next/headers";
-import { requireUser } from "@/server/auth";
+import { getSessionUser, requireUser } from "@/server/auth";
+import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import { clientIp, ipHash } from "@/server/request-ip";
 import { revalidateDishPages } from "@/server/revalidate";
 import { recordLocationObservation } from "@/server/services/location.service";
@@ -83,10 +84,16 @@ export async function signPhotoUploadAction(input: unknown) {
   });
 }
 
-/** "Rate the places you know" on a dish page: the static page asks for the list when it opens. */
+/**
+ * "Rate the places you know" on a dish page: the static page asks for the list when it opens. A
+ * public read, limited for a signed-out caller like every public GET.
+ */
 export async function quickRatePlacesAction(input: unknown) {
   return runAction("rating.quick_places", async () => {
-    const actor = await requireUser();
+    const actor = await getSessionUser();
+    if (!actor) {
+      await assertRateLimit(`ip:${ipHash(clientIp(await headers()))}:api`, RATE_LIMITS.api);
+    }
     return getQuickRatePlaces(actor, parseInput(quickRatePlacesInput, input));
   });
 }
