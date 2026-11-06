@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import {
   getAnalyticsAdmin,
   pakistanDay,
-  recordRankingView,
+  recordBrowserEvent,
 } from "@/server/services/analytics.service";
 import { listDishes } from "@/server/services/dish.service";
 import { createOrReplace } from "@/server/services/rating.service";
@@ -19,12 +19,12 @@ describe("light analytics (Phase 6)", () => {
     expect(pakistanDay(new Date("2026-11-04T20:30:00Z")).toISOString()).toBe(
       "2026-11-05T00:00:00.000Z",
     );
-    await recordRankingView(
+    await recordBrowserEvent(
       { name: "ranking_view", city: "islamabad", dish: "chicken-karahi" },
       "a".repeat(32),
     );
     await expect(
-      recordRankingView(
+      recordBrowserEvent(
         { name: "ranking_view", city: "islamabad", dish: "no-such-dish" },
         "a".repeat(32),
       ),

@@ -160,13 +160,15 @@ export const ownerDishInput = z.discriminatedUnion("action", [
 ]);
 export type OwnerDishInput = z.infer<typeof ownerDishInput>;
 
-/** POST /api/v1/events: a ranking page reports one view (city and dish only, Phase 6). */
-export const rankingViewInput = z.strictObject({
-  name: z.literal("ranking_view"),
-  city: slug,
-  dish: slug,
-});
-export type RankingViewInput = z.infer<typeof rankingViewInput>;
+/** POST /api/v1/events: what the browser reports (light analytics): a name, a city and a dish at most. */
+export const browserEventInput = z.discriminatedUnion("name", [
+  z.strictObject({ name: z.literal("ranking_view"), city: slug, dish: slug }),
+  z.strictObject({ name: z.literal("share_click"), city: slug, dish: slug }),
+  z.strictObject({ name: z.literal("sign_in_started") }),
+  z.strictObject({ name: z.literal("in_app_sign_in_started") }),
+  z.strictObject({ name: z.literal("in_app_left_browser") }),
+]);
+export type BrowserEventInput = z.infer<typeof browserEventInput>;
 
 /** A menu photo the browser uploaded with a signed URL (docs/07 §3) → MenuUpload PENDING. */
 export const menuUploadInput = z.strictObject({ restaurantId: id, path: z.string().max(300) });

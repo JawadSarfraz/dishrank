@@ -229,7 +229,13 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </Link>
       </p>
 
-      <ShareButton title={titleOf(ranking)} text={shareText} path={pathOf(ranking)} />
+      <ShareButton
+        city={ranking.city.slug}
+        dish={ranking.dish.slug}
+        title={titleOf(ranking)}
+        text={shareText}
+        path={pathOf(ranking)}
+      />
       <ViewBeacon city={ranking.city.slug} dish={ranking.dish.slug} />
 
       {eligible.length > 0 && (

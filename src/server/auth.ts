@@ -10,6 +10,7 @@ import { db } from "./db";
 import { logEvent } from "./log";
 import { assertRole, hasRole, toRole, type Role, type SessionUser } from "./roles";
 import { revalidateDishPages } from "./revalidate";
+import { recordEvent } from "./services/analytics.service";
 import { isEmailBanned } from "./services/ban-list";
 import {
   PANEL_INVITE,
@@ -98,6 +99,12 @@ export const auth = betterAuth({
         // Whoever signs in through a panel invite link joins the panel, new account or not. A
         // problem here never blocks the sign-in: /join/<token> then offers the one-tap join.
         after: async (session, ctx) => {
+          // Counted with no user (docs/06); `via` is the browser's own word, and only a count.
+          const state = await getOAuthState().catch(() => null);
+          if (state) {
+            const inApp = state.via === "in-app";
+            await recordEvent(inApp ? "IN_APP_SIGN_IN_COMPLETED" : "SIGN_IN_COMPLETED", {});
+          }
           if (!ctx?.getCookie(PANEL_INVITE.cookie)) return;
           try {
             const invite = await panelInviteOf(ctx);

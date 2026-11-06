@@ -180,7 +180,10 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   "Rate another dish here", Share (the ranking when ranked, the restaurant otherwise), "Rate
   somewhere else" and "My ratings". The second saved rating may bring up the install card.
 - **Sign in.** The wordmark (lg), "Sign in", one sentence on why, "Continue with Google", terms and privacy
-  links; fixed texts for the beta and ban refusals.
+  links; fixed texts for the beta and ban refusals. Inside the Facebook, Instagram, Messenger and
+  TikTok browsers, where Google refuses its sign-in, every sign-in step shows `OpenInBrowser`
+  instead of the button: on Android "Open in Chrome" (an `intent://` link to the same page) and
+  Copy link, on iPhone "Tap ••• then Open in Safari" and Copy link.
 - **My ratings.** Rows with the dish icon, name, restaurant, date, the diner's score as a large
   number, status chip, comment, Edit and Delete; claims; Your account with Delete my account.
 - **Owner.** Your restaurants (empty state explains the claim); a restaurant's dishes with status

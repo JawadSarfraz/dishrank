@@ -1,6 +1,6 @@
-// Light analytics (owner, Phase 6): rating_submitted, search and ranking_view, counted per day with
-// the city and dish only: no user, no IP, no query text, no exact time, no third-party tracker.
-// Recording never fails the request it belongs to.
+// Light analytics (owner, Phase 6): ratings, searches, ranking views, share clicks and sign-ins,
+// counted per day with at most the city and dish: no user, no IP, no query text, no exact time, no
+// third-party tracker. Recording never fails the request it belongs to.
 import type { AnalyticsEventName } from "@/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
@@ -13,7 +13,7 @@ import {
 import { findCityBySlug } from "@/server/repositories/public.repo";
 import { findDishBySlug } from "@/server/repositories/taxonomy.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
-import type { RankingViewInput } from "@/server/validation";
+import type { BrowserEventInput } from "@/server/validation";
 import { DAY_MS } from "./ranking.constants";
 
 const PKT_OFFSET_MS = 5 * 3_600_000; // Pakistan has no daylight saving
@@ -48,15 +48,32 @@ export async function recordEvent(
   }
 }
 
+const BROWSER_EVENTS = {
+  ranking_view: "RANKING_VIEW",
+  share_click: "SHARE_CLICK",
+  sign_in_started: "SIGN_IN_STARTED",
+  in_app_sign_in_started: "IN_APP_SIGN_IN_STARTED",
+  in_app_left_browser: "IN_APP_LEFT_BROWSER",
+} as const satisfies Record<BrowserEventInput["name"], AnalyticsEventName>;
+
 /**
- * POST /api/v1/events from a ranking page (the page is static, so the browser reports the view).
- * Only existing city and dish slugs are counted; limited per IP hash (`ip:{hash}:event`).
+ * POST /api/v1/events: what only the browser can see (the pages are static). An event about a page
+ * is counted for existing city and dish slugs only; limited per IP hash (`ip:{hash}:event`).
  */
-export async function recordRankingView(input: RankingViewInput, ipHash: string, now = new Date()) {
+export async function recordBrowserEvent(
+  input: BrowserEventInput,
+  ipHash: string,
+  now = new Date(),
+) {
   await assertRateLimit(`ip:${ipHash}:event`, RATE_LIMITS.event, now);
+  const name = BROWSER_EVENTS[input.name];
+  if (!("city" in input)) {
+    await recordEvent(name, {}, now);
+    return { ok: true };
+  }
   const [city, dish] = await Promise.all([findCityBySlug(input.city), findDishBySlug(input.dish)]);
   if (!city || !dish) throw new AppError("NOT_FOUND", "Unknown city or dish", 404);
-  await recordEvent("RANKING_VIEW", { citySlug: city.slug, dishSlug: dish.slug }, now);
+  await recordEvent(name, { citySlug: city.slug, dishSlug: dish.slug }, now);
   return { ok: true };
 }
 

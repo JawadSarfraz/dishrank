@@ -35,7 +35,7 @@ export const RATE_LIMITS = {
   accountDelete: { limit: 3, windowSeconds: 86_400 },
   /** `user:{id}:flag`: problem reports on restaurant pages (docs/06). */
   flag: { limit: 10, windowSeconds: 86_400 },
-  /** `ip:{hash}:event`: ranking-page views the browser reports (light analytics, Phase 6). */
+  /** `ip:{hash}:event`: what the browser reports: views, share clicks, sign-in steps (Phase 6). */
   // DECISION-PENDING: 300 an hour per IP: far above one person reading pages.
   event: { limit: 300, windowSeconds: 3600 },
   /** `ip:{hash}:health`: GET /api/health, an uptime monitor's check. */

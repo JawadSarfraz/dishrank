@@ -5,8 +5,11 @@
 import { Share2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { trackEvent } from "@/lib/track";
 
 export function ShareButton({
+  city,
+  dish,
   title,
   text,
   path,
@@ -14,6 +17,9 @@ export function ShareButton({
   variant = "outline",
   className,
 }: {
+  /** Counted with the click: the city and dish slugs, nothing else. */
+  city: string;
+  dish: string;
   title: string;
   text: string;
   path: string;
@@ -22,6 +28,7 @@ export function ShareButton({
   className?: string;
 }) {
   async function share() {
+    trackEvent({ name: "share_click", city, dish });
     const url = new URL(path, window.location.origin).toString();
     if (typeof navigator.share === "function") {
       try {

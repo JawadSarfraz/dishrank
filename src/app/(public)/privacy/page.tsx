@@ -75,10 +75,10 @@ export default function PrivacyPage() {
 
         <h2>Counting visits</h2>
         <p>
-          To see which pages are useful we count, per day, ratings saved, searches and views of
-          ranking pages, with only the city and dish. These counts hold nothing about you: no
-          account, no IP address, no search words, no time of day. We use no third-party tracking or
-          advertising cookies.
+          To see which pages are useful we count, per day, ratings saved, searches, views of ranking
+          pages, taps on Share and sign-ins, with at most the city and dish and whether the sign-in
+          began inside another app. These counts hold nothing about you: no account, no IP address,
+          no search words, no time of day. We use no third-party tracking or advertising cookies.
         </p>
 
         <h2>Reports and disputes</h2>

@@ -1,14 +1,15 @@
-// POST /api/v1/events: a ranking page reports one view (light analytics, Phase 6). Anyone may
-// send it; only the city and dish are kept, limited per IP hash. Answers 204.
+// POST /api/v1/events: the browser reports a ranking view, a share click or a sign-in step (light
+// analytics, docs/06). Anyone may send it; only the name, the city and the dish are kept, limited
+// per IP hash. Answers 204.
 import { jsonError, readJson } from "@/server/http";
 import { clientIp, ipHash } from "@/server/request-ip";
-import { recordRankingView } from "@/server/services/analytics.service";
-import { parseInput, rankingViewInput } from "@/server/validation";
+import { recordBrowserEvent } from "@/server/services/analytics.service";
+import { browserEventInput, parseInput } from "@/server/validation";
 
 export async function POST(request: Request) {
   try {
-    await recordRankingView(
-      parseInput(rankingViewInput, await readJson(request)),
+    await recordBrowserEvent(
+      parseInput(browserEventInput, await readJson(request)),
       ipHash(clientIp(request.headers)),
     );
     return new Response(null, { status: 204 });

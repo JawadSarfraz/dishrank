@@ -4,9 +4,11 @@
 // grants the panel, in src/server/auth.ts); signed in, join with one tap.
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
+import { startGoogleSignIn } from "@/lib/google-sign-in";
 import { joinWelcomeUrl } from "@/lib/panel-invite";
+import { useInAppBrowser } from "@/lib/use-in-app-browser";
 import { joinPanelAction, startPanelInviteAction } from "@/server/actions/panel-invite";
+import { OpenInBrowser } from "./OpenInBrowser";
 
 const UNREACHABLE = "The request did not reach the server. Check the connection and try again.";
 
@@ -22,6 +24,7 @@ export function JoinPanel({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inApp = useInAppBrowser();
 
   async function viaGoogle() {
     setPending(true);
@@ -34,12 +37,7 @@ export function JoinPanel({
         return;
       }
       // The invite goes in the cookie alone: this path is what Better Auth stores for the way back.
-      const callbackURL = joinWelcomeUrl(next);
-      const { error: signInError } = await authClient.signIn.social({
-        provider: "google",
-        callbackURL,
-        errorCallbackURL: `/sign-in?callbackUrl=${encodeURIComponent(callbackURL)}`,
-      });
+      const { error: signInError } = await startGoogleSignIn(joinWelcomeUrl(next));
       if (signInError) {
         setError(signInError.message ?? "Google sign-in is not available right now.");
         setPending(false);
@@ -62,6 +60,9 @@ export function JoinPanel({
     }
     setPending(false);
   }
+
+  // Joining while signed in needs no Google, so it works in any browser.
+  if (inApp && !signedInAs) return <OpenInBrowser browser={inApp} />;
 
   return (
     <div className="flex flex-col items-start gap-2">

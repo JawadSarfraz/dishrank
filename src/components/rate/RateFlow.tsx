@@ -905,6 +905,8 @@ function DoneStep({
         </Button>
         {counted && (
           <ShareButton
+            city={result.restaurant.citySlug}
+            dish={result.dish.slug}
             title={result.restaurant.name}
             text={share.text}
             path={share.path}

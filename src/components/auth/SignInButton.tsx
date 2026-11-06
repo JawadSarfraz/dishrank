@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
+import { startGoogleSignIn } from "@/lib/google-sign-in";
+import { useInAppBrowser } from "@/lib/use-in-app-browser";
+import { OpenInBrowser } from "./OpenInBrowser";
 
 export function SignInButton({
   callbackURL = "/",
@@ -13,21 +15,19 @@ export function SignInButton({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inApp = useInAppBrowser();
 
   async function signIn() {
     setPending(true);
     setError(null);
-    const { error } = await authClient.signIn.social({
-      provider: "google",
-      callbackURL,
-      // A refused sign-in (e.g. not invited to the beta) comes back to /sign-in with ?error=.
-      errorCallbackURL: `/sign-in?callbackUrl=${encodeURIComponent(callbackURL)}`,
-    });
+    const { error } = await startGoogleSignIn(callbackURL);
     if (error) {
       setError(error.message ?? "Google sign-in is not available right now.");
       setPending(false);
     }
   }
+
+  if (inApp) return <OpenInBrowser browser={inApp} />;
 
   return (
     <div className="flex flex-col gap-2">
