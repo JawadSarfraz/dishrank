@@ -6,7 +6,7 @@ import { OgWordmark, ogFont } from "@/app/opengraph-image";
 import { BRAND } from "@/lib/brand";
 import { formatScore, formatVotes } from "@/lib/format";
 import { SCORE_BAND_HEX, scoreBand } from "@/lib/score-band";
-import { getRanking } from "@/server/services/ranking.service";
+import { getRankingPage } from "@/server/services/ranking.service";
 
 export const alt = `${BRAND.name}: restaurants ranked for one dish`;
 export const size = { width: 1200, height: 630 };
@@ -104,7 +104,7 @@ export default async function Image({
 }) {
   const [{ city, slug }, displayFont, bodyFont] = await Promise.all([params, display, body]);
   const dishSlug = slug.startsWith("best-") ? slug.slice("best-".length) : "";
-  const ranking = dishSlug ? await getRanking({ citySlug: city, dishSlug }) : null;
+  const ranking = dishSlug ? await getRankingPage({ citySlug: city, dishSlug }) : null;
   const title = ranking ? `Best ${ranking.dish.name} in ${ranking.city.name}` : BRAND.name;
   const top = (ranking?.eligible.slice(0, 3) ?? []).map((row) => ({
     rank: row.rank,
@@ -117,10 +117,11 @@ export default async function Image({
   const podium =
     top.length === 3 ? [top[1]!, top[0]!, top[2]!] : top.length === 2 ? [top[0]!, top[1]!] : top;
   const votes = ranking?.eligible.reduce((sum, row) => sum + row.votes, 0) ?? 0;
+  const places = ranking?.placesToTryTotal ?? 0;
   const summary = ranking
     ? ranking.eligible.length > 0
       ? `${ranking.eligible.length} ranked from ${formatVotes(votes)} · ranked by diners`
-      : "Not enough votes yet. Be the first to rate it."
+      : `${places > 0 ? `${places} ${places === 1 ? "place" : "places"} to try` : "Not enough votes yet"}. Rate one you know.`
     : "";
 
   return new ImageResponse(
