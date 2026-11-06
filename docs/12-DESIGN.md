@@ -193,8 +193,11 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 - **Owner.** Your restaurants (empty state explains the claim); a restaurant's dishes with status
   chips, rank, "from" price, score and votes, Rank by week, the confirm / fix / remove actions,
   the menu photo box.
-- **Admin.** Overview cards with counts; every list page as `AdminHeader` + tabs + `AdminList`;
-  the review cards keep their one-tap decisions.
+- **Admin.** Overview cards with counts, one of them the held ratings; every list page as
+  `AdminHeader` + tabs + `AdminList`; the review cards keep their one-tap decisions, and a burst
+  card marks the ratings that look genuine and adds "Release the ones that look genuine".
+  `/admin/analytics` has weekly raters, returning raters, share clicks and a sign-ins table split by
+  normal and in-app browser.
 - **Trust pages.** `Prose` (`components/layout/Prose.tsx`): one reading column, brand links,
   tables for the trust levels.
 - **Share images** (`app/opengraph-image.tsx`, `app/(public)/[city]/[slug]/share-image/route.tsx`).

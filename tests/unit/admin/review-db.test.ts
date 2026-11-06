@@ -151,6 +151,83 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
     expect(statuses.filter((s) => s.status === "ACTIVE")).toHaveLength(4);
   });
 
+  it("marks the burst ratings that look genuine; releasing them leaves the rest held", async () => {
+    const r = await makeRestaurant("Fixture Burst Genuine");
+    const other = await makeRestaurant("Fixture Elsewhere");
+    const young = (i: number) => makeUser(`Young ${i}`, { createdAt: daysAgo(1, NOW) });
+    const real = [await young(0), await young(1)];
+    for (const u of real) await rate(u, other.id, "chai", { score: 5 });
+    const ring = [await young(2), await young(3), await young(4)];
+    // The last one rated elsewhere too, but gives everything a 9.
+    await rate(ring[2]!, other.id, "chai", { score: 9 });
+    for (const u of [...real, ...ring]) await rate(u, r.id, "broast", { score: 9 });
+
+    const queue = await getReviewQueue(
+      admin,
+      { type: "SUSPICIOUS_RATINGS", status: "OPEN", limit: 50 },
+      NOW,
+    );
+    const marks = queue.items[0]!.ratings.map((x) => [x.userId, x.looksGenuine]);
+    expect(Object.fromEntries(marks)).toEqual({
+      [real[0]!.id]: true,
+      [real[1]!.id]: true,
+      [ring[0]!.id]: false,
+      [ring[1]!.id]: false,
+      [ring[2]!.id]: false,
+    });
+
+    const burst = await openItem("SUSPICIOUS_RATINGS");
+    const out = await resolveReviewItem(admin, burst.id, { action: "release_genuine" }, NOW);
+    expect(out.resolution).toBe("released 2, 3 still held");
+    const statusOf = async (userId: string) =>
+      (
+        await db.rating.findFirstOrThrow({
+          where: { userId, restaurantDish: { restaurantId: r.id } },
+        })
+      ).status;
+    expect(await statusOf(real[0]!.id)).toBe("ACTIVE");
+    expect(await statusOf(ring[0]!.id)).toBe("HELD");
+
+    // The rest wait in an open item of their own, and the released two stay clear of the burst rule.
+    const rest = await openItem("SUSPICIOUS_RATINGS");
+    expect(rest.id).not.toBe(burst.id);
+    expect((rest.payload as { ratingIds: string[] }).ratingIds).toHaveLength(3);
+    await rate(await young(5), r.id, "broast", { score: 9 });
+    expect(await statusOf(real[0]!.id)).toBe("ACTIVE");
+    await resolveReviewItem(
+      admin,
+      (await openItem("SUSPICIOUS_RATINGS")).id,
+      { action: "hide" },
+      NOW,
+    );
+    expect(await statusOf(ring[0]!.id)).toBe("HIDDEN");
+
+    // Nothing to mark: a burst of accounts that only rated here can only be decided as a whole.
+    const r2 = await makeRestaurant("Fixture Burst None");
+    for (let i = 10; i < 15; i++) await rate(await young(i), r2.id, "pizza", { score: 9 });
+    await expect(
+      resolveReviewItem(
+        admin,
+        (await openItem("SUSPICIOUS_RATINGS")).id,
+        { action: "release_genuine" },
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: "NOTHING_GENUINE" });
+  });
+
+  it("a held comment is not a burst: its item cannot be released by the genuine rule", async () => {
+    const r = await makeRestaurant("Fixture Comment Only");
+    await rate(await oldUser(), r.id, "chai", { comment: "Call 0300 1234567" });
+    await expect(
+      resolveReviewItem(
+        admin,
+        (await openItem("SUSPICIOUS_RATINGS")).id,
+        { action: "release_genuine" },
+        NOW,
+      ),
+    ).rejects.toMatchObject({ code: "ACTION_NOT_ALLOWED" });
+  });
+
   it("dish suggestions: create the dish with its spellings, or map, or reject", async () => {
     const user = await oldUser();
     const r = await makeRestaurant("Fixture Dish Ideas");

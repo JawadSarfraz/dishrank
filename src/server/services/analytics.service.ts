@@ -7,6 +7,7 @@ import { logEvent } from "@/server/log";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
   countEventsByWeek,
+  countRatersByWeek,
   insertAnalyticsEvent,
   topRankingViews,
 } from "@/server/repositories/analytics.repo";
@@ -86,8 +87,9 @@ export async function getAnalyticsAdmin(actor: SessionUser | null, now: Date = n
   // Monday of this week (UTC dates; getUTCDay 0 = Sunday).
   const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * DAY_MS);
   const since = new Date(monday.getTime() - (ANALYTICS_WEEKS - 1) * 7 * DAY_MS);
-  const [rows, thisWeek, lastFourWeeks] = await Promise.all([
+  const [rows, raters, thisWeek, lastFourWeeks] = await Promise.all([
     countEventsByWeek(since),
+    countRatersByWeek(since),
     topRankingViews(monday, 10),
     topRankingViews(new Date(monday.getTime() - 3 * 7 * DAY_MS), 10),
   ]);
@@ -95,11 +97,20 @@ export async function getAnalyticsAdmin(actor: SessionUser | null, now: Date = n
     const week = new Date(monday.getTime() - i * 7 * DAY_MS);
     const count = (name: AnalyticsEventName) =>
       rows.find((r) => r.name === name && r.week.getTime() === week.getTime())?.count ?? 0;
+    const people = raters.find((r) => r.week.getTime() === week.getTime());
     return {
       week,
       ratings: count("RATING_SUBMITTED"),
+      raters: people?.raters ?? 0,
+      returningRaters: people?.returning ?? 0,
       searches: count("SEARCH"),
       rankingViews: count("RANKING_VIEW"),
+      shareClicks: count("SHARE_CLICK"),
+      signInStarted: count("SIGN_IN_STARTED"),
+      signInCompleted: count("SIGN_IN_COMPLETED"),
+      inAppStarted: count("IN_APP_SIGN_IN_STARTED"),
+      inAppLeft: count("IN_APP_LEFT_BROWSER"),
+      inAppCompleted: count("IN_APP_SIGN_IN_COMPLETED"),
     };
   });
   return { weeks, thisWeek, lastFourWeeks };

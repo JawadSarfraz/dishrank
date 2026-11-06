@@ -30,6 +30,47 @@ function TopPages({
   );
 }
 
+type Week = Awaited<ReturnType<typeof getAnalyticsAdmin>>["weeks"][number];
+
+function WeekTable({
+  weeks,
+  columns,
+}: {
+  weeks: Week[];
+  columns: [label: string, value: (week: Week) => number][];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50 text-left">
+            <th scope="col" className="px-4 py-2 font-medium">
+              Week of
+            </th>
+            {columns.map(([label]) => (
+              <th key={label} scope="col" className="px-4 py-2 text-right font-medium">
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((w) => (
+            <tr key={w.week.toISOString()} className="border-b last:border-0">
+              <td className="px-4 py-2 whitespace-nowrap">{day.format(w.week)}</td>
+              {columns.map(([label, value]) => (
+                <td key={label} className="px-4 py-2 text-right tabular-nums">
+                  {value(w)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default async function AdminAnalyticsPage() {
   const user = await requirePageRole("ADMIN", "/admin/analytics");
   if (!user) return <Forbidden />;
@@ -39,38 +80,37 @@ export default async function AdminAnalyticsPage() {
     <main className="flex flex-col gap-5">
       <AdminHeader
         title="Analytics"
-        help="Counted per day with the city and dish only: no account, no IP address, no search text and no third-party tracker. Weeks start on Monday (Pakistan time)."
+        help="Counted per day with at most the city and dish: no account, no IP address, no search text and no third-party tracker. Raters are counted from the ratings themselves, as totals; returning raters also rated in an earlier week. Weeks start on Monday (Pakistan time)."
       />
-      <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50 text-left">
-              <th scope="col" className="px-4 py-2 font-medium">
-                Week of
-              </th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">
-                Ratings
-              </th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">
-                Searches
-              </th>
-              <th scope="col" className="px-4 py-2 text-right font-medium">
-                Ranking views
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.weeks.map((w) => (
-              <tr key={w.week.toISOString()} className="border-b last:border-0">
-                <td className="px-4 py-2">{day.format(w.week)}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{w.ratings}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{w.searches}</td>
-                <td className="px-4 py-2 text-right tabular-nums">{w.rankingViews}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <WeekTable
+        weeks={data.weeks}
+        columns={[
+          ["Ratings", (w) => w.ratings],
+          ["Raters", (w) => w.raters],
+          ["Returning raters", (w) => w.returningRaters],
+          ["Searches", (w) => w.searches],
+          ["Ranking views", (w) => w.rankingViews],
+          ["Share clicks", (w) => w.shareClicks],
+        ]}
+      />
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-bold">Sign-ins</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          Google refuses its sign-in inside the Facebook, Instagram, Messenger and TikTok browsers.
+          In-app reached: a sign-in step opened in one of them. Left: Open in Chrome or Copy link
+          was tapped. Completed: the sign-in finished in Chrome or Safari after that.
+        </p>
+        <WeekTable
+          weeks={data.weeks}
+          columns={[
+            ["Browser: started", (w) => w.signInStarted],
+            ["Browser: completed", (w) => w.signInCompleted],
+            ["In-app: reached", (w) => w.inAppStarted],
+            ["In-app: left", (w) => w.inAppLeft],
+            ["In-app: completed", (w) => w.inAppCompleted],
+          ]}
+        />
+      </section>
       <div className="grid gap-4 md:grid-cols-2">
         <TopPages title="Most viewed this week" rows={data.thisWeek} />
         <TopPages title="Most viewed, last 4 weeks" rows={data.lastFourWeeks} />

@@ -52,6 +52,7 @@ export function ReviewItemCard({
   const [mode, setMode] = useState<"idle" | "create" | "map" | "link">("idle");
   const open = item.status === "OPEN" && !message?.text.startsWith("Done");
   const p = item.payload as Record<string, unknown>;
+  const genuine = item.ratings.filter((r) => r.looksGenuine).length;
 
   function resolve(input: Record<string, unknown>) {
     startTransition(async () => {
@@ -116,7 +117,8 @@ export function ReviewItemCard({
                   {" "}
                   · account {r.accountDays} days old{r.user.isPanel ? " · panel" : ""} ·{" "}
                   {r.status.toLowerCase()}
-                </span>
+                </span>{" "}
+                {r.looksGenuine && <Badge variant="secondary">looks genuine</Badge>}
               </span>
               {r.comment && <span>“{r.comment}”</span>}
             </li>
@@ -125,6 +127,13 @@ export function ReviewItemCard({
             <li className="p-2">The ratings were deleted or merged away.</li>
           )}
         </ul>
+      )}
+
+      {genuine > 0 && (
+        <p className="text-muted-foreground">
+          Looks genuine: the account has rated at another restaurant and its scores vary. It is a
+          hint; the decision is yours.
+        </p>
       )}
 
       {item.type === "UNMATCHED_MENU_ITEM" && (
@@ -210,8 +219,22 @@ export function ReviewItemCard({
         <div className="flex flex-wrap gap-2">
           {item.type === "SUSPICIOUS_RATINGS" && (
             <>
-              <Button size="sm" disabled={pending} onClick={() => resolve({ action: "release" })}>
-                Approve (count them)
+              {genuine > 0 && (
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => resolve({ action: "release_genuine" })}
+                >
+                  Release the ones that look genuine ({genuine})
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant={genuine > 0 ? "outline" : "default"}
+                disabled={pending}
+                onClick={() => resolve({ action: "release" })}
+              >
+                Approve all (count them)
               </Button>
               <Button
                 size="sm"

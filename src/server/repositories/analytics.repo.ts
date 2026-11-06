@@ -22,6 +22,29 @@ export async function countEventsByWeek(since: Date) {
     ORDER BY 1 DESC, 2`;
 }
 
+/**
+ * Distinct raters per week since `since` (weeks start on Monday, Pakistan time), and how many of
+ * them had also rated in an earlier week. Counts only: no user leaves this query. A rating counts
+ * in the week it was given and the week of its last edit; a rating an admin hid does not count.
+ */
+// DECISION-PENDING: "returning" is rated this week and in any earlier week.
+export async function countRatersByWeek(since: Date) {
+  return db.$queryRaw<{ week: Date; raters: number; returning: number }[]>`
+    WITH rated AS (
+      SELECT "userId", date_trunc('week', "createdAt" + interval '5 hours')::date AS week
+      FROM "Rating" WHERE status <> 'HIDDEN'
+      UNION
+      SELECT "userId", date_trunc('week', "updatedAt" + interval '5 hours')::date AS week
+      FROM "Rating" WHERE status <> 'HIDDEN'
+    ),
+    firsts AS (SELECT "userId", min(week) AS week FROM rated GROUP BY "userId")
+    SELECT r.week, count(*)::int AS raters,
+      (count(*) FILTER (WHERE r.week > f.week))::int AS returning
+    FROM rated r JOIN firsts f ON f."userId" = r."userId"
+    WHERE r.week >= ${since}
+    GROUP BY r.week`;
+}
+
 /** The most viewed ranking pages since `since`. */
 export async function topRankingViews(since: Date, take: number) {
   const rows = await db.analyticsEvent.groupBy({

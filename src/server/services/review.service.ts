@@ -12,6 +12,7 @@ import { findAreaById, findCityWithAreasById } from "@/server/repositories/geo.r
 import {
   closeReviewItem,
   countOpenReviewItems,
+  createReviewItem,
   listRatingIdsInOtherOpenItems,
   listReviewItemsPage,
   lockReviewItem,
@@ -24,6 +25,7 @@ import {
   reviveStaleDishRows,
 } from "@/server/repositories/restaurant-dish.repo";
 import {
+  listRatingSignalsOfUsers,
   listRatingsForReview,
   listRatingsOfUsers,
   listRowsRatedByUserAt,
@@ -43,7 +45,7 @@ import {
   listDishesForPicker,
   listDishCategories,
 } from "@/server/repositories/taxonomy.repo";
-import { inTransaction, type Tx } from "@/server/repositories/transaction";
+import { inTransaction, type Client, type Tx } from "@/server/repositories/transaction";
 import { updateUserById } from "@/server/repositories/user.repo";
 import { assertRole, type SessionUser } from "@/server/roles";
 import {
@@ -53,6 +55,7 @@ import {
 } from "@/server/validation";
 import { refreshUserTrust } from "./admin-users.service";
 import { reviewFingerprint } from "./review-fingerprint";
+import { looksGenuine } from "./review-genuine";
 import { decideOwnerClaimTx } from "./claim.service";
 import { invalidateAliasIndex } from "./matching/aliases";
 import { decideMenuItemTx, lockMenuItemParents } from "./menu.service";
@@ -89,10 +92,36 @@ type RestaurantProposalPayload = {
   note: string | null;
 };
 
+const isBurst = (item: { type: ReviewItemType; payload: unknown }) =>
+  item.type === "SUSPICIOUS_RATINGS" && (item.payload as HeldPayload).reason === "BURST";
+
 const listedRatings = <T extends { id: string }>(payload: unknown, byId: Map<string, T>) =>
   ((payload as HeldPayload).ratingIds ?? [])
     .map((id) => byId.get(id))
     .filter((r): r is T => Boolean(r));
+
+/** The ratings of a burst at this restaurant that look genuine (docs/07 §6). */
+async function genuineRatingIds(
+  ratings: readonly { id: string; userId: string }[],
+  restaurantId: string | null,
+  client?: Client,
+) {
+  if (!restaurantId) return new Set<string>();
+  const signals = await listRatingSignalsOfUsers(
+    [...new Set(ratings.map((r) => r.userId))],
+    client,
+  );
+  return new Set(
+    ratings
+      .filter((r) =>
+        looksGenuine(
+          signals.filter((s) => s.userId === r.userId),
+          restaurantId,
+        ),
+      )
+      .map((r) => r.id),
+  );
+}
 
 // ---------- list ----------
 
@@ -119,6 +148,12 @@ export async function getReviewQueue(
     item.type === "SUSPICIOUS_RATINGS" ? ((item.payload as HeldPayload).ratingIds ?? []) : [],
   );
   const ratings = new Map((await listRatingsForReview(ratingIds)).map((r) => [r.id, r]));
+  const genuine = new Map<string, Set<string>>();
+  for (const item of page) {
+    if (item.status !== "OPEN" || !isBurst(item)) continue;
+    const listed = listedRatings(item.payload, ratings);
+    genuine.set(item.id, await genuineRatingIds(listed, item.restaurantId));
+  }
   const [counts, categories, dishes] = await Promise.all([
     countOpenReviewItems(types),
     listDishCategories(),
@@ -163,6 +198,7 @@ export async function getReviewQueue(
           ? listedRatings(item.payload, ratings).map((r) => ({
               ...r,
               accountDays: Math.floor((now.getTime() - r.user.createdAt.getTime()) / 86_400_000),
+              looksGenuine: genuine.get(item.id)?.has(r.id) ?? false,
             }))
           : [],
     })),
@@ -200,7 +236,13 @@ const reject = (input: ReviewResolveInput): Decision => ({
 });
 
 async function decideHeldRatings(
-  item: { id: string; payload: unknown },
+  item: {
+    id: string;
+    type: ReviewItemType;
+    payload: unknown;
+    restaurantId: string | null;
+    dishId: string | null;
+  },
   ratings: readonly { id: string; status: string; userId: string; restaurantDishId: string }[],
   /** The dish rows locked before the item (lockItemParents). */
   lockedRows: ReadonlySet<string>,
@@ -211,13 +253,22 @@ async function decideHeldRatings(
   const payload = item.payload as HeldPayload;
   const rows = [...new Set(ratings.map((r) => r.restaurantDishId))];
   const users = [...new Set(ratings.map((r) => r.userId))];
-  if (input.action === "release") {
+  if (input.action === "release" || input.action === "release_genuine") {
+    const partial = input.action === "release_genuine";
+    if (partial && !isBurst(item)) {
+      throw new AppError("ACTION_NOT_ALLOWED", "That action does not fit this item", 400);
+    }
+    const genuine = partial ? await genuineRatingIds(ratings, item.restaurantId, tx) : null;
+    if (genuine?.size === 0) {
+      throw new AppError("NOTHING_GENUINE", "No rating here looks genuine any more", 409);
+    }
+    const cleared = genuine ? ratings.filter((r) => genuine.has(r.id)) : ratings;
     // A rating also listed in another open item (a burst and a comment) waits for that one too.
     const elsewhere = new Set<string>();
     for (const row of rows) {
       for (const id of await listRatingIdsInOtherOpenItems(row, item.id, tx)) elsewhere.add(id);
     }
-    const release = ratings.filter((r) => r.status === "HELD" && !elsewhere.has(r.id));
+    const release = cleared.filter((r) => r.status === "HELD" && !elsewhere.has(r.id));
     await setRatingStatus(
       release.map((r) => r.id),
       "ACTIVE",
@@ -227,14 +278,33 @@ async function decideHeldRatings(
     // the row STALE; its release is when it starts to count (audit 2026-11, B-03). The rows were
     // locked before the item (lockItemParents).
     await reviveStaleDishRows([...new Set(release.map((r) => r.restaurantDishId))], now, tx);
+    // The rest of a burst stays held, in an item of its own, so this one can close: a closed
+    // "released" item is what clears its listed ratings of the burst rule.
+    // DECISION-PENDING: a new open item for the rest, rather than this one staying open.
+    const rest = genuine ? ratings.filter((r) => !genuine.has(r.id) && r.status === "HELD") : [];
+    if (rest.length > 0) {
+      await createReviewItem(
+        {
+          type: "SUSPICIOUS_RATINGS",
+          restaurantId: item.restaurantId,
+          dishId: item.dishId,
+          payload: { ...payload, ratingIds: rest.map((r) => r.id), flags: [] },
+        },
+        tx,
+      );
+    }
     return {
       status: "RESOLVED",
-      resolution: `released ${release.length}`,
+      resolution: `released ${release.length}${rest.length > 0 ? `, ${rest.length} still held` : ""}`,
       recompute: rows,
       trustUsers: [],
       restaurantSlugs: [],
       // Only these are "released" for the burst rule; the ones left HELD wait for their other item.
-      payload: { ...payload, releasedRatingIds: release.map((r) => r.id) },
+      payload: {
+        ...payload,
+        ratingIds: cleared.map((r) => r.id),
+        releasedRatingIds: release.map((r) => r.id),
+      },
     };
   }
   if (input.action === "hide") {

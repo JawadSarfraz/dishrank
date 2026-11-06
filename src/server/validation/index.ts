@@ -463,6 +463,7 @@ export const reviewResolveInput = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("dismiss"), payload: noPayload }),
   // SUSPICIOUS_RATINGS
   z.strictObject({ action: z.literal("release"), payload: noPayload }),
+  z.strictObject({ action: z.literal("release_genuine"), payload: noPayload }),
   z.strictObject({ action: z.literal("hide"), payload: noPayload }),
   z.strictObject({ action: z.literal("ban_users"), payload: noPayload }),
   // OWNER_CLAIM
@@ -495,7 +496,7 @@ export const REVIEW_ACTIONS: Record<ReviewItemType, readonly ReviewAction[]> = {
   DISH_PROPOSAL: ["create_dish", "map_to_dish", "reject"],
   RESTAURANT_PROPOSAL: ["create_restaurant", "link_restaurant", "reject"],
   FLAG: ["uphold", "dismiss"],
-  SUSPICIOUS_RATINGS: ["release", "hide", "ban_users"],
+  SUSPICIOUS_RATINGS: ["release", "release_genuine", "hide", "ban_users"],
   OWNER_CLAIM: ["approve", "reject"],
   DUPLICATE_RESTAURANT: ["merge", "keep_both"],
   // A panel member's on-site location for a restaurant without one, or far from it (docs/07 §7).

@@ -1,5 +1,6 @@
 import { countMenuUploadsByStatus } from "@/server/repositories/menu.repo";
 import { countOpenReviewItems } from "@/server/repositories/moderation.repo";
+import { countHeldRatings } from "@/server/repositories/rating.repo";
 import { ERROR_LOG } from "@/server/error-log";
 import { listRecentJobRuns, listRecentServerErrors } from "@/server/repositories/ops.repo";
 import { countNewCandidates } from "@/server/repositories/overture.repo";
@@ -20,6 +21,7 @@ export async function getAdminOverview(actor: SessionUser | null) {
     menusByStatus,
     [lastRun],
     serverErrors,
+    heldRatings,
   ] = await Promise.all([
     countUsersByRole(),
     countOpenReviewItems(REVIEW_PAGE_TYPES),
@@ -28,9 +30,11 @@ export async function getAdminOverview(actor: SessionUser | null) {
     countMenuUploadsByStatus(),
     listRecentJobRuns(RECOMPUTE_JOB, 1),
     listRecentServerErrors(ERROR_LOG.shown),
+    countHeldRatings(),
   ]);
   return {
     serverErrors,
+    heldRatings,
     usersByRole,
     openReviewItems: Object.values(openByType).reduce((sum, n) => sum + (n ?? 0), 0),
     restaurantsByStatus,

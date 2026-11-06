@@ -32,6 +32,12 @@ export default async function AdminOverviewPage() {
       detail: `open item${o.openReviewItems === 1 ? "" : "s"}`,
     },
     {
+      href: "/admin/review?type=SUSPICIOUS_RATINGS",
+      label: "Held ratings",
+      count: o.heldRatings,
+      detail: `rating${o.heldRatings === 1 ? "" : "s"} waiting for a check; held ratings do not count`,
+    },
+    {
       href: "/admin/menus",
       label: "Menus",
       count: (o.menusByStatus.PENDING ?? 0) + (o.menusByStatus.PARSED ?? 0),
@@ -61,7 +67,7 @@ export default async function AdminOverviewPage() {
       href: "/admin/analytics",
       label: "Analytics",
       count: null,
-      detail: "Ratings, searches and ranking views per week (city and dish only)",
+      detail: "Ratings, raters, views, share clicks and sign-ins per week (no accounts)",
     },
   ];
 

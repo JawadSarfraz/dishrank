@@ -229,6 +229,25 @@ export async function listRatingsForReview(ids: readonly string[], client: Clien
   });
 }
 
+/** What the genuine-looking rule reads: the ratings of these users an admin has not hidden. */
+export async function listRatingSignalsOfUsers(userIds: readonly string[], client: Client = db) {
+  if (userIds.length === 0) return [];
+  const rows = await client.rating.findMany({
+    where: { userId: { in: [...userIds] }, status: { not: "HIDDEN" } },
+    select: { userId: true, score: true, restaurantDish: { select: { restaurantId: true } } },
+  });
+  return rows.map((r) => ({
+    userId: r.userId,
+    score: r.score,
+    restaurantId: r.restaurantDish.restaurantId,
+  }));
+}
+
+/** Ratings waiting for an admin (a burst or a comment): they count for nothing until released. */
+export async function countHeldRatings() {
+  return db.rating.count({ where: { status: "HELD" } });
+}
+
 /** Every rating of these users (for a ban: all of them are hidden). */
 export async function listRatingsOfUsers(userIds: readonly string[], tx: Tx) {
   if (userIds.length === 0) return [];
