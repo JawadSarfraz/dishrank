@@ -231,7 +231,7 @@ model City {
   name        String
   lat         Float
   lng         Float
-  launchedAt  DateTime? // NULL until an admin launches the city from /admin; bootstrap thresholds while NULL and for 60 days after
+  launchedAt  DateTime? // NULL until an admin presses "End early rankings in 60 days" on /admin/rankings; bootstrap thresholds while NULL and for 60 days after
   areas       Area[]
   restaurants Restaurant[]
   dishStats   DishStat[]

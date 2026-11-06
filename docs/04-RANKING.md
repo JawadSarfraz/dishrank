@@ -45,7 +45,7 @@ eligible =
   AND restaurant.status = ACTIVE
 ```
 
-**Bootstrap mode**: while `City.launchedAt` is NULL (city not launched yet) and for 60 days after it, use `MIN_RATERS = 4`, `MIN_WEIGHT = 2.5`, and label the page "Early rankings". The seed never sets `launchedAt`; an admin sets it once from `/admin` on launch day.
+**Bootstrap mode**: while `City.launchedAt` is NULL and for 60 days after it, use `MIN_RATERS = 4`, `MIN_WEIGHT = 2.5`, and label the page "Early rankings". The seed never sets `launchedAt`, so a city starts in early rankings and stays there, for as long as it takes. An admin sets the date once on `/admin/rankings` with **End early rankings in 60 days**: the name says what it does, because it starts nothing. Going live is `SITE_MODE`, a separate decision (`docs/DEPLOY-CHECKLIST.md`). On day 60 the nightly run re-ranks with the normal thresholds, so every row below them loses its rank and a dish page left without one goes noindex. The confirm step shows how many places rank now and how many would still rank under the normal rules; nothing in the admin moves or undoes the date.
 
 Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCount DESC, lastRatedAt DESC`, under the heading "Not enough votes yet". They never get a rank number.
 

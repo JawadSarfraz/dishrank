@@ -13,7 +13,7 @@ What is left on 2026-11-06. No new environment variable is needed for any of it.
 
 **Before the switch**
 
-1. Push `main`. The build runs the three new migrations. When it is ready,
+1. Push `main`. The build runs the new migrations. When it is ready,
    `https://kahankhayen.com/api/health` shows `{"ok":true}`.
 2. Check Vercel → Settings → Environment Variables: `BETTER_AUTH_URL` and `NEXT_PUBLIC_SITE_URL` are
    both `https://kahankhayen.com`, with no trailing slash. They decide the sign-in callback, canonical
@@ -38,32 +38,42 @@ What is left on 2026-11-06. No new environment variable is needed for any of it.
 
 **The switch**
 
+Going live is two things: `SITE_MODE=live` and Search Console. Nothing else has to happen that day.
+
 7. Vercel → Environment Variables: `SITE_MODE` = `live`, then Deployments → latest → **Redeploy**
    (it is read at build time). Check: no **Beta** label; `https://kahankhayen.com/robots.txt` no longer
    says `Disallow: /`; a Gmail not on `BETA_ALLOWED_EMAILS` can sign up in a private tab.
-8. Vercel → Settings → Domains → `www.kahankhayen.com`: change the redirect to `kahankhayen.com` from
+8. **Google Search Console** (search.google.com/search-console) → Add property → **Domain** →
+   `kahankhayen.com`, confirm with the DNS TXT record it gives you, then Sitemaps → submit
+   `https://kahankhayen.com/sitemap.xml`. Only pages with real ratings are in it, so it starts short.
+9. Vercel → Settings → Domains → `www.kahankhayen.com`: change the redirect to `kahankhayen.com` from
    **307** to **308** (permanent).
-9. **Launch date:** `/admin/rankings` → **Launch Islamabad** and **Launch Rawalpindi**. It is set once,
-   so press it on the day you announce. Early rankings (fewer raters needed) go on for 60 days after it.
-10. Google Auth Platform (console.cloud.google.com) → **Audience** → **Publish app**, so anyone can sign
-    in without being a test user. First check **Branding**: the app name is Kahan Khayen, home page
-    `https://kahankhayen.com`, privacy `/privacy`, terms `/terms`, and `kahankhayen.com` is an authorized
-    domain. Sign-in asks only for name and e-mail, the basic scopes; if Google still asks for a
-    verification step, follow what the console says.
-11. **Google Search Console** (search.google.com/search-console) → Add property → **Domain** →
-    `kahankhayen.com`, confirm with the DNS TXT record it gives you, then Sitemaps → submit
-    `https://kahankhayen.com/sitemap.xml`. Only pages with real ratings are in it, so it starts short.
-12. Smoke test on your phone in Chrome or Safari: the home page, a sign-in, a rating, and `/admin` shows
+10. Smoke test on your phone in Chrome or Safari: the home page, a sign-in, a rating, and `/admin` shows
     **No server errors** at the bottom.
 
 **A week later: clean up the old address**
 
-13. Vercel → Settings → Domains → `dishrank-beta.vercel.app`: change the redirect from **307** to
+11. Vercel → Settings → Domains → `dishrank-beta.vercel.app`: change the redirect from **307** to
     **308**.
-14. Only then, in Google Auth Platform: under **Clients** remove the JavaScript origin
+12. Only then, in Google Auth Platform: under **Clients** remove the JavaScript origin
     `https://dishrank-beta.vercel.app` and the redirect URI
     `https://dishrank-beta.vercel.app/api/auth/callback/google`, and under **Branding** remove its
     authorized domain.
+
+**Separate decisions, for later (not part of going live)**
+
+- **End early rankings.** `/admin/rankings` → **End early rankings in 60 days**, per city. Do not press
+  it to go live: it starts nothing. A city stays in early rankings (4 raters, weight 2.5) until you press
+  it. Pressing it sets a date 60 days ahead; that night the normal rules apply (8 raters, weight 5.0) and
+  every place below them loses its rank. The date is set once and the admin cannot move or undo it. Its
+  confirm step shows how many places rank now and how many would still rank, so press it when most of
+  them would. Avoid a date that lands just before or in Ramadan, when fewer people eat out by day.
+- **Publish the Google app.** Sign-in asks only for name and e-mail, so Google already lets every account
+  in while the app is in Testing, and going live does not need this. When `/privacy` and `/terms` are
+  final and their draft banners are gone: Google Auth Platform (console.cloud.google.com) → **Branding**:
+  the app name is Kahan Khayen, home page `https://kahankhayen.com`, privacy `/privacy`, terms `/terms`,
+  and `kahankhayen.com` is an authorized domain; then **Audience** → **Publish app**. If Google asks for
+  a verification step, follow what the console says.
 
 ## 1. Supabase project (Mumbai)
 

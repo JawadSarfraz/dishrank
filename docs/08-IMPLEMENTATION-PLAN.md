@@ -76,7 +76,7 @@ Tasks
 - Metadata: title/description per page, canonical, OpenGraph (dynamic image with the top 3), JSON-LD `ItemList` + `Restaurant` (no aggregateRating); `sitemap.ts` (indexable pages only), `robots.ts`; thin pages noindex
 - ISR 3600s + `revalidatePath` after rating writes (ranking, restaurant, city and home pages)
 - Trust pages: `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` (drafts marked for legal review; `/about/data`, the data sources and credits page, exists since Phase 2); footer links to all of them
-- `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`: trust, DishStat, rows, stale, re-rank, snapshot, rate-limit cleanup, JobRun) and `/admin/rankings` (last 10 runs, "Recompute now", "Launch city")
+- `/api/cron/recompute-rankings` + `scripts/recompute-rankings.ts` (`recomputeAll`: trust, DishStat, rows, stale, re-rank, snapshot, rate-limit cleanup, JobRun) and `/admin/rankings` (last 10 runs, "Recompute now", "End early rankings in 60 days")
 
 Acceptance
 - Lighthouse mobile ≥ 90 performance on the ranking page; JSON-LD validates; cron runs locally with the secret; ranking changes after a rating without redeploy.

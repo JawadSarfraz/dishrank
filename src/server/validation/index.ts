@@ -257,7 +257,7 @@ export const adminTrustInput = z.strictObject({
 export const adminUserUpdateInput = z.union([adminPanelInput, adminTrustInput]);
 export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateInput>;
 
-/** /admin/rankings "Launch city": sets City.launchedAt once (docs/06 admin cities launch). */
+/** /admin/rankings "End early rankings in 60 days": sets City.launchedAt once (docs/06). */
 export const cityLaunchInput = z.strictObject({ city: slug });
 export type CityLaunchInput = z.infer<typeof cityLaunchInput>;
 

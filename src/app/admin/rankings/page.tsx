@@ -1,5 +1,5 @@
 import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
-import { LaunchCityButton, RecomputeButton } from "@/components/admin/RankingsControls";
+import { EndEarlyRankingsButton, RecomputeButton } from "@/components/admin/RankingsControls";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
 import { requirePageRole } from "@/server/auth";
@@ -81,12 +81,13 @@ export default async function AdminRankingsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-bold">City launch</h2>
+        <h2 className="text-lg font-bold">Early rankings</h2>
         <p className="max-w-prose text-sm text-muted-foreground">
-          Until a city is launched, and for {RANKING.bootstrapDays} days after, its pages say
-          &quot;Early rankings&quot; and a rank needs {RANKING.bootstrap.minRaters} raters and
-          weight {RANKING.bootstrap.minWeight} instead of {RANKING.normal.minRaters} and{" "}
-          {RANKING.normal.minWeight.toFixed(1)}. The launch date is set once.
+          A city starts in early rankings: its pages say &quot;Early rankings&quot; and a rank needs{" "}
+          {RANKING.bootstrap.minRaters} raters and weight {RANKING.bootstrap.minWeight} instead of{" "}
+          {RANKING.normal.minRaters} and {RANKING.normal.minWeight.toFixed(1)}. That lasts until you
+          end it. The button starts nothing: going live is separate. It sets the end,{" "}
+          {RANKING.bootstrapDays} days later, and can be pressed once.
         </p>
         <AdminList>
           {cities.map((c) => (
@@ -97,15 +98,25 @@ export default async function AdminRankingsPage() {
               <div className="flex flex-col">
                 <span className="font-medium">{c.name}</span>
                 <span className="text-muted-foreground">
-                  {c.launchedAt
-                    ? `Launched ${date.format(c.launchedAt)} · early rankings until ${date.format(c.bootstrapEndsAt!)}`
-                    : "Not launched · early rankings"}
+                  {!c.launchedAt
+                    ? "Early rankings, no end date"
+                    : c.mode === "bootstrap"
+                      ? `Early rankings end on ${date.format(c.bootstrapEndsAt!)}`
+                      : `Early rankings ended on ${date.format(c.bootstrapEndsAt!)}`}
                 </span>
               </div>
               {c.launchedAt ? (
                 <Badge variant="secondary">{c.mode === "bootstrap" ? "early" : "normal"}</Badge>
               ) : (
-                <LaunchCityButton city={c.slug} name={c.name} />
+                <EndEarlyRankingsButton
+                  city={c.slug}
+                  name={c.name}
+                  days={RANKING.bootstrapDays}
+                  endsOn={date.format(c.wouldEndOn)}
+                  rankedNow={c.rankedNow}
+                  stillRanked={c.stillRankedUnderNormalRules}
+                  normalRule={`${RANKING.normal.minRaters} raters and weight ${RANKING.normal.minWeight.toFixed(1)}`}
+                />
               )}
             </li>
           ))}

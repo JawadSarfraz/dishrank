@@ -76,6 +76,21 @@ export async function listCityLaunches(client: Client = db) {
   });
 }
 
+/** Per city: the dish rows ranked now, and how many of them meet these thresholds as well. */
+export async function countRankedRowsByCity(
+  min: { minRaters: number; minWeight: number },
+  client: Client = db,
+) {
+  return client.$queryRaw<{ cityId: string; ranked: number; kept: number }[]>`
+    SELECT "cityId", count(*)::int AS ranked,
+      (count(*) FILTER (
+        WHERE "distinctRaters" >= ${min.minRaters} AND "weightSum" >= ${min.minWeight}
+      ))::int AS kept
+    FROM "RestaurantDish"
+    WHERE "rankInCity" IS NOT NULL
+    GROUP BY "cityId"`;
+}
+
 /** Sets City.launchedAt once: false when the city was launched already. */
 export async function setCityLaunchedAtOnce(id: string, launchedAt: Date, client: Client = db) {
   const { count } = await client.city.updateMany({
