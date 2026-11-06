@@ -23,6 +23,13 @@ vi.mock("@/server/site", async (original) => ({
   SITE_MODE: "beta",
 }));
 
+// The OAuth state of the sign-in in progress; real hooks read it from Better Auth's request state.
+const oauth = vi.hoisted(() => ({ callbackURL: "/join/welcome" }));
+vi.mock("better-auth/api", async (original) => ({
+  ...(await original<typeof import("better-auth/api")>()),
+  getOAuthState: async () => ({ callbackURL: oauth.callbackURL }),
+}));
+
 const NOW = new Date("2026-11-06T10:00:00Z");
 const later = (days: number) => new Date(NOW.getTime() + days * 86_400_000);
 
@@ -152,14 +159,33 @@ describe("panel invite links (test DB)", () => {
     });
   });
 
-  it("turning the panel off by hand keeps a later use of the link honest", async () => {
-    const { token } = await invite();
+  it("an admin's panel off holds against every link, until the admin turns it on again", async () => {
+    const first = await invite();
+    const second = await invite();
     const diner = await makeUser("Diner");
-    await redeemPanelInvite(diner.id, token, NOW);
+    await redeemPanelInvite(diner.id, first.token, NOW);
     await setPanel(admin, diner.id, false);
-    // Already counted on this link: it does not put them back.
-    expect((await redeemPanelInvite(diner.id, token, NOW)).outcome).toBe("already");
-    expect(await userOf(diner.id)).toMatchObject({ isPanel: false });
+
+    expect((await redeemPanelInvite(diner.id, first.token, NOW)).outcome).toBe("removed");
+    expect((await redeemPanelInvite(diner.id, second.token, NOW)).outcome).toBe("removed");
+    expect(await userOf(diner.id)).toMatchObject({ isPanel: false, trustScore: 0.6 });
+    expect(
+      await getJoinPageState(actorOf({ ...diner, role: "USER" }), second.token, NOW),
+    ).toMatchObject({ kind: "closed" });
+    expect(
+      (await db.panelInvite.findUniqueOrThrow({ where: { id: second.invite.id } })).usesCount,
+    ).toBe(0);
+
+    await setPanel(admin, diner.id, true);
+    expect((await userOf(diner.id)).panelRemovedAt).toBeNull();
+    await setPanel(admin, diner.id, false);
+    await setPanel(admin, diner.id, true);
+    expect((await redeemPanelInvite(diner.id, second.token, NOW)).outcome).toBe("already");
+
+    // Someone who was never on the panel is not marked as removed.
+    const other = await makeUser("Other");
+    await setPanel(admin, other.id, false);
+    expect((await redeemPanelInvite(other.id, second.token, NOW)).outcome).toBe("joined");
   });
 
   describe("the sign-in hooks", () => {
@@ -176,6 +202,28 @@ describe("panel invite links (test DB)", () => {
         } as never,
       };
     };
+
+    it("only a sign-in that started from the join page counts: a stale cookie gives nothing", async () => {
+      const { token } = await createPanelInvite(admin, { label: "Now" });
+      oauth.callbackURL = "/";
+      try {
+        await expect(
+          hooks.user!.create!.before!(newAccount("bob@test.local"), ctxWith(token).ctx),
+        ).rejects.toMatchObject({ body: { code: "BETA_INVITE_ONLY" } });
+        const bob = await makeUser("Bob");
+        const { ctx, setCookie } = ctxWith(token);
+        await hooks.session!.create!.after!({ userId: bob.id } as never, ctx);
+        expect(await userOf(bob.id)).toMatchObject({ isPanel: false, trustScore: 0.6 });
+        // The stale cookie goes, so it cannot wait for someone else.
+        expect(setCookie).toHaveBeenCalledWith(
+          PANEL_INVITE.cookie,
+          "",
+          expect.objectContaining({ maxAge: 0 }),
+        );
+      } finally {
+        oauth.callbackURL = "/join/welcome";
+      }
+    });
 
     it("a stranger is refused in beta; a usable link lets a verified account in", async () => {
       const { token } = await invite();

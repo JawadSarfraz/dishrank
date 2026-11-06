@@ -20,7 +20,14 @@ export async function findUserRole(id: string, client: Client = db) {
 export async function findRater(id: string, client: Client = db) {
   return client.user.findUnique({
     where: { id },
-    select: { id: true, isPanel: true, trustScore: true, createdAt: true, bannedAt: true },
+    select: {
+      id: true,
+      isPanel: true,
+      panelRemovedAt: true,
+      trustScore: true,
+      createdAt: true,
+      bannedAt: true,
+    },
   });
 }
 

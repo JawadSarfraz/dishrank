@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { APIError } from "better-auth/api";
+import { APIError, getOAuthState } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -19,14 +19,21 @@ import {
 import { SITE_MODE, newAccountDecision } from "./site";
 import { panelInviteToken } from "./validation";
 import { BRAND } from "@/lib/brand";
+import { JOIN_WELCOME_PATH } from "@/lib/panel-invite";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
 
-/** The invite this sign-in started from on /join/<token>, from its HttpOnly cookie (docs/07 §7a). */
-function panelInviteOf(ctx: { getCookie(key: string): string | null } | null | undefined) {
+/**
+ * The invite this sign-in started from on /join/<token>, from its HttpOnly cookie (docs/07 §7a). Only
+ * a sign-in that names the join path counts, so a cookie left by an abandoned sign-in gives nothing to
+ * the next person who signs in on that browser.
+ */
+async function panelInviteOf(ctx: { getCookie(key: string): string | null } | null | undefined) {
   const parsed = panelInviteToken.safeParse(ctx?.getCookie(PANEL_INVITE.cookie));
-  return parsed.success ? parsed.data : null;
+  if (!parsed.success) return null;
+  const state = await getOAuthState().catch(() => null);
+  return state?.callbackURL === JOIN_WELCOME_PATH ? parsed.data : null;
 }
 
 /** Google sign-in is offered only when both credentials are set (src/env.ts requires them in production). */
@@ -68,7 +75,7 @@ export const auth = betterAuth({
           // Private beta: only invited Google accounts get an account (BETA_ALLOWED_EMAILS, docs/10);
           // the OAuth callback sends anyone else to /sign-in?error=BETA_INVITE_ONLY. The first
           // admin: ADMIN_EMAIL gets role ADMIN on first sign-in (docs/10).
-          const invite = panelInviteOf(ctx);
+          const invite = await panelInviteOf(ctx);
           const decision = newAccountDecision(user, {
             mode: SITE_MODE,
             allowed: env.BETA_ALLOWED_EMAILS,
@@ -91,12 +98,13 @@ export const auth = betterAuth({
         // Whoever signs in through a panel invite link joins the panel, new account or not. A
         // problem here never blocks the sign-in: /join/<token> then offers the one-tap join.
         after: async (session, ctx) => {
-          const invite = panelInviteOf(ctx);
-          if (!invite) return;
+          if (!ctx?.getCookie(PANEL_INVITE.cookie)) return;
           try {
+            const invite = await panelInviteOf(ctx);
+            ctx.setCookie(PANEL_INVITE.cookie, "", { maxAge: 0, path: "/" });
+            if (!invite) return;
             const { dishPages } = await redeemPanelInvite(session.userId, invite);
             for (const page of dishPages) revalidateDishPages(page);
-            ctx?.setCookie(PANEL_INVITE.cookie, "", { maxAge: 0, path: "/" });
           } catch (error) {
             logEvent(
               "panel_invite.redeem_failed",

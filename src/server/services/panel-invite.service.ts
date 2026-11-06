@@ -107,12 +107,14 @@ export async function getPanelInviteState(token: string, now: Date = new Date())
   return stateOf(await findPanelInviteByHash(hashToken(token)), now);
 }
 
-export type RedeemOutcome = "joined" | "already" | "banned" | Exclude<InviteState, "usable">;
+export type RedeemOutcome =
+  "joined" | "already" | "banned" | "removed" | Exclude<InviteState, "usable">;
 
 /**
  * Makes the user a panel member through this link. Under the link's row lock (then the user's, last
  * as everywhere), so its limit holds however many sign in at once. Someone already on the panel, or
- * already counted on this link, does not use up a place. An admin's trust override still wins.
+ * already counted on this link, does not use up a place. An admin who turned the panel off for
+ * someone is not overruled by any link, and an admin's trust override still wins.
  */
 export async function redeemPanelInvite(userId: string, token: string, now: Date = new Date()) {
   const result = await inTransaction(
@@ -122,9 +124,9 @@ export async function redeemPanelInvite(userId: string, token: string, now: Date
       await lockUser(userId, tx);
       const rater = await findRater(userId, tx);
       if (!rater || rater.bannedAt) return { outcome: "banned" };
-      if (rater.isPanel || (await findPanelInviteUse(invite.id, userId, tx))) {
-        return { outcome: "already" };
-      }
+      if (rater.isPanel) return { outcome: "already" };
+      if (rater.panelRemovedAt) return { outcome: "removed" };
+      if (await findPanelInviteUse(invite.id, userId, tx)) return { outcome: "already" };
       const state = stateOf(invite, now);
       if (state !== "usable") return { outcome: state };
       await recordPanelInviteUse(invite.id, userId, tx);
@@ -152,9 +154,11 @@ export async function redeemPanelInvite(userId: string, token: string, now: Date
 /** Why a link cannot be used, in words for the person holding it. */
 export function inviteProblem(outcome: Exclude<RedeemOutcome, "joined" | "already">): string {
   if (outcome === "banned") return "This account cannot join the panel.";
-  if (outcome === "full") return "This invite link has been used as many times as it allows.";
-  if (outcome === "expired") return "This invite link has expired.";
-  return "This invite link no longer works.";
+  if (outcome === "removed") return "This account was taken off the panel, so a link can't add it.";
+  const ask = "Ask whoever sent it for a new one.";
+  if (outcome === "full") return `It has been used as many times as it allows. ${ask}`;
+  if (outcome === "expired") return `It has expired. ${ask}`;
+  return `It no longer works. ${ask}`;
 }
 
 /** /join/<token>: what to show this visitor. */
@@ -166,6 +170,7 @@ export async function getJoinPageState(
   const rater = user ? await findRater(user.id) : null;
   if (rater?.bannedAt) return { kind: "closed" as const, message: inviteProblem("banned") };
   if (rater?.isPanel) return { kind: "member" as const };
+  if (rater?.panelRemovedAt) return { kind: "closed" as const, message: inviteProblem("removed") };
   const state = token ? await getPanelInviteState(token, now) : "unknown";
   if (state !== "usable") return { kind: "closed" as const, message: inviteProblem(state) };
   return { kind: "open" as const, signedInAs: user?.name ?? null };

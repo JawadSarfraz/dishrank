@@ -105,7 +105,7 @@ export function SiteHeader({ beta }: { beta: boolean }) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : pathname === "/sign-in" ? null : (
+            ) : pathname === "/sign-in" || pathname.startsWith("/join/") ? null : (
               <ButtonLink
                 variant="ghost"
                 size="sm"

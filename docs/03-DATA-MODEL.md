@@ -269,6 +269,7 @@ model User {
   trustScore    Float     @default(0.6) // 0.3 .. 1.5, see docs/04: the trust used at compute time
   trustOverride Float? // set by an admin on /admin/users (0.3 .. 1.5); wins over the trust table, also the nightly job's
   isPanel       Boolean   @default(false) // admin-only (never Better Auth input); trust 1.3 unless trustOverride is set, panel limits in docs/04
+  panelRemovedAt DateTime? // an admin turned the panel off: an invite link does not put them back (docs/07 §7a)
   ratingsCount  Int       @default(0)
   photoRatings  Int       @default(0)
   bannedAt      DateTime?

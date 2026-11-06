@@ -62,7 +62,14 @@ export async function setPanel(actor: SessionUser | null, userId: string, isPane
     if (!stats) throw new AppError("NOT_FOUND", "User not found", 404);
     // Panel trust is 1.3 (Decided 2026-10-22) unless an admin set an override; off → the table.
     const trustScore = trustFor({ ...stats, isPanel });
-    return updateUserById(userId, { isPanel, trustScore }, tx);
+    // Turning a member off is remembered, so an invite link does not put them back (docs/07 §7a);
+    // turning anyone on clears it.
+    const removal = isPanel
+      ? { panelRemovedAt: null }
+      : stats.isPanel
+        ? { panelRemovedAt: new Date() }
+        : {};
+    return updateUserById(userId, { isPanel, trustScore, ...removal }, tx);
   });
   const trustScore = updated.trustScore;
   const rows = await listRatedRowsOfUser(userId);
