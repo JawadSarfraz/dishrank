@@ -31,6 +31,8 @@ export const AUTO_LIST = {
   similarNameMetres: 300,
   /** The same name this close is one place too; a real second branch stays NEW for a person. */
   sameNameMetres: 1000,
+  /** Names that start with the same distinctive word this close: "Cafe Trieste", "Trieste Bahria Town". */
+  sameBrandMetres: 60,
 } as const;
 
 /**
@@ -129,6 +131,22 @@ const GENERIC_WORDS = new Set(
   ).split(" "),
 );
 
+/** A name cannot end on these: "Taste of Pakistan" is a name, and "Taste of" is not. */
+const DANGLING_WORDS = new Set("al and at by de e el for in of the ul".split(" "));
+
+/**
+ * Words that do not tell one place from another at the start of a name: the generic ones, connectors,
+ * and the regions and dishes many unrelated places open with ("Quetta Bilal Cafe", "Tikka Mehal").
+ */
+const NOT_A_BRAND = new Set([
+  ...GENERIC_WORDS,
+  ...(
+    "al e el la ms mr n s the de afghan afghani balochi bannu bbq beef broast chicken cream fish " +
+    "hunza ice kabab kabul karachi kebab lahore lahori mandi murgh mutton nihari peshawar peshawari " +
+    "pulao punjab quetta roll rolls shanwari shawarma shinwari sindhi sweet tandoori tikka wok"
+  ).split(" "),
+]);
+
 /** Words that say the record is not a place to eat, unless the name also says it serves food. */
 const NOT_EATING_WORDS = new Set(
   (
@@ -199,8 +217,9 @@ function fixCase(name: string): string {
   if (hasLower && !hasUpper) return words.map(capitalise).join(" ");
   return words
     .map((w) => {
+      // Only long words: a short one in a mixed name is initials as often as not ("Steak by CFU").
       const letters = w.replace(/[^\p{L}]/gu, "");
-      return letters.length >= 3 && !/\p{Ll}/u.test(letters) ? fixCapsWord(w, false) : w;
+      return letters.length >= 4 && !/\p{Ll}/u.test(letters) ? fixCapsWord(w, false) : w;
     })
     .join(" ");
 }
@@ -208,6 +227,7 @@ function fixCase(name: string): string {
 /** Stray separators at the ends; the dot of a short abbreviation ("The Burger Co.") stays. */
 const tidyEnds = (name: string) =>
   name
+    .replace(/(?:['"._]\s*){2,}$/u, "")
     .replace(/^[\s,;:|/\\.\-–—]+/u, "")
     .replace(/[\s,;:|/\\\-–—]+$/u, "")
     .replace(/(?<!(?:^|[^\p{L}])\p{L}{1,3})[.\s]+$/u, "");
@@ -253,8 +273,10 @@ function dropOtherScriptEnds(name: string): string {
  */
 export function cleanPlaceName(raw: string): string | null {
   let name = raw
+    // Before NFKC, which would turn ™ into the letters "TM": a word the original never had.
+    .replace(/[\p{Extended_Pictographic}\u{2120}\u{FE0F}\u{200D}\u{20E3}]/gu, " ")
     .normalize("NFKC")
-    .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}]/gu, " ")
+    .replace(/_/g, " ")
     .replace(/[‘’`´]/g, "'")
     .replace(/[“”]/g, '"')
     .replace(/\s+/g, " ")
@@ -276,6 +298,8 @@ export function cleanPlaceName(raw: string): string | null {
     if (withoutCity === name) break;
     if (!tokenize(cleanText(withoutCity)).length) return null; // only a city name
     if (isGenericName(withoutCity)) break; // "Cake Shop Islamabad" keeps its city
+    const lastWord = tokenize(cleanText(withoutCity)).at(-1)!;
+    if (DANGLING_WORDS.has(lastWord)) break; // "Shan-e-Pakistan" keeps it too
     name = withoutCity;
   }
   name = balanceBrackets(tidyEnds(name)).replace(/\s+/g, " ").trim();
@@ -305,20 +329,26 @@ type DishRule = {
   notAfter?: readonly string[];
   /** The word after does ("The Coffee Bean & Tea Leaf"). */
   notBefore?: readonly string[];
+  /** Anywhere in the name, these say it is another dish ("Mutton Tikka and Kabab Shop"). */
+  notWith?: readonly string[];
 };
 
 const BURGERS = ["beef-burger", "zinger-burger"];
 const KARAHIS = ["chicken-karahi", "mutton-karahi"];
+const PIZZA_WORDS = ["pizza", "pizzas", "pizzeria"];
+const BURGER_WORDS = ["burger", "burgers"];
+const ZINGER_WORDS = ["zinger", "zingers"];
+const CHAI_WORDS = ["chai", "chaiwala", "chaiwalla", "chaye", "chaaye", "chae", "tea"];
 
 // DECISION-PENDING: a bare "burger" links both launch burgers, as a bare "karahi" links both karahis.
 const DISH_RULES: readonly DishRule[] = [
-  { words: ["pizza", "pizzas", "pizzeria"], dishes: ["pizza"] },
+  { words: PIZZA_WORDS, dishes: ["pizza"] },
   {
-    words: ["burger", "burgers"],
+    words: BURGER_WORDS,
     dishes: BURGERS,
     after: { beef: ["beef-burger"], zinger: ["zinger-burger"], chicken: ["zinger-burger"] },
   },
-  { words: ["zinger", "zingers"], dishes: ["zinger-burger"] },
+  { words: ZINGER_WORDS, dishes: ["zinger-burger"] },
   { words: ["broast", "broasted"], dishes: ["broast"] },
   {
     words: ["shawarma", "shawarmas", "shwarma", "shawerma"],
@@ -326,7 +356,7 @@ const DISH_RULES: readonly DishRule[] = [
     notAfter: ["beef", "mutton"],
   },
   {
-    words: ["chai", "chaiwala", "chaiwalla", "chaye", "chaaye", "chae", "tea"],
+    words: CHAI_WORDS,
     dishes: ["chai"],
     notAfter: [
       "boba",
@@ -370,15 +400,21 @@ const DISH_RULES: readonly DishRule[] = [
     words: ["kabab", "kebab", "kabob", "kababs", "kebabs"],
     dishes: ["beef-seekh-kabab"],
     after: { chapli: ["chapli-kabab"], chappal: ["chapli-kabab"] },
-    notAfter: ["bun", "chicken", "doner", "fish", "reshmi", "shami"],
+    notAfter: ["adana", "bun", "chicken", "doner", "fish", "pulao", "reshmi", "shami"],
+    notWith: ["chicken", "fish", "mutton"],
   },
 ];
 
-/** Overture categories that clearly say a launch dish. */
-const CATEGORY_RULES: Readonly<Record<string, readonly string[]>> = {
-  pizza_restaurant: ["pizza"],
-  burger_restaurant: BURGERS,
-  tea_room: ["chai"],
+/**
+ * Overture categories that clearly say a launch dish, unless the name speaks to it itself: then the
+ * name decides ("Beef Burger Spot" is not a Zinger Burger, "Bubble Tea House" serves no chai).
+ */
+const CATEGORY_RULES: Readonly<
+  Record<string, { dishes: readonly string[]; nameWords: readonly string[] }>
+> = {
+  pizza_restaurant: { dishes: ["pizza"], nameWords: PIZZA_WORDS },
+  burger_restaurant: { dishes: BURGERS, nameWords: [...BURGER_WORDS, ...ZINGER_WORDS] },
+  tea_room: { dishes: ["chai"], nameWords: CHAI_WORDS },
 };
 
 /**
@@ -387,18 +423,28 @@ const CATEGORY_RULES: Readonly<Record<string, readonly string[]>> = {
  */
 export function autoListDishes(name: string, category: string | null): string[] {
   const tokens = tokenize(cleanText(name));
-  const found = new Set<string>(category ? (CATEGORY_RULES[category] ?? []) : []);
+  const byCategory = category ? CATEGORY_RULES[category] : undefined;
+  const found = new Set<string>(
+    byCategory && !byCategory.nameWords.some((w) => tokens.includes(w)) ? byCategory.dishes : [],
+  );
   tokens.forEach((token, i) => {
     const before = tokens[i - 1] ?? "";
     const after = tokens[i + 1] ?? "";
     for (const rule of DISH_RULES) {
       if (!rule.words.includes(token)) continue;
       if (rule.notAfter?.includes(before) || rule.notBefore?.includes(after)) continue;
+      if (rule.notWith?.some((w) => tokens.includes(w))) continue;
       for (const slug of rule.after?.[before] ?? rule.dishes) found.add(slug);
     }
   });
   return [...found].sort();
 }
+
+/** An admin's hand on an auto-listed restaurant ends its "not checked" state (docs/07 §2a). */
+export const checkedBy = (
+  restaurant: { autoListedAt: Date | null; checkedAt: Date | null },
+  now: Date,
+) => (restaurant.autoListedAt && !restaurant.checkedAt ? { checkedAt: now } : {});
 
 // ---------- the plan ----------
 
@@ -481,9 +527,8 @@ function byStrength(a: AutoListRow, b: AutoListRow) {
   );
 }
 
-type NamedPoint = LatLng & { keys: readonly string[] };
-
-const keysOf = (names: readonly string[]) => [...new Set(names.map(nameKey))];
+type NamedPoint = LatLng & { keys: readonly string[]; brands: readonly string[] };
+type Names = Pick<NamedPoint, "keys" | "brands">;
 
 /**
  * Places to compare a candidate with. Each name's key is worked out once, and equal names are looked
@@ -503,8 +548,11 @@ class PlaceIndex {
     }
   }
 
-  /** Is a place here probably this one: the same name nearby, or a similar name close by? */
-  matches(at: LatLng, keys: readonly string[]): boolean {
+  /**
+   * Is a place here probably this one: the same name nearby, a similar name close by, or a name that
+   * starts with the same distinctive word right next to it?
+   */
+  matches(at: LatLng, { keys, brands }: Names): boolean {
     for (const key of keys) {
       for (const point of this.byKey.get(key) ?? []) {
         if (metresBetween(at, point) <= AUTO_LIST.sameNameMetres) return true;
@@ -512,7 +560,11 @@ class PlaceIndex {
     }
     return this.nearby
       .near(at, AUTO_LIST.similarNameMetres)
-      .some(({ point }) => keys.some((a) => point.keys.some((b) => similarKeys(a, b))));
+      .some(
+        ({ point, metres }) =>
+          keys.some((a) => point.keys.some((b) => similarKeys(a, b))) ||
+          (metres <= AUTO_LIST.sameBrandMetres && brands.some((b) => point.brands.includes(b))),
+      );
   }
 }
 
@@ -533,19 +585,31 @@ export function planAutoList(input: {
   areaNames: readonly string[];
 }): { picks: AutoListPick[]; held: AutoListHeld[] } {
   const areaKeys = new Set(input.areaNames.map(nameKey));
+  const areaWords = new Set(input.areaNames.flatMap((area) => tokenize(cleanText(area))));
+  /** A name's first word that tells it from its neighbours; none for a name of general words. */
+  const brandOf = (name: string) =>
+    tokenize(cleanText(name)).find(
+      (w) => !NOT_A_BRAND.has(w) && !areaWords.has(w) && !/^\d+$/.test(w),
+    );
+  const namesOf = (names: readonly string[]): Names => ({
+    keys: [...new Set(names.map(nameKey))],
+    brands: [...new Set(names.flatMap((n) => brandOf(n) ?? []))],
+  });
   const restaurants = new PlaceIndex();
   /** Restaurants with no location can only be matched by name, within their area (docs/07 §2). */
   const unlocatedByArea = new Map<string, string[]>();
   for (const r of input.restaurants) {
-    const keys = keysOf([r.name, ...r.aliases]);
+    const names = namesOf([r.name, ...r.aliases]);
     if (r.lat !== null && r.lng !== null) {
-      restaurants.add({ lat: r.lat, lng: r.lng, keys });
+      restaurants.add({ lat: r.lat, lng: r.lng, ...names });
     } else if (r.areaId) {
-      unlocatedByArea.set(r.areaId, [...(unlocatedByArea.get(r.areaId) ?? []), ...keys]);
+      unlocatedByArea.set(r.areaId, [...(unlocatedByArea.get(r.areaId) ?? []), ...names.keys]);
     }
   }
   const reviewed = new PlaceIndex();
-  for (const c of input.reviewed) reviewed.add({ lat: c.lat, lng: c.lng, keys: keysOf([c.name]) });
+  for (const c of input.reviewed) {
+    reviewed.add({ lat: c.lat, lng: c.lng, ...namesOf([c.name]) });
+  }
   const picked = new PlaceIndex();
   const picks: AutoListPick[] = [];
   const held: AutoListHeld[] = [];
@@ -569,24 +633,24 @@ export function planAutoList(input: {
   }
 
   for (const row of eligible) {
-    const keys = keysOf([row.name, row.cleanName]);
+    const names = namesOf([row.name, row.cleanName]);
     const isOurs =
       input.usedOvertureIds.has(row.overtureId) ||
-      restaurants.matches(row, keys) ||
+      restaurants.matches(row, names) ||
       (unlocatedByArea.get(row.suggestedAreaId) ?? []).some((other) =>
-        keys.some((key) => sameKeys(key, other)),
+        names.keys.some((key) => sameKeys(key, other)),
       );
     const reason: HoldReason | null = isOurs
       ? "DUPLICATE_OF_RESTAURANT"
-      : reviewed.matches(row, keys)
+      : reviewed.matches(row, names)
         ? "DUPLICATE_OF_REVIEWED"
-        : picked.matches(row, keys)
+        : picked.matches(row, names)
           ? "DUPLICATE"
           : null;
     if (reason) {
       held.push({ row, reason, cleanName: row.cleanName });
     } else {
-      picked.add({ lat: row.lat, lng: row.lng, keys });
+      picked.add({ lat: row.lat, lng: row.lng, ...names });
       picks.push(row);
     }
   }

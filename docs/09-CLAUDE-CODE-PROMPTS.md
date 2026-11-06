@@ -215,7 +215,7 @@ Commit as: feat(owner): claims, owner dashboard, hardening and analytics
 Act as a reviewer who has not seen this code before. Read CLAUDE.md and docs/11-REVIEW-CHECKLIST.md. Then inspect the repo and answer, with file:line references:
 
 1. Which server actions, /api/v1 handlers, admin/owner pages or admin/owner services can run without the right role? List any missing requireUser/requireRole/requirePageRole, any admin service that does not take and check the current user, any cron handler that does not fail closed, and any missing Zod parse.
-2. Is any Google Places code, key or data left anywhere, and does every restaurant pass an admin's review? (tests/unit/ops/no-google-places.test.ts; docs/07 §1–2.)
+2. Is any Google Places code, key or data left anywhere, and does every restaurant come from an admin's action (a review on /admin/import, or the Auto-list they ran)? (tests/unit/ops/no-google-places.test.ts; docs/07 §1–2.)
 3. Can any user create a Dish row outside the admin resolve flow?
 4. Can an RD get a rank number while below thresholds? Trace getRanking and the page.
 5. What happens if ANTHROPIC_API_KEY is missing? (Should degrade gracefully.)

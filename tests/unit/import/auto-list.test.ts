@@ -69,6 +69,9 @@ describe("cleanPlaceName: only shortens and re-cases, never invents", () => {
     ["Sufi’s", "Sufi's"],
     ["The Burger Co.", "The Burger Co."],
     ["Baoo Muhaala Rawalpindi.", "Baoo Muhaala"],
+    ["Pizza Max™", "Pizza Max"], // never "Pizza MaxTM"
+    ["Thai Taste_Giga Mall", "Thai Taste Giga Mall"],
+    ["The Centaures Mall''.''.", "The Centaures Mall"],
   ])("%s → %s", (raw, clean) => {
     expect(cleanPlaceName(raw)).toBe(clean);
   });
@@ -87,6 +90,11 @@ describe("cleanPlaceName: only shortens and re-cases, never invents", () => {
     ["KHIVA Revolving Restaurant", "Khiva Revolving Restaurant"],
     ["lahoree chatkhara", "Lahoree Chatkhara"],
     ["McDonald's", "McDonald's"],
+    // In a mixed name, short words may be initials: left as written.
+    ["Steak by CFU", "Steak by CFU"],
+    ["OMG Healthy Grilled", "OMG Healthy Grilled"],
+    ["YDA Doctor Cafe", "YDA Doctor Cafe"],
+    ["KAF Coffee", "KAF Coffee"],
   ])("fixes capitals: %s → %s", (raw, clean) => {
     expect(cleanPlaceName(raw)).toBe(clean);
   });
@@ -95,6 +103,13 @@ describe("cleanPlaceName: only shortens and re-cases, never invents", () => {
     expect(cleanPlaceName("Cake Shop Islamabad")).toBe("Cake Shop Islamabad");
     expect(cleanPlaceName("Islamabad Murgh Pulao")).toBe("Islamabad Murgh Pulao");
     expect(cleanPlaceName("Islamabadmarketing")).toBe("Islamabadmarketing");
+  });
+
+  it("keeps the city when the rest would end on a connector", () => {
+    expect(cleanPlaceName("Taste of Pakistan")).toBe("Taste of Pakistan");
+    expect(cleanPlaceName("Shan-e-Pakistan")).toBe("Shan-e-Pakistan");
+    expect(cleanPlaceName("Spirit of Islamabad")).toBe("Spirit of Islamabad");
+    expect(cleanPlaceName("Al-Pakistan")).toBe("Al-Pakistan");
   });
 
   it("returns null when no usable Latin name is left", () => {
@@ -155,12 +170,19 @@ describe("autoListDishes: only what the name or category clearly says", () => {
     ["Chapli Kabab House", "restaurant", ["chapli-kabab"]],
     ["Burger Point", "restaurant", ["beef-burger", "zinger-burger"]],
     ["Fixture", "burger_restaurant", ["beef-burger", "zinger-burger"]],
+    // The name decides over its category.
+    ["Beef Burger Spot", "burger_restaurant", ["beef-burger"]],
+    ["Zinger Point", "burger_restaurant", ["zinger-burger"]],
   ])("%s (%s) → %j", (name, category, dishes) => {
     expect(autoListDishes(name, category)).toEqual(dishes);
   });
 
   it.each([
     ["Bubble Tea House", "cafe"],
+    ["Bubble Tea House", "tea_room"],
+    ["Food Hut pulao kabab", "restaurant"],
+    ["Adana Kebab House", "restaurant"],
+    ["Aziz Mutton Tikka and Kabab Shop", "restaurant"],
     ["The Coffee Bean & Tea Leaf", "coffee_shop"],
     ["Beef Biryani Corner", "restaurant"],
     ["Doner Kebab", "restaurant"],
@@ -221,6 +243,53 @@ describe("planAutoList: who is listed", () => {
       [strong.id, elsewhere.id, other.id].sort(),
     );
     for (const c of [weak, tied, sameNameFar]) expect(reasonOf(result, c.id)).toBe("DUPLICATE");
+  });
+
+  it("names that start with the same distinctive word, right next to each other, are one place", () => {
+    const pairs = [
+      ["Sufi Shinwari Restaurant", "Sufi shinwari f.8 markaz Islamabad"],
+      ["Nutella Spot Bahria Phase - 4", "The Nutella Spot"],
+      ["Trieste Bahria Town", "Cafe Trieste"],
+      ["Hot And Spicy", "Hot 'N Spicy - Chinese Cuisine"],
+      ["Khyber Shinwari", "New Khyber Shinwani Resturant G-9/4"],
+    ];
+    pairs.forEach(([strong, weak], i) => {
+      const at = metresNorth(4000 * (i + 1));
+      const a = row(strong!, { confidence: 0.9, ...at });
+      const b = row(weak!, { confidence: 0.7, ...at });
+      const result = plan([a, b]);
+      expect(
+        result.picks.map((p) => p.id),
+        `${strong} / ${weak}`,
+      ).toEqual([a.id]);
+      expect(reasonOf(result, b.id)).toBe("DUPLICATE");
+    });
+  });
+
+  it("neighbours that only share a kind of food, a region or a mall both stay", () => {
+    const pairs = [
+      ["Domino's Pizza", "Papa Johns Pizza"],
+      ["Pizza Hut", "Pizza Max"],
+      ["Arabian Hut", "Pizza Hut"],
+      ["KFC Centaurus", "Mr. Cod Centaurus"],
+      ["Quetta Bilal Cafe", "Quetta Commercial Cafe"],
+      ["Zia Balti & BBQ", "Zahoor Balti and Barbecue"],
+      ["TJ Tandoori Junction", "Tandoori chai and maska bun"],
+    ];
+    pairs.forEach(([one, two], i) => {
+      const at = metresNorth(4000 * (i + 1));
+      const result = plan([row(one!, at), row(two!, at)]);
+      expect(result.picks, `${one} / ${two}`).toHaveLength(2);
+    });
+  });
+
+  it("the same first word further apart is not enough", () => {
+    const near = row("Trieste Bahria Town", { confidence: 0.9 });
+    const far = row("Cafe Trieste", {
+      confidence: 0.7,
+      ...metresNorth(AUTO_LIST.sameBrandMetres + 40),
+    });
+    expect(plan([near, far]).picks).toHaveLength(2);
   });
 
   it("the strongest is the most confident, then the fullest record", () => {

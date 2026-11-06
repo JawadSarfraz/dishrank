@@ -4,7 +4,11 @@ import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { SessionUser } from "@/server/roles";
 import { applyAutoListBatch, previewAutoList } from "@/server/services/auto-list.service";
-import { createFromCandidate, skipCandidate } from "@/server/services/import.service";
+import {
+  createFromCandidate,
+  linkCandidate,
+  skipCandidate,
+} from "@/server/services/import.service";
 import { createOrReplace } from "@/server/services/rating.service";
 import {
   markRestaurantChecked,
@@ -226,6 +230,43 @@ describe("Auto-list apply (test DB)", () => {
       address: "Corrected",
     });
     expect(await db.restaurant.count()).toBe(1);
+  });
+
+  it("a re-run also keeps a neighbour with the same first word NEW", async () => {
+    const strong = await candidate("Trieste Bahria Town", { confidence: 0.9 });
+    const weak = await candidate("Cafe Trieste", { confidence: 0.7, ...metresNorth(30) });
+    await applyAutoListBatch(admin, {});
+    expect(await statusOf(strong.id)).toBe("CREATED");
+    expect(await statusOf(weak.id)).toBe("NEW");
+    expect(await applyAutoListBatch(admin, {})).toMatchObject({ created: 0, remaining: 0 });
+    expect(await statusOf(weak.id)).toBe("NEW");
+  });
+
+  it("a place without an address can be listed and its name fixed without inventing one", async () => {
+    await candidate("Fixture Grill", { address: null });
+    await applyAutoListBatch(admin, {});
+    const r = await db.restaurant.findFirstOrThrow();
+    expect(r.address).toBeNull();
+    await updateRestaurant(admin, r.id, {
+      ...edit("Fixture Grille", r.areaId!, "x"),
+      address: null,
+    });
+    expect(await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).toMatchObject({
+      name: "Fixture Grille",
+      address: null,
+    });
+  });
+
+  it("linking a candidate to an auto-listed restaurant counts as a check", async () => {
+    await candidate("Fixture Grill");
+    await applyAutoListBatch(admin, {});
+    const r = await db.restaurant.findFirstOrThrow();
+    expect(r.checkedAt).toBeNull();
+    const again = await candidate("Fixture Grill", { overtureId: "08f-another-record" });
+    await linkCandidate(admin, { candidateId: again.id, restaurantId: r.id });
+    expect(
+      (await db.restaurant.findUniqueOrThrow({ where: { id: r.id } })).checkedAt,
+    ).not.toBeNull();
   });
 
   it("leaves a candidate alone that an admin skipped, and its duplicates", async () => {

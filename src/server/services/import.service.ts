@@ -29,6 +29,7 @@ import type {
   ImportQueueQuery,
 } from "@/server/validation";
 import { rethrowConflict } from "./conflict";
+import { checkedBy } from "./overture/auto-list";
 import { suggestDishes } from "./overture/dish-hints";
 import {
   NearbyIndex,
@@ -274,8 +275,13 @@ export async function linkCandidate(
     if (restaurant.status === "DUPLICATE") {
       throw new AppError("RESTAURANT_MERGED", "This restaurant was merged into another one", 409);
     }
-    const update: { overtureId?: string; lat?: number; lng?: number; locationSource?: "OVERTURE" } =
-      {};
+    const update: {
+      overtureId?: string;
+      lat?: number;
+      lng?: number;
+      locationSource?: "OVERTURE";
+      checkedAt?: Date;
+    } = { ...checkedBy(restaurant, now) };
     if (!restaurant.overtureId && !(await findRestaurantByOvertureId(candidate.overtureId, tx))) {
       update.overtureId = candidate.overtureId;
     }

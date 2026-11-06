@@ -63,7 +63,7 @@ export function RestaurantEditForm({
     const input = {
       name: value("name"),
       areaId: value("areaId"),
-      address: value("address"),
+      address: value("address") || null,
       phone: value("phone") || null,
       website: value("website") || null,
       priceBand: value("priceBand") ? Number(value("priceBand")) : null,
@@ -113,7 +113,6 @@ export function RestaurantEditForm({
         <textarea
           name="address"
           defaultValue={restaurant.address ?? ""}
-          required
           maxLength={300}
           rows={2}
           className="field h-10 text-sm"

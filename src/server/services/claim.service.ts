@@ -17,6 +17,7 @@ import {
 } from "@/server/repositories/moderation.repo";
 import { countRestaurantsManagedBy } from "@/server/repositories/owner.repo";
 import { listRowsRatedByUserAt } from "@/server/repositories/rating.repo";
+import { checkedBy } from "./overture/auto-list";
 import { listDishPagesOfRows } from "@/server/repositories/restaurant-dish.repo";
 import {
   findRestaurantById,
@@ -173,7 +174,11 @@ export async function decideOwnerClaimTx(
   // key-share lock on that row (its foreign key), and two approvals for one claimant that upgraded
   // that lock afterwards would deadlock.
   await lockUser(claim.userId, tx);
-  await updateRestaurantById(restaurant.id, { claimedByUserId: claim.userId, claimedAt: now }, tx);
+  await updateRestaurantById(
+    restaurant.id,
+    { claimedByUserId: claim.userId, claimedAt: now, ...checkedBy(restaurant, now) },
+    tx,
+  );
   await updateOwnerClaim(claim.id, { status: "APPROVED", ...reviewed }, tx);
   // A USER becomes OWNER; an ADMIN keeps the admin role (it includes the owner area).
   if ((await findUserRole(claim.userId, tx)) === "USER") {

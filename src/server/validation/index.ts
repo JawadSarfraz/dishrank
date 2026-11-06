@@ -361,7 +361,8 @@ export const adminRestaurantUpdateInput = z
   .strictObject({
     name: text(120),
     areaId: id,
-    address: text(300),
+    // Null: Overture had none for an auto-listed place, and an admin need not invent one to fix a name.
+    address: text(300).nullable(),
     phone: phone.nullable(),
     website: website.nullable(),
     priceBand: z.int().min(1).max(4).nullable(),

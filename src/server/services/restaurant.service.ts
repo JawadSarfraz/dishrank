@@ -75,6 +75,7 @@ import { recomputeEach, rerankRestaurant } from "./ranking.service";
 import { deleteUnusedPhotos } from "./upload.service";
 import type { StorageAdapter } from "@/server/storage";
 import { cleanText } from "./matching/normalize";
+import { checkedBy } from "./overture/auto-list";
 import {
   planClaimMerge,
   planDishMerge,
@@ -270,10 +271,6 @@ async function loadEditable(id: string, tx?: Tx) {
   }
   return restaurant;
 }
-
-/** An admin's hand on an auto-listed restaurant ends its "not checked" state (docs/07 §2a). */
-const checkedBy = (restaurant: { autoListedAt: Date | null; checkedAt: Date | null }, now: Date) =>
-  restaurant.autoListedAt && !restaurant.checkedAt ? { checkedAt: now } : {};
 
 /** "Looks right" on /admin/restaurants: the spot-check of an auto-listed restaurant. */
 export async function markRestaurantChecked(

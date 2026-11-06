@@ -1,8 +1,10 @@
 flowchart LR
-  subgraph Seed["Candidate import (Overture Maps, every restaurant reviewed)"]
+  subgraph Seed["Candidate import (Overture Maps: Auto-list, or reviewed one by one)"]
     S["pnpm overture:sync<br/>Meta + Microsoft food places"] --> Q["OvertureCandidate NEW<br/>city, suggested area"]
     Q --> Imp["/admin/import: Create (prefilled form,<br/>admin corrects) / Link / Skip"]
     Imp --> RD0["RestaurantDish CANDIDATE<br/>source ADMIN conf 0.4 per ticked dish"]
+    Q --> Auto["/admin/import/auto-list: dry run, then Apply<br/>fixed rules, spot-checked afterwards"]
+    Auto --> RD1["RestaurantDish CANDIDATE<br/>source AUTO_LIST conf 0.3 where the name or category says so"]
   end
   subgraph Menu["Menu ingestion"]
     Up["Panel/owner uploads menu photo"] --> ST["Supabase Storage menus/"]

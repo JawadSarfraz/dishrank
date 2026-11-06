@@ -58,6 +58,7 @@ import { invalidateAliasIndex } from "./matching/aliases";
 import { decideMenuItemTx, lockMenuItemParents } from "./menu.service";
 import { normalize } from "./matching/normalize";
 import { recomputeEach } from "./ranking.service";
+import { checkedBy } from "./overture/auto-list";
 import { addAdminDishesTx, insertRestaurantTx, resolveDishSlugs } from "./restaurant.service";
 import type { SuggestionPayload } from "./location.service";
 import { recordBannedUsers } from "./ban-list";
@@ -482,7 +483,12 @@ async function decideLocation(
   const { best } = item.payload as SuggestionPayload;
   await updateRestaurantById(
     restaurant.id,
-    { lat: best.lat, lng: best.lng, locationSource: "PANEL_GPS" },
+    {
+      lat: best.lat,
+      lng: best.lng,
+      locationSource: "PANEL_GPS",
+      ...checkedBy(restaurant, new Date()),
+    },
     tx,
   );
   return {
