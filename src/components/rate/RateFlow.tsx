@@ -17,7 +17,7 @@ import { describeActionError } from "@/components/admin/action-error";
 import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { ShareButton } from "@/components/ranking/ShareButton";
 import { BRAND } from "@/lib/brand";
-import { formatNeeded, formatScore, formatVotes } from "@/lib/format";
+import { formatAddress, formatNeeded, formatScore, formatVotes } from "@/lib/format";
 import { withPendingScore } from "@/lib/pending-score";
 import { PWA_EVENTS, noteRating } from "@/lib/pwa-prompt";
 import { myRatingAction, submitRatingAction } from "@/server/actions/rating";
@@ -359,7 +359,7 @@ function RestaurantStep({
                 {hit.name}
               </span>
               <span className="text-sm text-muted-foreground">
-                {[hit.area, hit.address].filter(Boolean).join(" · ")}
+                {[hit.area, hit.address && formatAddress(hit.address)].filter(Boolean).join(" · ")}
               </span>
             </button>
           </li>

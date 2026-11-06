@@ -4,6 +4,7 @@ import { Forbidden } from "@/components/auth/Forbidden";
 import { PageHeader } from "@/components/layout/Page";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { formatDishes } from "@/lib/format";
 import { requirePageRole } from "@/server/auth";
 import { AppError } from "@/server/errors";
 import { listMyRestaurants } from "@/server/services/owner.service";
@@ -46,7 +47,7 @@ export default async function OwnerHomePage() {
                     {r.name}
                   </span>
                   <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    {r.area?.name ?? "no area"}, {r.city.name} · {r._count.dishes} dishes
+                    {r.area?.name ?? "no area"}, {r.city.name} · {formatDishes(r._count.dishes)}
                     {r.status !== "ACTIVE" && (
                       <Badge variant="outline">{r.status.toLowerCase()}</Badge>
                     )}

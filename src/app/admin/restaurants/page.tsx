@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
+import { formatDishes } from "@/lib/format";
 import { requirePageRole } from "@/server/auth";
 import { listRestaurantsForAdmin } from "@/server/services/restaurant.service";
 import { adminRestaurantListQuery } from "@/server/validation";
@@ -114,7 +115,7 @@ export default async function AdminRestaurantsPage({
               {r.autoListedAt && !r.checkedAt && <Badge variant="outline">Not checked</Badge>}
             </div>
             <span className="text-muted-foreground">
-              {r.area?.name ?? "no area"}, {r.city.name} · {r._count.dishes} dishes ·{" "}
+              {r.area?.name ?? "no area"}, {r.city.name} · {formatDishes(r._count.dishes)} ·{" "}
               {r.source === "OVERTURE" ? "from Overture" : "added by hand"} ·{" "}
               {r.lat === null ? "no location" : "location set"} · {r.slug}
             </span>

@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BRAND } from "@/lib/brand";
-import { formatFromPrice, formatScore, formatVotes } from "@/lib/format";
+import { formatAddress, formatFromPrice, formatScore, formatVotes } from "@/lib/format";
 import { restaurantJsonLd } from "@/server/seo";
 import { getPublicRestaurant } from "@/server/services/restaurant.service";
 
@@ -104,7 +104,11 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
           )}
         </div>
         <p className="text-base text-muted-foreground">
-          {[restaurant.address, restaurant.area?.name, restaurant.city.name]
+          {[
+            restaurant.address && formatAddress(restaurant.address),
+            restaurant.area?.name,
+            restaurant.city.name,
+          ]
             .filter(Boolean)
             .join(" · ")}
         </p>
@@ -238,7 +242,7 @@ export default async function RestaurantPage({ params }: PageProps<"/[city]/r/[s
             citySlug: restaurant.city.slug,
             cityName: restaurant.city.name,
             areaName: restaurant.area?.name ?? null,
-            address: restaurant.address,
+            address: restaurant.address && formatAddress(restaurant.address),
             phone: restaurant.phone,
             lat: restaurant.lat,
             lng: restaurant.lng,

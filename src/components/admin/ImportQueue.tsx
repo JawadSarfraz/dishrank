@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatAddress } from "@/lib/format";
 import {
   createFromCandidateAction,
   linkCandidateAction,
@@ -168,7 +169,7 @@ function CandidateCard({
         )}
       </div>
       <p className="text-sm text-muted-foreground">
-        {c.address ?? "(no address)"} · {c.phone ?? "(no phone)"}
+        {c.address ? formatAddress(c.address) : "(no address)"} · {c.phone ?? "(no phone)"}
         {c.website && (
           <>
             {" · "}

@@ -28,3 +28,9 @@ export function formatNeeded(votes: number, minRaters: number, ranksNext: boolea
     ? `needs ${raters} more rater${raters === 1 ? "" : "s"} to rank`
     : "needs a few more ratings to rank";
 }
+
+/** "1 dish", "12 dishes". */
+export const formatDishes = (n: number) => `${n} dish${n === 1 ? "" : "es"}`;
+
+/** Overture's addresses can carry Arabic commas (،); we show ordinary ones. */
+export const formatAddress = (address: string) => address.replace(/\s*،\s*/g, ", ");
