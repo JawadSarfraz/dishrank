@@ -31,7 +31,7 @@ import { runAction } from "./result";
 export async function submitRatingAction(input: unknown) {
   return runAction("rating.submit", async () => {
     const actor = await requireUser();
-    const result = await createOrReplace(actor, parseInput(ratingInput, input), {
+    const { otherPages, ...result } = await createOrReplace(actor, parseInput(ratingInput, input), {
       ipHash: ipHash(clientIp(await headers())),
     });
     revalidateDishPages({
@@ -39,6 +39,7 @@ export async function submitRatingAction(input: unknown) {
       dishSlug: result.dish.slug,
       restaurantSlug: result.restaurant.slug,
     });
+    for (const page of otherPages) revalidateDishPages(page);
     return result;
   });
 }
@@ -48,6 +49,7 @@ export async function deleteRatingAction(ratingId: unknown) {
     const actor = await requireUser();
     const deleted = await deleteOwn(actor, parseInput(id, ratingId));
     revalidateDishPages(deleted);
+    for (const page of deleted.otherPages) revalidateDishPages(page);
     return { id: deleted.id };
   });
 }

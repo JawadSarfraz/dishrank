@@ -24,15 +24,15 @@ import {
 } from "@/server/repositories/ops.repo";
 import { lockCityDish } from "@/server/repositories/ranking.repo";
 import { inTransaction } from "@/server/repositories/transaction";
-import {
-  findRater,
-  findTrustStats,
-  listTrustSnapshot,
-  lockUser,
-  updateUserById,
-} from "@/server/repositories/user.repo";
+import { listTrustSnapshot } from "@/server/repositories/user.repo";
 import { DAY_MS, RANKING } from "./ranking.constants";
-import { recomputeOne, rerankList, thresholdsFor, trustFor } from "./ranking.service";
+import {
+  applyTrustTable,
+  recomputeOne,
+  rerankList,
+  thresholdsFor,
+  trustFor,
+} from "./ranking.service";
 
 export const RECOMPUTE_JOB = "recompute-rankings";
 export const MARK_STALE_JOB = "mark-stale";
@@ -86,17 +86,8 @@ async function recomputeTrust() {
       recentRatings: u.recentRatings ?? [],
     });
     if (expected === u.trustScore) continue;
-    const wrote = await inTransaction(async (tx) => {
-      await lockUser(u.id, tx);
-      const rater = await findRater(u.id, tx);
-      const stats = await findTrustStats(u.id, tx);
-      if (!rater || !stats || rater.isPanel || rater.bannedAt) return false;
-      const trustScore = trustFor(stats);
-      if (trustScore === rater.trustScore) return false;
-      await updateUserById(u.id, { trustScore }, tx);
-      return true;
-    });
-    if (wrote) changed++;
+    const trustScore = await inTransaction((tx) => applyTrustTable(u.id, tx));
+    if (trustScore !== null) changed++;
   }
   return { users: users.length, changed };
 }

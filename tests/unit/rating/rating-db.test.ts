@@ -360,4 +360,82 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
       photoRatings: 1,
     });
   });
+
+  describe("trust right after a rating (docs/04)", () => {
+    const trustOf = async (id: string) =>
+      (await db.user.findUniqueOrThrow({ where: { id } })).trustScore;
+    const rowsOf = (userId: string) =>
+      db.restaurantDish.findMany({ where: { ratings: { some: { userId } } } });
+
+    it("the third rating, at a second restaurant, counts at 1.0 at once, and so do the earlier two", async () => {
+      const a = await makeRestaurant("Trust A");
+      const b = await makeRestaurant("Trust B");
+      const diner = await oldUser();
+
+      expect((await rate(diner, a.id, "pizza")).otherPages).toEqual([]);
+      expect((await rate(diner, a.id, "chai")).otherPages).toEqual([]);
+      expect(await trustOf(diner.id)).toBe(0.6);
+      for (const row of await rowsOf(diner.id)) expect(row.weightSum).toBeCloseTo(0.6, 3);
+
+      const third = await rate(diner, b.id, "pizza");
+      expect(await trustOf(diner.id)).toBe(1);
+      const rows = await rowsOf(diner.id);
+      expect(rows).toHaveLength(3);
+      for (const row of rows) expect(row.weightSum).toBeCloseTo(1, 3);
+      // The pages of every row whose score moved, for the caller to revalidate.
+      expect(third.otherPages.map((p) => `${p.restaurantSlug}:${p.dishSlug}`).sort()).toEqual(
+        [`${a.slug}:chai`, `${a.slug}:pizza`, `${b.slug}:pizza`].sort(),
+      );
+    });
+
+    it("three ratings at one restaurant stay at 0.6, and an unchanged trust recomputes nothing else", async () => {
+      const a = await makeRestaurant("Trust A");
+      const diner = await oldUser();
+      await rate(diner, a.id, "pizza");
+      await rate(diner, a.id, "chai");
+      const third = await rate(diner, a.id, "broast");
+      expect(await trustOf(diner.id)).toBe(0.6);
+      expect(third.otherPages).toEqual([]);
+    });
+
+    it("a rating that is held does not raise trust", async () => {
+      const a = await makeRestaurant("Trust A");
+      const b = await makeRestaurant("Trust B");
+      const diner = await oldUser();
+      await rate(diner, a.id, "pizza");
+      await rate(diner, a.id, "chai");
+      const held = await rate(diner, b.id, "pizza", { comment: "call me on 0300 1234567" });
+      expect(held.held).toBe(true);
+      expect(await trustOf(diner.id)).toBe(0.6);
+    });
+
+    it("deleting one takes it back: the same table, and the rows are recomputed", async () => {
+      const a = await makeRestaurant("Trust A");
+      const b = await makeRestaurant("Trust B");
+      const diner = await oldUser();
+      await rate(diner, a.id, "pizza");
+      await rate(diner, a.id, "chai");
+      const third = await rate(diner, b.id, "pizza");
+      expect(await trustOf(diner.id)).toBe(1);
+
+      const deleted = await deleteOwn(actorOf(diner), third.ratingId, { now: NOW });
+      expect(await trustOf(diner.id)).toBe(0.6);
+      for (const row of await rowsOf(diner.id)) expect(row.weightSum).toBeCloseTo(0.6, 3);
+      expect(deleted.otherPages).toHaveLength(2);
+    });
+
+    it("a panel member and a trust set by hand are left as they are", async () => {
+      const a = await makeRestaurant("Trust A");
+      const b = await makeRestaurant("Trust B");
+      const panel = await oldUser("Panel", { isPanel: true, trustScore: 1.3 });
+      const byHand = await oldUser("By hand", { trustOverride: 0.4, trustScore: 0.4 });
+      for (const user of [panel, byHand]) {
+        await rate(user, a.id, "pizza");
+        await rate(user, a.id, "chai");
+        expect((await rate(user, b.id, "pizza")).otherPages).toEqual([]);
+      }
+      expect(await trustOf(panel.id)).toBe(1.3);
+      expect(await trustOf(byHand.id)).toBe(0.4);
+    });
+  });
 });

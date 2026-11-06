@@ -12,6 +12,7 @@ export async function DELETE(_request: Request, ctx: RouteContext<"/api/v1/ratin
     const ratingId = parseInput(id, (await ctx.params).id);
     const deleted = await deleteOwn(actor, ratingId);
     revalidateDishPages(deleted);
+    for (const page of deleted.otherPages) revalidateDishPages(page);
     return jsonData({ id: deleted.id });
   } catch (error) {
     return jsonError(error, "/api/v1/ratings/[id]");

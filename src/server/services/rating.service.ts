@@ -52,7 +52,12 @@ import { screenComment, type CommentFlag } from "./comment-screen";
 import { rethrowConflict } from "./conflict";
 import { BURST, RANKING, USER_DISH } from "./ranking.constants";
 import { recordEvent } from "./analytics.service";
-import { recomputeEach, recomputeOne, type Thresholds } from "./ranking.service";
+import {
+  recomputeEach,
+  recomputeOne,
+  refreshTrustAfterRating,
+  type Thresholds,
+} from "./ranking.service";
 import { deleteUnusedPhotos, PHOTO_PREFIX, verifyUploadedPhoto } from "./upload.service";
 
 /** Why a rating is held: its comment (docs/04 control 5) or a burst of new accounts (control 3). */
@@ -83,6 +88,14 @@ export type RatingResult = {
   dish: { id: string; slug: string; name: string };
 };
 
+/**
+ * RatingResult, plus the other dish pages whose scores moved because the rater's trust did. For the
+ * caller to revalidate; it does not go to the browser.
+ */
+export type RatingWrite = RatingResult & { otherPages: DishPage[] };
+
+type DishPage = { citySlug: string; dishSlug: string; restaurantSlug: string };
+
 export type RatingContext = {
   ipHash?: string;
   now?: Date;
@@ -91,6 +104,23 @@ export type RatingContext = {
 };
 
 const SIGNED_IN = ["USER", "OWNER", "ADMIN"] as const;
+
+/**
+ * The trust table again for this rater (docs/04). The rating is saved either way: a failure here is
+ * logged, and the nightly job applies the same table. Returns the pages whose scores moved.
+ */
+async function refreshTrust(userId: string, now: Date): Promise<DishPage[]> {
+  try {
+    return await listDishPagesOfRows(await refreshTrustAfterRating(userId, now));
+  } catch (error) {
+    logEvent(
+      "rating.trust_failed",
+      { userId, error: error instanceof Error ? error.message : String(error) },
+      "error",
+    );
+    return [];
+  }
+}
 
 async function loadRater(actor: SessionUser | null) {
   const user = assertRole(actor, SIGNED_IN);
@@ -229,7 +259,7 @@ export async function createOrReplace(
   actor: SessionUser | null,
   input: RatingInput,
   ctx: RatingContext = {},
-): Promise<RatingResult> {
+): Promise<RatingWrite> {
   const started = Date.now();
   const now = ctx.now ?? new Date();
   const rater = await loadRater(actor);
@@ -399,6 +429,8 @@ export async function createOrReplace(
     return rethrowConflict(error);
   });
 
+  // First, so this row's numbers below use the rater's new trust.
+  const trustPages = await refreshTrust(rater.id, now);
   // The rating is saved: a failed recompute is logged and reported as `stale`, not as a failed save
   // (saving again would only repeat the write).
   const ranked = await recomputeOne(written.restaurantDishId, now).catch((error: unknown) => {
@@ -433,6 +465,7 @@ export async function createOrReplace(
     durationMs: Date.now() - started,
   });
   return {
+    otherPages: trustPages,
     ratingId: written.ratingId,
     restaurantDishId: written.restaurantDishId,
     created: written.created,
@@ -506,12 +539,14 @@ export async function deleteOwn(
     await adjustRatingCounters(user.id, { ratings: -1, photos: live.photoPath ? -1 : 0 }, tx);
     return { rowId: row.restaurantDishId, photoPath: live.photoPath };
   });
+  const trustPages = await refreshTrust(user.id, now);
   await recomputeEach([rowId], now); // the delete is committed: a failure is only logged
   // Its photo file goes too (best effort: a failure is logged, the delete stands).
   await deleteUnusedPhotos([photoPath], ctx.storage === undefined ? getStorage() : ctx.storage);
   logEvent("rating.delete", { userId: user.id, entityId: rating.id });
   const [page] = await listDishPagesOfRows([rowId]);
   return {
+    otherPages: trustPages,
     id: rating.id,
     restaurantDishId: rowId,
     citySlug: page?.citySlug ?? rating.restaurantDish.restaurant.city.slug,

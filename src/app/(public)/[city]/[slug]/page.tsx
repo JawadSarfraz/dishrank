@@ -136,6 +136,13 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </div>
       </header>
 
+      {ranking.firstRankNeeds !== null && (
+        <p className="font-medium">
+          {ranking.firstRankNeeds} more rating{ranking.firstRankNeeds === 1 ? "" : "s"} until the
+          first ranked {ranking.dish.name} in {ranking.city.name}
+        </p>
+      )}
+
       <QuickRate citySlug={ranking.city.slug} dishSlug={ranking.dish.slug} />
 
       {eligible.length > 0 && (

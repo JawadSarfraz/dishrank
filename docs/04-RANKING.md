@@ -65,7 +65,7 @@ Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCou
 | ≥ 2 of their ratings hidden by admin | 0.3 |
 | Banned | ratings set HIDDEN |
 
-Trust is recomputed by the nightly job from these rules. An admin can set a user's trust by hand: it is stored in `trustOverride`, apart from the computed `trustScore`, so the nightly job keeps it; clearing it returns the user to the table at once.
+Trust is applied from these rules after every rating a user writes or deletes (`refreshTrustAfterRating`; owner, 2026-11-06: no overnight lag, so a new user's third rating at a second restaurant counts at 1.0 right away, and when it changes, every row their ratings count in is recomputed) and again for everyone by the nightly job, with the same code (`applyTrustTable`). An admin can set a user's trust by hand: it is stored in `trustOverride`, apart from the computed `trustScore`, so the nightly job keeps it; clearing it returns the user to the table at once.
 
 The rows are checked in this order: banned → set by hand → panel → ≥ 2 hidden (0.3) → extreme-score pattern (0.6, abuse control 4) → 1.2 → 1.0 → 0.6 (DECISION-PENDING, docs/OPEN-QUESTIONS.md). "Upheld flags against their ratings" counts as none for now, because a `Flag` points at a dish row, not a rating. The nightly job (Phase 4) recomputes it for everyone; the admin decisions that change these inputs also apply the table at once: turning the panel off, setting or clearing a trust by hand, hiding ratings and banning.
 
@@ -79,7 +79,7 @@ The rows are checked in this order: banned → set by hand → panel → ≥ 2 h
 6. **Held and hidden ratings**: an edit keeps `HELD` or `HIDDEN` (only admins change them; the new comment is screened again), and the author cannot delete them (`RATING_UNDER_REVIEW`). Deleting an `ACTIVE` rating removes it with its history (DECISION-PENDING: hard delete).
 7. **Dish row status**: a new rating on a `STALE` row makes it `USER_CONFIRMED` again (docs/02 lifecycle); a rating held at write time revives the row when an admin releases it (audit 2026-11); a `REMOVED` row takes no ratings (`DISH_REMOVED`).
 
-The checks run in RatingService in this order: user, restaurant and dish checks, photo check, rate limits, then one transaction (dish row, rating, history, comment hold, burst rule), then `recomputeOne` after commit.
+The checks run in RatingService in this order: user, restaurant and dish checks, photo check, rate limits, then one transaction (dish row, rating, history, comment hold, burst rule), then after commit the trust table for the rater (and their other rows when it changed), then `recomputeOne`.
 
 ## Compute paths
 
@@ -109,7 +109,7 @@ Finally it re-ranks the row's (city, dish) list (docs/03 invariant 6f): in SQL, 
 
 `src/server/services/ranking-nightly.service.ts`; the cron, the CLI and "Recompute now" on `/admin/rankings` run the same function. One run at a time: a run that started less than 30 minutes ago and has not finished refuses a second one (`409 JOB_RUNNING`).
 
-1. Recompute `User.trustScore` from the trust table, skipping panel users (`isPanel`; trust stays 1.3) and banned users. One scan finds the users whose trust would change; each is re-checked and written under its user row lock, so a panel toggle or an admin decision made meanwhile wins.
+1. Recompute `User.trustScore` from the trust table, skipping panel users (`isPanel`; trust stays 1.3) and banned users. A rating write already does this for its rater; this catches what changed without one, and a write whose trust step failed. One scan finds the users whose trust would change; each is re-checked and written under its user row lock, so a panel toggle or an admin decision made meanwhile wins.
 2. For each city × dish: `DishStat.meanScore` = weighted mean of all active ratings of users who are not banned (same weights, decay at the run's time), `ratingCount`. A city × dish without counted ratings keeps its old row (none of its dish rows has a score).
 3. For each RD with `ratingCount > 0`, a score, or an active rating (a recompute that failed after a commit is caught here): recompute as above (applies decay to all), without the per-row re-rank.
 4. Mark stale: `CANDIDATE/USER_CONFIRMED` with no rating or verification in 270 days → `STALE`; `MENU_VERIFIED/OWNER_VERIFIED` after 365 days → `STALE`. The age runs from the latest of `lastRatedAt`, `lastVerifiedAt` and `createdAt`, so a new row is never stale.

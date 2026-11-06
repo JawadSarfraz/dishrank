@@ -116,8 +116,9 @@ export default function HowRankingsWorkPage() {
           </tbody>
         </table>
         <p className="text-sm text-muted-foreground">
-          Trust levels are worked out again every night, except one our team set by hand. A rater
-          whose last 10 ratings are all 10s or all 1s counts as a new account until that changes.
+          Trust levels are worked out again after each of your ratings and every night, except one
+          our team set by hand. A rater whose last 10 ratings are all 10s or all 1s counts as a new
+          account until that changes.
         </p>
 
         <h2>Keeping it fair</h2>

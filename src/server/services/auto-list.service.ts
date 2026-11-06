@@ -113,7 +113,6 @@ export async function previewAutoList(actor: SessionUser | null) {
     ]);
   const backfill = await planBackfill(launchDishes);
   const areaName = new Map(cities.flatMap((c) => c.areas.map((a) => [a.id, a.name] as const)));
-  const dishName = new Map(launchDishes.map((d) => [d.slug, d.name]));
   const pickIds = new Set(picks.map((p) => p.id));
 
   const bands = Array.from({ length: 10 }, (_, i) => {

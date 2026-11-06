@@ -20,6 +20,13 @@ import {
 import { findCityBySlug, listRankingRows } from "@/server/repositories/public.repo";
 import { findDishBySlug } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
+import {
+  findRater,
+  findTrustStats,
+  listRatedRowsOfUser,
+  lockUser,
+  updateUserById,
+} from "@/server/repositories/user.repo";
 import { haversineKm } from "@/lib/geo";
 import { DAY_MS, RANKING, TRUST } from "./ranking.constants";
 
@@ -146,6 +153,22 @@ export function isExtremePattern(last: readonly { score: number; restaurantId: s
   const recent = last.slice(0, TRUST.extremeScores.lastRatings);
   const extreme = recent.every((r) => r.score === 10) || recent.every((r) => r.score === 1);
   return extreme && new Set(recent.map((r) => r.restaurantId)).size > 1;
+}
+
+/**
+ * The docs/04 table for one user, under their row lock: what the nightly job runs for everyone and a
+ * rating write runs for its rater. Panel members and banned users are skipped. Returns the new trust
+ * when it changed, else null.
+ */
+export async function applyTrustTable(userId: string, tx: Tx): Promise<number | null> {
+  await lockUser(userId, tx);
+  const rater = await findRater(userId, tx);
+  const stats = await findTrustStats(userId, tx);
+  if (!rater || !stats || rater.isPanel || rater.bannedAt) return null;
+  const trustScore = trustFor(stats);
+  if (trustScore === rater.trustScore) return null;
+  await updateUserById(userId, { trustScore }, tx);
+  return trustScore;
 }
 
 export type CountedRating = { userId: string; score: number; updatedAt: Date; trust: number };
@@ -297,6 +320,20 @@ async function rerankLists(
 }
 
 /**
+ * After a rating is written or deleted: the trust table again for its rater, so a new rater's third
+ * rating at a second restaurant counts at 1.0 right away. Trust is read at compute time, so when it
+ * changed, every row their ratings count in is recomputed. Returns those rows.
+ */
+export async function refreshTrustAfterRating(userId: string, now: Date = new Date()) {
+  const trustScore = await inTransaction((tx) => applyTrustTable(userId, tx));
+  if (trustScore === null) return [];
+  const rows = await listRatedRowsOfUser(userId);
+  await recomputeEach(rows, now); // trust is saved; a row that fails is logged, the nightly run catches it
+  logEvent("rating.trust", { userId, trustScore, recomputedRows: rows.length });
+  return rows;
+}
+
+/**
  * recomputeOne for each row after a commit: a failure is logged and the other rows still run, so a
  * decision or write that already committed is never reported as failed. Returns the failed ids.
  */
@@ -429,8 +466,14 @@ export async function getRankingPage(options: RankingOptions, now: Date = new Da
     .filter((r) => r.rankInCity === null && r.distinctRaters === 0)
     .sort((a, b) => a.restaurant.name.localeCompare(b.restaurant.name));
   const rounded = (n: number | null) => (n === null ? null : Math.round(n * 100_000) / 100_000);
+  // Nothing ranks yet: what the place closest to a rank still needs, by the live thresholds.
+  const closest =
+    loaded.ranking.eligible.length === 0 && loaded.rows.length > 0
+      ? Math.min(...loaded.rows.map((r) => ratingsNeeded(r, loaded.thresholds)))
+      : 0;
   return {
     ...loaded.ranking,
+    firstRankNeeds: closest > 0 ? closest : null,
     insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
     placesToTryTotal: untried.length,
     placesFromMapData: untried.every((r) => r.restaurant.source === "OVERTURE"),
@@ -524,5 +567,5 @@ async function loadRanking(options: RankingOptions, now: Date) {
     insufficient: insufficient.slice(0, limit),
     computedAt: now.toISOString(),
   };
-  return { ranking, rows };
+  return { ranking, rows, thresholds: t };
 }
