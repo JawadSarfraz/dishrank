@@ -59,7 +59,7 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   expect(taps).toBe(4);
   expect(elapsed).toBeLessThan(30_000);
   // One rater: the row is not eligible, so it shows what it needs and no rank.
-  await expect(page.getByText(/needs \d+ more ratings? to rank/)).toBeVisible();
+  await expect(page.getByText(/needs \d+ more raters? to rank/)).toBeVisible();
   await expect(page.getByText(/#\d+ in /)).toHaveCount(0);
   await expectNoSideScroll(page);
 

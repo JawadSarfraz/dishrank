@@ -87,7 +87,7 @@ sequenceDiagram
   RK->>DB: re-rank the (city, dish) list (rankInCity)
   A->>A: revalidatePath(ranking page, restaurant page)
   A-->>P: { score, votes, eligible, rank, ratingsNeeded, held }
-  P-->>U: "8.3 · 23 votes · #3 in Islamabad" or "needs 2 more ratings to rank"
+  P-->>U: "8.3 · 23 votes · #3 in Islamabad" or "needs 2 more raters to rank"
 ```
 
 ### Ranking page render

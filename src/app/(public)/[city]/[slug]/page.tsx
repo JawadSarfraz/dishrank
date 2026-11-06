@@ -150,10 +150,12 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </div>
       </header>
 
-      {ranking.firstRankNeeds !== null && (
+      {ranking.firstRankRaters !== null && (
         <p className="font-medium">
-          {ranking.firstRankNeeds} more rating{ranking.firstRankNeeds === 1 ? "" : "s"} until the
-          first ranked {ranking.dish.name} in {ranking.city.name}
+          {ranking.firstRankRaters < thresholds.minRaters
+            ? `${ranking.firstRankRaters} of ${thresholds.minRaters} raters so far for`
+            : "A few more ratings for"}{" "}
+          the first ranked {ranking.dish.name} in {ranking.city.name}
         </p>
       )}
 
@@ -201,7 +203,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
             name: row.restaurant.name,
             area: row.restaurant.area?.name ?? null,
             votes: row.votes,
-            ratingsNeeded: row.ratingsNeeded,
+            ranksNext: row.ratingsNeeded === 0,
           }))}
         />
       )}

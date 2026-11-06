@@ -17,6 +17,14 @@ export const formatFromPrice = (price: number) => `from ${formatPrice(price)}`;
 /** "1.4 km". */
 export const formatKm = (km: number) => `${km.toFixed(1)} km`;
 
-/** "needs 1 more rating", "needs 4 more ratings". */
-export const formatNeeded = (n: number) =>
-  n > 0 ? `needs ${n} more rating${n === 1 ? "" : "s"} to rank` : "ranks at the next update";
+/**
+ * What a place still needs, in raters like the page's "4 raters needed". With enough raters only
+ * the weight is short (new accounts count less, docs/04), which has no honest number.
+ */
+export function formatNeeded(votes: number, minRaters: number, ranksNext: boolean) {
+  if (ranksNext) return "ranks at the next update";
+  const raters = minRaters - votes;
+  return raters > 0
+    ? `needs ${raters} more rater${raters === 1 ? "" : "s"} to rank`
+    : "needs a few more ratings to rank";
+}

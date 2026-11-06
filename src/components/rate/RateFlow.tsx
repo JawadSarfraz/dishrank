@@ -914,7 +914,8 @@ function DoneStep({
               <span className="font-medium">
                 {result.votes} of {result.minRaters} raters so far:
               </span>{" "}
-              {formatNeeded(result.ratingsNeeded)} before {result.restaurant.name} gets a rank for{" "}
+              {result.restaurant.name}{" "}
+              {formatNeeded(result.votes, result.minRaters, result.ratingsNeeded === 0)} for{" "}
               {result.dish.name}.
             </p>
             <p className="text-sm text-muted-foreground">

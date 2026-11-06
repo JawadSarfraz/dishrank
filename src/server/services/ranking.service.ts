@@ -466,14 +466,16 @@ export async function getRankingPage(options: RankingOptions, now: Date = new Da
     .filter((r) => r.rankInCity === null && r.distinctRaters === 0)
     .sort((a, b) => a.restaurant.name.localeCompare(b.restaurant.name));
   const rounded = (n: number | null) => (n === null ? null : Math.round(n * 100_000) / 100_000);
-  // Nothing ranks yet: what the place closest to a rank still needs, by the live thresholds.
-  const closest =
-    loaded.ranking.eligible.length === 0 && loaded.rows.length > 0
-      ? Math.min(...loaded.rows.map((r) => ratingsNeeded(r, loaded.thresholds)))
-      : 0;
   return {
     ...loaded.ranking,
-    firstRankNeeds: closest > 0 ? closest : null,
+    /**
+     * Nothing ranks yet: the most raters any place has. In raters, so the page agrees with its
+     * badge; `ratingsNeeded` counts fresh new accounts and can say more.
+     */
+    firstRankRaters:
+      loaded.ranking.eligible.length === 0 && loaded.rows.length > 0
+        ? Math.max(...loaded.rows.map((r) => r.distinctRaters))
+        : null,
     insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
     placesToTryTotal: untried.length,
     placesFromMapData: untried.every((r) => r.restaurant.source === "OVERTURE"),

@@ -11,7 +11,8 @@ export type WaitingRow = {
   name: string;
   area: string | null;
   votes: number;
-  ratingsNeeded: number;
+  /** Nothing is missing: the next re-rank gives it its place. */
+  ranksNext: boolean;
 };
 
 export function WaitingList({
@@ -59,7 +60,7 @@ export function WaitingList({
                     {[
                       row.area,
                       row.votes > 0 ? formatVotes(row.votes) : "No votes yet",
-                      formatNeeded(row.ratingsNeeded),
+                      formatNeeded(row.votes, minRaters, row.ranksNext),
                     ]
                       .filter(Boolean)
                       .join(" · ")}
