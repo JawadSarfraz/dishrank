@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuLinkItem,
@@ -83,22 +84,25 @@ export function SiteHeader({ beta }: { beta: boolean }) {
                   {initial}
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" sideOffset={8}>
-                  <DropdownMenuLabel className="truncate px-2.5 pt-1.5 pb-1 text-sm">
-                    {data.user.name || data.user.email}
-                  </DropdownMenuLabel>
-                  <DropdownMenuLinkItem render={<Link href="/me" />}>
-                    <StarIcon /> My ratings
-                  </DropdownMenuLinkItem>
-                  {role === "OWNER" && (
-                    <DropdownMenuLinkItem render={<Link href="/owner" />}>
-                      <StoreIcon /> Owner
+                  {/* The name labels a group: Base UI's GroupLabel throws outside one (2026-11-08). */}
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="truncate px-2.5 pt-1.5 pb-1 text-sm">
+                      {data.user.name || data.user.email}
+                    </DropdownMenuLabel>
+                    <DropdownMenuLinkItem render={<Link href="/me" />}>
+                      <StarIcon /> My ratings
                     </DropdownMenuLinkItem>
-                  )}
-                  {role === "ADMIN" && (
-                    <DropdownMenuLinkItem render={<Link href="/admin" />}>
-                      <ShieldIcon /> Admin
-                    </DropdownMenuLinkItem>
-                  )}
+                    {role === "OWNER" && (
+                      <DropdownMenuLinkItem render={<Link href="/owner" />}>
+                        <StoreIcon /> Owner
+                      </DropdownMenuLinkItem>
+                    )}
+                    {role === "ADMIN" && (
+                      <DropdownMenuLinkItem render={<Link href="/admin" />}>
+                        <ShieldIcon /> Admin
+                      </DropdownMenuLinkItem>
+                    )}
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={signOut} disabled={signingOut}>
                     <LogOutIcon /> {signingOut ? "Signing out…" : "Sign out"}

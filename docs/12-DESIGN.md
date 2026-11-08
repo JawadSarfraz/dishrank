@@ -97,7 +97,7 @@ The `.dark` block in `globals.css` holds a dark set of the same tokens (not swit
 Two faces, both SIL Open Font License 1.1, committed in `src/fonts/` as variable WOFF2 files
 (latin subset, one file per family, about 41 KB and 29 KB, taken from the Fontsource builds of the
 Google Fonts releases; provenance and licences in `src/fonts/README.md`) and loaded with
-`next/font/local`, so they are served from this site and neither a page nor a build calls Google
+`next/font/local` (`src/app/fonts.ts`, used by the root layout and the global error page), so they are served from this site and neither a page nor a build calls Google
 (fetching them at build time with `next/font/google` fails at random, vercel/next.js#99114). Only
 the weights in the table are used. `display: "fallback"`: a size-adjusted fallback paints at once
 and the real face swaps in only when it arrives within about three seconds, so a slow first load
@@ -153,7 +153,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Badge | `components/ui/badge.tsx` | default (brand-soft), secondary, outline, destructive, gold (unused by design; kept for the medals' siblings). |
 | Steps | `components/rate/Steps.tsx` | Restaurant → Dish → Score with ticks. |
 | Admin shell | `app/admin/layout.tsx`, `components/admin/AdminNav.tsx`, `AdminPage.tsx` | A sidebar from 1024 px, a scrolling row of pills below; `AdminHeader`, `AdminTabs`, `AdminList`, `AdminNote`, `AdminPagination`. Clean, not fancy. |
-| 404, error, Forbidden, Offline | `app/not-found.tsx`, `app/error.tsx`, `components/auth/Forbidden.tsx`, `app/(public)/offline/page.tsx` | Mark, one line, one or two buttons. |
+| 404, error, Forbidden, Offline, global error | `components/layout/ProblemPage.tsx`; `app/not-found.tsx`, `app/error.tsx`, `components/auth/Forbidden.tsx`, `app/(public)/offline/page.tsx`, `app/global-error.tsx` | One shape, `ProblemPage`: an icon in a brand-soft disc (a plate for the 404, the mark for the global error), a balanced title, one line, one or two buttons, centred in the narrow column. `global-error.tsx` is the last resort when the root layout itself fails: it replaces Next's own black "This page couldn't load" screen, so it carries the fonts (`app/fonts.ts`) and styles itself, and offers Reload. |
 
 ## Screens
 

@@ -53,6 +53,23 @@ test("a signed-in visitor on /sign-in goes on to the callbackUrl", async ({
   await expect(page).toHaveURL(`${baseURL}/`);
 });
 
+// The account menu lives in the root layout: when it threw, every signed-in visitor who tapped it
+// got Next's black "This page couldn't load" screen (2026-11-08). It must open, and go somewhere.
+test("the account menu opens and goes to My ratings", async ({ page, context, baseURL }) => {
+  const { cookie }: E2EFixture = JSON.parse(readFileSync(E2E.fixtureFile, "utf8"));
+  await context.addCookies([{ ...cookie, url: baseURL! }]);
+  const crashes: string[] = [];
+  page.on("pageerror", (e) => crashes.push(e.message));
+  await page.goto("/islamabad");
+  await page.getByRole("button", { name: "Account menu" }).tap();
+  await expect(page.getByRole("menuitem", { name: "My ratings" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.getByRole("menuitem", { name: "My ratings" }).tap();
+  await expect(page).toHaveURL(`${baseURL}/me`);
+  await expect(page.getByRole("heading", { level: 1, name: "My ratings" })).toBeVisible();
+  expect(crashes).toEqual([]);
+});
+
 // Phase 5 acceptance: an unmatched menu item is assigned in one tap, and the upload is done when
 // every item is decided.
 test("an admin assigns a menu item's suggested dish in one tap", async ({
