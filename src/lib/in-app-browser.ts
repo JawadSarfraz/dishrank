@@ -3,7 +3,8 @@
 // tests can read every user agent; the browser's own hook is in use-in-app-browser.ts.
 
 export type InAppBrowser = {
-  app: "instagram" | "messenger" | "facebook" | "tiktok";
+  /** The app, when its browser names itself; `other` for any other embedded browser. */
+  app: "instagram" | "messenger" | "facebook" | "tiktok" | "other";
   os: "android" | "ios" | "other";
 };
 
@@ -13,17 +14,42 @@ const APPS: readonly [InAppBrowser["app"], RegExp][] = [
   ["messenger", /Orca-Android|Messenger(?:Lite)?ForiOS|FBAN\/FBMessenger|FB_IAB\/MESSENGER/i],
   ["facebook", /FBAN\/|FBAV\/|FB_IAB\/|FBIOS|FB4A/],
   ["tiktok", /musical_ly|trill_|BytedanceWebview|\bTikTok\b/i],
+  // Other apps whose built-in browser names itself (2026-11-11): LinkedIn, Snapchat, X, Pinterest,
+  // Line, WeChat.
+  ["other", /LinkedInApp|Snapchat|\bTwitter\b|Pinterest\/|\bLine\/|MicroMessenger/i],
 ];
 
-export function detectInAppBrowser(userAgent: string): InAppBrowser | null {
-  const app = APPS.find(([, pattern]) => pattern.test(userAgent))?.[0];
-  if (!app) return null;
+/**
+ * Android's own WebView marks itself with "; wv)" (2026-11-11). "Version/4.0" alone is not enough:
+ * Xiaomi's and UC's browsers carry it too, and Google signs people in there.
+ */
+const ANDROID_WEBVIEW = /;\s*wv\)/;
+
+/**
+ * On iPhone and iPad every real browser ends in "Safari/…" or names itself (CriOS, FxiOS, EdgiOS,
+ * OPiOS, OPT); a WKWebView inside an app has none of it. A page added to the home screen looks the
+ * same, so the caller says when the page runs standalone.
+ */
+const IOS_BROWSER = /Safari\/|CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|Version\//;
+
+export function detectInAppBrowser(
+  userAgent: string,
+  options: { standalone?: boolean } = {},
+): InAppBrowser | null {
+  // The installed home-screen app is the phone's own browser, whatever its user agent says.
+  if (options.standalone) return null;
   const os = /Android/i.test(userAgent)
     ? "android"
     : /iPhone|iPad|iPod/i.test(userAgent)
       ? "ios"
       : "other";
-  return { app, os };
+  const named = APPS.find(([, pattern]) => pattern.test(userAgent))?.[0];
+  if (named) return { app: named, os };
+  if (os === "android" && ANDROID_WEBVIEW.test(userAgent)) return { app: "other", os };
+  if (os === "ios" && /AppleWebKit/.test(userAgent) && !IOS_BROWSER.test(userAgent)) {
+    return { app: "other", os };
+  }
+  return null;
 }
 
 const ESCAPED_PARAM = "via";

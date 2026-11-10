@@ -1,7 +1,8 @@
 "use client";
 
-// Shown instead of "Continue with Google" inside the Facebook, Instagram, Messenger and TikTok
-// browsers, where Google refuses its sign-in. The page itself goes on in the phone's browser: on
+// Shown instead of "Continue with Google" inside an app's built-in browser (Facebook, Instagram,
+// Messenger, TikTok, LinkedIn and any other WebView), where Google refuses its sign-in. The page
+// itself goes on in the phone's browser: on
 // Android by an intent:// link to the same address, on iPhone by the app's own menu, which no link
 // can reach. Either way the address keeps everything the visitor did, such as a tapped score.
 import { useEffect, useRef, useState } from "react";
@@ -15,6 +16,7 @@ const APP_NAMES: Record<InAppBrowser["app"], string> = {
   instagram: "Instagram",
   messenger: "Messenger",
   tiktok: "TikTok",
+  other: "this app's browser",
 };
 
 export function OpenInBrowser({ browser }: { browser: InAppBrowser }) {

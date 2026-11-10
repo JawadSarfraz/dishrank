@@ -70,8 +70,30 @@ describe("detectInAppBrowser", () => {
       "tiktok",
       "ios",
     ],
+    ["LinkedIn, Android", `${ANDROID} LinkedInApp`, "other", "android"],
+    ["LinkedIn, iPhone", `${IPHONE} LinkedInApp`, "other", "ios"],
+    [
+      "Snapchat, Android",
+      `${ANDROID} Snapchat/12.80.0.46 (SM-A135F; Android 13#TP1A.220624.014#33; gzip; panda)`,
+      "other",
+      "android",
+    ],
+    ["X, iPhone", `${IPHONE} Twitter for iPhone/10.50`, "other", "ios"],
+    ["Pinterest, Android", `${ANDROID} [Pinterest/Android]`, "other", "android"],
+    ["Line, iPhone", `${IPHONE} Line/14.0.0 LIFF`, "other", "ios"],
+    ["WeChat, Android", `${ANDROID} MicroMessenger/8.0.44`, "other", "android"],
+    // Any other app's WebView: Android marks it "; wv)", an iPhone WKWebView has no browser name.
+    ["an Android WebView with no app name", ANDROID, "other", "android"],
+    ["an iPhone WKWebView with no app name", IPHONE, "other", "ios"],
   ])("finds %s", (_label, userAgent, app, os) => {
     expect(detectInAppBrowser(userAgent)).toEqual({ app, os });
+  });
+
+  it("never triggers in the installed home-screen app, whose iPhone user agent looks like a WebView", () => {
+    expect(detectInAppBrowser(IPHONE, { standalone: true })).toBeNull();
+    expect(detectInAppBrowser(ANDROID, { standalone: true })).toBeNull();
+    expect(detectInAppBrowser(`${IPHONE} LinkedInApp`, { standalone: true })).toBeNull();
+    expect(detectInAppBrowser(IPHONE, { standalone: false })).toEqual({ app: "other", os: "ios" });
   });
 
   it.each([
@@ -90,6 +112,27 @@ describe("detectInAppBrowser", () => {
     [
       "Chrome on a laptop",
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    ],
+    [
+      "Chrome on iPhone",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1",
+    ],
+    [
+      "Firefox on iPhone",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/131.0 Mobile/15E148 Safari/605.1.15",
+    ],
+    [
+      "Edge on iPhone",
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 EdgiOS/129.0.2792.84 Mobile/15E148 Safari/605.1.15",
+    ],
+    ["Firefox on Android", "Mozilla/5.0 (Android 13; Mobile; rv:131.0) Gecko/131.0 Firefox/131.0"],
+    [
+      "Mi Browser (Version/4.0 without the WebView mark)",
+      "Mozilla/5.0 (Linux; U; Android 13; en-us; 2201117TI Build/TKQ1.220829.002) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/112.0.5615.136 Mobile Safari/537.36 XiaoMi/MiuiBrowser/14.5.12",
+    ],
+    [
+      "UC Browser",
+      "Mozilla/5.0 (Linux; U; Android 12; en-US; SM-A135F Build/SP1A.210812.016) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/100.0.4896.58 UCBrowser/13.4.0.1306 Mobile Safari/537.36",
     ],
     ["no user agent", ""],
   ])("leaves %s alone", (_label, userAgent) => {

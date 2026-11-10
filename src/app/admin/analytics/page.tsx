@@ -139,9 +139,10 @@ export default async function AdminAnalyticsPage() {
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-bold">Sign-ins</h2>
         <p className="max-w-prose text-sm text-muted-foreground">
-          Google refuses its sign-in inside the Facebook, Instagram, Messenger and TikTok browsers.
-          In-app reached: a sign-in step opened in one of them. Left: Open in Chrome or Copy link
-          was tapped. Completed: the sign-in finished in Chrome or Safari after that.
+          Google refuses its sign-in inside apps&apos; built-in browsers (Facebook, Instagram,
+          Messenger, TikTok, LinkedIn and the rest). In-app reached: a sign-in step opened in one of
+          them. Left: Open in Chrome or Copy link was tapped. Completed: the sign-in finished in
+          Chrome or Safari after that.
         </p>
         <WeekTable
           weeks={data.weeks}

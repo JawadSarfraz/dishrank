@@ -524,6 +524,8 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
       return b.votes - a.votes || a.dish.name.localeCompare(b.dish.name);
     });
 
+  const claimed = Boolean(restaurant.claimedByUserId);
+  const unchecked = Boolean(restaurant.autoListedAt && !restaurant.checkedAt);
   return {
     kind: "found",
     restaurant: {
@@ -533,15 +535,18 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
       city: { slug: restaurant.city.slug, name: restaurant.city.name },
       area: restaurant.area ? { slug: restaurant.area.slug, name: restaurant.area.name } : null,
       address: restaurant.address,
-      phone: restaurant.phone,
+      // A phone number shows once a person has checked the listing or its owner has claimed it
+      // (2026-11-11): on an unchecked auto-listed place it is open map data nobody verified. The
+      // page, its JSON-LD and the JSON route all read this field.
+      phone: unchecked && !claimed ? null : restaurant.phone,
       website: restaurant.website,
       priceBand: restaurant.priceBand,
       lat: restaurant.lat,
       lng: restaurant.lng,
     },
     dishes,
-    claimed: Boolean(restaurant.claimedByUserId),
-    unchecked: Boolean(restaurant.autoListedAt && !restaurant.checkedAt),
+    claimed,
+    unchecked,
   };
 }
 

@@ -1,6 +1,6 @@
-// Only pages worth a search result (docs/08 Phase 4): the home and city pages, ranking pages that
-// rank at least one restaurant, and restaurants with at least one counted rating. Thin pages are
-// noindex and left out. In beta (SITE_MODE, docs/10) nothing is listed.
+// Only pages worth a search result (docs/01 D1c): the home and city pages, ranking pages with at
+// least three ranked restaurants, and restaurants with at least one ranked dish (INDEX_RULES). Thin
+// pages are noindex and left out. In beta (SITE_MODE, docs/10) nothing is listed.
 import type { MetadataRoute } from "next";
 import { absoluteUrl, isBeta } from "@/server/site";
 import { listSitemapEntries } from "@/server/services/city-page.service";

@@ -1,5 +1,6 @@
 // Reads for the public pages (ranking, restaurant, city and home pages, sitemap). They are cached by
 // ISR and never depend on who is looking.
+import { dishPageIndexable, restaurantPageIndexable } from "@/lib/indexing";
 import type { Prisma, RestaurantDishStatus } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Client } from "./transaction";
@@ -174,20 +175,27 @@ export async function countListedRowsPerDish(client: Client = db) {
 }
 
 /**
- * For the sitemap: (city, dish) lists that rank at least one restaurant, and ACTIVE restaurants with
- * a counted rating on a listed dish (the pages that are not noindex), each with its latest rating.
+ * For the sitemap (docs/01 D1c): (city, dish) lists with enough ranked restaurants, and ACTIVE
+ * restaurants with enough ranked dishes (the pages that are not noindex), each with its latest
+ * rating. The numbers are INDEX_RULES, the same the pages' robots tags use.
  */
 export async function listIndexablePages(client: Client = db) {
-  const listGroups = await client.restaurantDish.groupBy({
-    by: ["cityId", "dishId"],
-    where: { rankInCity: { not: null } },
-    _max: { lastRatedAt: true },
-  });
-  const restaurantGroups = await client.restaurantDish.groupBy({
-    by: ["restaurantId"],
-    where: { ratingCount: { gt: 0 }, status: { not: "REMOVED" }, restaurant: { status: "ACTIVE" } },
-    _max: { lastRatedAt: true },
-  });
+  const listGroups = (
+    await client.restaurantDish.groupBy({
+      by: ["cityId", "dishId"],
+      where: { rankInCity: { not: null } },
+      _count: { _all: true },
+      _max: { lastRatedAt: true },
+    })
+  ).filter((g) => dishPageIndexable(g._count._all));
+  const restaurantGroups = (
+    await client.restaurantDish.groupBy({
+      by: ["restaurantId"],
+      where: { rankInCity: { not: null }, restaurant: { status: "ACTIVE" } },
+      _count: { _all: true },
+      _max: { lastRatedAt: true },
+    })
+  ).filter((g) => restaurantPageIndexable(g._count._all));
   const cities = await client.city.findMany({ select: { id: true, slug: true } });
   const dishes = await client.dish.findMany({
     where: { id: { in: [...new Set(listGroups.map((g) => g.dishId))] } },

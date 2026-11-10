@@ -58,7 +58,7 @@ test("ranking page: ranked list, contenders, and a new vote moves one to not-eno
   }).toPass({ timeout: 15_000 });
 });
 
-test("robots.txt keeps private pages out; the sitemap lists ranked pages only", async ({
+test("robots.txt keeps private pages out; the sitemap and robots tags follow the index rules", async ({
   request,
 }) => {
   const robots = await (await request.get("/robots.txt")).text();
@@ -68,8 +68,20 @@ test("robots.txt keeps private pages out; the sitemap lists ranked pages only", 
   expect(robots).toContain("/sitemap.xml");
 
   const sitemap = await (await request.get("/sitemap.xml")).text();
-  expect(sitemap).toContain("/islamabad/best-pizza</loc>");
-  expect(sitemap).toContain(`/islamabad/r/${fixture().pizza.ranked.slug}</loc>`);
-  // Lists that rank nobody are noindex and left out.
+  // A dish page is listed once three restaurants rank on it (docs/01 D1c); the fixture ranks one.
+  expect(sitemap).not.toContain("/islamabad/best-pizza</loc>");
   expect(sitemap).not.toContain("/islamabad/best-haleem</loc>");
+  // A restaurant page is listed once one of its dishes ranks.
+  expect(sitemap).toContain(`/islamabad/r/${fixture().pizza.ranked.slug}</loc>`);
+  expect(sitemap).not.toContain(`/islamabad/r/${fixture().pizza.unranked.slug}</loc>`);
+
+  // The pages say the same with their robots tag.
+  const noindex = /name="robots" content="noindex/;
+  expect(await (await request.get("/islamabad/best-pizza")).text()).toMatch(noindex);
+  expect(
+    await (await request.get(`/islamabad/r/${fixture().pizza.ranked.slug}`)).text(),
+  ).not.toMatch(noindex);
+  expect(await (await request.get(`/islamabad/r/${fixture().pizza.unranked.slug}`)).text()).toMatch(
+    noindex,
+  );
 });

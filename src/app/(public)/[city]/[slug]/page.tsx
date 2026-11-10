@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BRAND } from "@/lib/brand";
 import { formatScore, formatVotes } from "@/lib/format";
+import { dishPageIndexable } from "@/lib/indexing";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
 import { getRankingPage } from "@/server/services/ranking.service";
@@ -110,8 +111,10 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
       description,
       images: [image],
     },
-    // A page that ranks nobody yet stays out of search results (it is still linked and crawled).
-    ...(ranking.eligible.length === 0 ? { robots: { index: false, follow: true } } : {}),
+    // Fewer than three ranked restaurants: out of search results (still linked and crawled).
+    ...(dishPageIndexable(ranking.eligible.length)
+      ? {}
+      : { robots: { index: false, follow: true } }),
   };
 }
 

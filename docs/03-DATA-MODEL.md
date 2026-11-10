@@ -807,7 +807,7 @@ enum AnalyticsEventName {
   SHARE_CLICK
   SIGN_IN_STARTED // "Continue with Google" in a normal browser
   SIGN_IN_COMPLETED
-  IN_APP_SIGN_IN_STARTED // reached a sign-in step inside the Facebook, Instagram, Messenger or TikTok browser
+  IN_APP_SIGN_IN_STARTED // reached a sign-in step inside an app's built-in browser (Facebook, Instagram, Messenger, TikTok, LinkedIn and the rest; docs/12 Sign in)
   IN_APP_LEFT_BROWSER // tapped "Open in Chrome" or "Copy link" there
   IN_APP_SIGN_IN_COMPLETED // finished in Chrome or Safari, after leaving one of those browsers
 }

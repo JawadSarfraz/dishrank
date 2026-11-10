@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BRAND } from "@/lib/brand";
+import { restaurantPageIndexable } from "@/lib/indexing";
 import { formatAddress, formatFromPrice, formatScore, formatVotes } from "@/lib/format";
 import { restaurantJsonLd } from "@/server/seo";
 import { getPublicRestaurant } from "@/server/services/restaurant.service";
@@ -43,7 +44,7 @@ export async function generateMetadata({
   const { restaurant, dishes } = result;
   const place = [restaurant.area?.name, restaurant.city.name].filter(Boolean).join(", ");
   const best = dishes.find((d) => d.rankInCity !== null);
-  const votes = dishes.reduce((sum, d) => sum + d.votes, 0);
+  const rankedDishes = dishes.filter((d) => d.rankInCity !== null).length;
   const title = `${restaurant.name}, ${place}`;
   const description = best
     ? `${restaurant.name} in ${place}: ${best.dish.name} is #${best.rankInCity} in ${restaurant.city.name} (${formatScore(best.score ?? 0)} · ${formatVotes(best.votes)}). Dish-by-dish scores from diners.`
@@ -60,8 +61,8 @@ export async function generateMetadata({
       type: "website",
       siteName: BRAND.name,
     },
-    // Until someone rates a dish here the page has nothing of its own: kept out of search results.
-    ...(votes === 0 ? { robots: { index: false, follow: true } } : {}),
+    // Until a dish ranks here the page has nothing of its own: kept out of search results.
+    ...(restaurantPageIndexable(rankedDishes) ? {} : { robots: { index: false, follow: true } }),
   };
 }
 

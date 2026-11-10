@@ -155,7 +155,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N contenders" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
 | Trust box | `components/ranking/TrustBox.tsx` | Brand-soft card with three points; the rater count is the city's live threshold. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed card: icon, one-line title, one sentence, one action. Used on every empty list. |
-| Skeleton | `components/ui/skeleton.tsx`, `loading.tsx` files | The city, ranking and restaurant pages show their shape while rendering. The cached page swaps it for the content on load, so it and its page both have `min-h-dvh`: the footer stays below the fold in both, or a long list moves it (CLS). |
+| Skeleton | `components/ui/skeleton.tsx` | Loading shapes, kept for admin lists. The public city, ranking and restaurant pages no longer ship a `loading.tsx` (2026-11-11): with one, the first HTML of a cached page was the skeleton, then the footer, then the content in hidden blocks, so a fetcher without JavaScript saw no `<h1>` and the footer before the dish. The cached HTML now carries the whole page in order. |
 | Toasts | `components/ui/toast.tsx` (Base UI) | Share → "Link copied"; sign-out failure. The viewport sits above the install card. |
 | Disclosure | `components/ui/disclosure.tsx` | A native `<details>` as a card: report a problem, claim, suggest, add details, delete account. |
 | Badge | `components/ui/badge.tsx` | default (brand-soft), secondary, outline, destructive, gold (unused by design; kept for the medals' siblings). |
@@ -200,9 +200,12 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   "Rate another dish here", "Rate more places for <dish>" (back to the dish page's list), Share
   (the ranking when ranked, the restaurant otherwise), "Rate somewhere else" and "My ratings". The second saved rating may bring up the install card.
 - **Sign in.** The wordmark (lg), "Sign in", one sentence on why, "Continue with Google", terms and privacy
-  links; fixed texts for the beta and ban refusals. Inside the Facebook, Instagram, Messenger and
-  TikTok browsers, where Google refuses its sign-in, every sign-in step shows `OpenInBrowser`
-  instead of the button: on Android "Open in Chrome" (an `intent://` link to the same page) and
+  links; fixed texts for the beta and ban refusals. Inside an app's built-in browser, where Google
+  refuses its sign-in (Facebook, Instagram, Messenger, TikTok, LinkedIn, Snapchat, X, Pinterest,
+  Line, WeChat, and any other Android WebView or iOS WKWebView; never Chrome, Safari, Samsung
+  Internet or the installed home-screen app, which `isStandalone()` tells apart; 2026-11-11), every
+  sign-in step shows `OpenInBrowser` instead of the button ("Google sign-in doesn't work in this
+  app's browser" when the app has no name): on Android "Open in Chrome" (an `intent://` link to the same page) and
   Copy link, on iPhone "Tap ••• then Open in Safari" and Copy link.
 - **My ratings.** Rows with the dish icon, name, restaurant, date, the diner's score as a large
   number, status chip, comment, Edit and Delete; claims; Your account with Delete my account.
