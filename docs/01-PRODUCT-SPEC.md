@@ -87,7 +87,7 @@ who ate there." Internal identifiers stay `dishrank`.
 | `/[city]/r/[restaurantSlug]` | Restaurant page: dishes ranked, each with score/votes, rate buttons | ISR 1h |
 | `/rate` | Rating flow: search restaurant → pick dish → score → optional photo/comment | Client form + server action |
 | `/me` | My ratings, edit/delete | Dynamic |
-| `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` | Trust + legal pages | Static |
+| `/how-rankings-work`, `/dispute`, `/about`, `/privacy`, `/terms` | Trust + legal pages. `/about` also says who runs the site and how to reach them (`OPERATOR_NAME`, `CONTACT_EMAIL`), why it exists, and that we earn nothing today: no restaurant has paid, nobody can pay to change a ranking (2026-11-11) | Static |
 | `/owner/*` | Claim, dishes, basic report | Dynamic, role OWNER |
 | `/admin/*` | Import, review queue, restaurants, users, recompute | Dynamic, role ADMIN |
 | `/api/v1/*` | JSON API (same services) | Route handlers |

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
 import Link from "next/link";
+import { ContactEmail, OperatorName } from "@/components/trust/Operator";
 import { BRAND } from "@/lib/brand";
 
 export const revalidate = 3600;
@@ -37,6 +38,18 @@ export default function AboutPage() {
         <p>
           Ratings are opinions, not facts about a restaurant. If something looks wrong, use the{" "}
           <Link href="/dispute">dispute page</Link>.
+        </p>
+        <h2>Who runs it</h2>
+        <p>
+          {BRAND.name} is run by <OperatorName />. Write to <ContactEmail /> about anything on the
+          site: a listing, a rating, a ranking or an idea.
+        </p>
+        <p>
+          I built it because a star rating for a whole restaurant never told me where to get the
+          best plate of one dish.
+        </p>
+        <p>
+          We earn nothing today. No restaurant has paid us, and no one can pay to change a ranking.
         </p>
       </Prose>
     </Main>
