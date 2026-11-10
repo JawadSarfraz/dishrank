@@ -111,9 +111,12 @@ function PlaceRow({
 export default function QuickRatePanel({
   citySlug,
   dishSlug,
+  seed,
 }: {
   citySlug: string;
   dishSlug: string;
+  /** The page's shuffle seed: the contenders open in the order the page showed them. */
+  seed: string;
 }) {
   const router = useRouter();
   const [data, setData] = useState<QuickRateData | null>(null);
@@ -129,7 +132,7 @@ export default function QuickRatePanel({
 
   useEffect(() => {
     let live = true;
-    quickRatePlacesAction({ city: citySlug, dish: dishSlug })
+    quickRatePlacesAction({ city: citySlug, dish: dishSlug, seed })
       .then((res) => {
         if (!live) return;
         if (res.error) {
@@ -145,7 +148,7 @@ export default function QuickRatePanel({
     return () => {
       live = false;
     };
-  }, [citySlug, dishSlug]);
+  }, [citySlug, dishSlug, seed]);
 
   const text = q.trim();
   useEffect(() => {

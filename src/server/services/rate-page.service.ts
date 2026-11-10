@@ -3,6 +3,7 @@
 // score tapped before sign-in, so a deep link, a sign-in return or an edit from /me opens at the
 // right step.
 import { parsePendingScore } from "@/lib/pending-score";
+import { seededOrder } from "@/lib/shuffle";
 import { AppError } from "@/server/errors";
 import { findCityBySlug, listRankingRows } from "@/server/repositories/public.repo";
 import { listRatingsOfUserForDish } from "@/server/repositories/rating.repo";
@@ -32,7 +33,7 @@ export type RateRestaurant = {
 
 export async function getRatePageData(
   user: SessionUser | null,
-  params: { city?: string; r?: string; d?: string; score?: string },
+  params: { city?: string; r?: string; d?: string; score?: string; suggest?: string },
 ) {
   const [cities, launchDishes, rater] = await Promise.all([
     listCities(),
@@ -82,6 +83,8 @@ export async function getRatePageData(
     existing,
     /** The score tapped before signing in: it fills the score step, and the diner submits it. */
     pendingScore: restaurant && dish ? parsePendingScore(params.score) : null,
+    /** "Missing one? Add it" on a dish page opens the suggest-a-restaurant form. */
+    suggestOpen: params.suggest === "1",
   };
 }
 
@@ -104,7 +107,7 @@ export type QuickRatePlace = {
  */
 export async function getQuickRatePlaces(
   actor: SessionUser | null,
-  input: { city: string; dish: string },
+  input: { city: string; dish: string; seed?: string },
 ) {
   const [city, dish] = await Promise.all([findCityBySlug(input.city), findDishBySlug(input.dish)]);
   if (!city || !dish) throw new AppError("NOT_FOUND", "City or dish not found", 404);
@@ -113,6 +116,11 @@ export async function getQuickRatePlaces(
     actor ? listRatingsOfUserForDish(actor.id, city.id, dish.id) : [],
   ]);
   const mineAt = new Map(mine.map((r) => [r.restaurantDish.restaurantId, r]));
+  // The dish page's order: ranked, then collecting votes, then the contenders nobody has rated in
+  // the page's shuffled order (its seed comes along), or by name without one.
+  const voted = rows.filter((r) => r.rankInCity !== null || r.distinctRaters > 0);
+  const fresh = rows.filter((r) => r.rankInCity === null && r.distinctRaters === 0);
+  const ordered = [...voted, ...(input.seed ? seededOrder(fresh, input.seed, (r) => r.id) : fresh)];
   return {
     signedIn: Boolean(actor),
     city: { slug: city.slug, name: city.name },
@@ -123,7 +131,7 @@ export async function getQuickRatePlaces(
       score: r.score,
       status: r.status,
     })),
-    places: rows.map((row): QuickRatePlace => {
+    places: ordered.map((row): QuickRatePlace => {
       const own = mineAt.get(row.restaurant.id);
       return {
         restaurantId: row.restaurant.id,

@@ -10,9 +10,12 @@ import { RestaurantCreateFields, type CreateFieldsValues } from "./RestaurantCre
 export function AddRestaurantForm({
   cities,
   launchDishes,
+  defaultDishSlugs = [],
 }: {
   cities: { id: string; name: string; areas: { id: string; name: string }[] }[];
   launchDishes: { slug: string; name: string }[];
+  /** Pre-ticked dishes (from /admin/contenders). */
+  defaultDishSlugs?: string[];
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +44,7 @@ export function AddRestaurantForm({
       cities={cities}
       defaultAreaId=""
       dishes={launchDishes}
-      defaultDishSlugs={[]}
+      defaultDishSlugs={defaultDishSlugs}
       withLocation
       note="For a place that is not in the Overture list. Type the name as on the signboard and a short address; the location is optional (you can add it later)."
       submitLabel="Add restaurant"

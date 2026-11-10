@@ -192,6 +192,7 @@ export function RateFlow({ data }: { data: RatePageData }) {
           cities={data.cities}
           citySlug={city?.slug ?? ""}
           signedIn={data.signedIn}
+          suggestOpen={data.suggestOpen}
           onCity={(slug) => move({ restaurant: null, dish: null, city: slug })}
           onPick={(hit) => {
             // Show the dish step at once; the restaurant's own dishes arrive a moment later.
@@ -264,12 +265,15 @@ function RestaurantStep({
   cities,
   citySlug,
   signedIn,
+  suggestOpen,
   onCity,
   onPick,
 }: {
   cities: RatePageData["cities"];
   citySlug: string;
   signedIn: boolean;
+  /** Opened from "Missing one? Add it" on a dish page: the suggest form starts open. */
+  suggestOpen: boolean;
   onCity: (slug: string) => void;
   onPick: (hit: SearchHit) => void;
 }) {
@@ -370,7 +374,14 @@ function RestaurantStep({
           </li>
         )}
       </ul>
-      {city && <SuggestRestaurant city={city} signedIn={signedIn} defaultName={q.trim()} />}
+      {city && (
+        <SuggestRestaurant
+          city={city}
+          signedIn={signedIn}
+          defaultName={q.trim()}
+          defaultOpen={suggestOpen}
+        />
+      )}
     </section>
   );
 }

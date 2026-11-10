@@ -6,11 +6,14 @@ import { cn } from "cn";
  * add details to a rating). Works without JavaScript; the chevron turns when open.
  */
 export function Disclosure({
+  id,
   summary,
   children,
   defaultOpen,
   className,
 }: {
+  /** A link target: a page can open and scroll to the section. */
+  id?: string;
   summary: React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
@@ -18,6 +21,7 @@ export function Disclosure({
 }) {
   return (
     <details
+      id={id}
       open={defaultOpen}
       className={cn("group/disclosure rounded-xl border bg-card shadow-card", className)}
     >

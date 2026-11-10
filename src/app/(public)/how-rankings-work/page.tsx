@@ -84,7 +84,7 @@ export default function HowRankingsWorkPage() {
           {RANKING.promoteRaters} different people have rated it, or we have seen it on the menu, or
           the owner has confirmed it. Everything else is listed under &quot;Not enough votes
           yet&quot;, with how many more raters it needs, and places nobody has rated yet are under
-          &quot;Places to try&quot;. Neither ever gets a number.
+          &quot;Contenders&quot;. Neither ever gets a number.
         </p>
         <p>
           <strong>Early rankings.</strong> While a city is new on {BRAND.name}, a rank needs{" "}

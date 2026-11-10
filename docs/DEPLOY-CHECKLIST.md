@@ -26,7 +26,7 @@ What is left on 2026-11-06. No new environment variable is needed for any of it.
 4. Spot-check: `/admin/restaurants` → Listing **Auto-listed, not checked**. **Looks right** for the
    good ones; open the wrong ones and fix, hide or merge them. It does not have to be finished before
    launch: a page says "our team has not checked it yet" until you have.
-5. Open a dish page on your phone: "Places to try", the area and Near me filters, and **Rate the places
+5. Open a dish page on your phone: "Contenders", the area and Near me filters, and **Rate the places
    you know**. Rate two dishes you have really eaten.
 6. `/admin/users` → **Panel invite links** → create one; copy it when it is shown, only once. **Test it
    with a real Google sign-in before sending it to anyone:** open it in a private tab, **Continue with

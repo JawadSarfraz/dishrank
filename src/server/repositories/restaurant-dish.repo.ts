@@ -1,4 +1,4 @@
-import { Prisma, type SourceType } from "@/generated/prisma/client";
+import { Prisma, type RestaurantDishStatus, type SourceType } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Client, Tx } from "./transaction";
 
@@ -11,6 +11,19 @@ export async function findRestaurantDish(
     where: { restaurantId_dishId: { restaurantId, dishId } },
     select: { id: true, status: true, rankInCity: true },
   });
+}
+
+/** A dish row's restaurant, to take the restaurant's lock before the row's (docs/02). */
+export async function findRestaurantDishById(id: string, client: Client = db) {
+  return client.restaurantDish.findUnique({
+    where: { id },
+    select: { id: true, restaurantId: true, status: true },
+  });
+}
+
+/** /admin/contenders: REMOVED, or back to CANDIDATE. The caller holds the row's lock. */
+export async function setRestaurantDishStatus(id: string, status: RestaurantDishStatus, tx: Tx) {
+  return tx.restaurantDish.update({ where: { id }, data: { status }, select: { id: true } });
 }
 
 /** A new CANDIDATE row; the caller has checked that none exists. */

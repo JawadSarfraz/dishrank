@@ -17,6 +17,7 @@ export default async function RatePage({ searchParams }: PageProps<"/rate">) {
     r: one(params.r),
     d: one(params.d),
     score: one(params.score),
+    suggest: one(params.suggest),
   });
   return (
     <Main width="narrow" className="gap-4">

@@ -142,9 +142,9 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Rank rows | `components/ranking/RankingBrowser.tsx` | Disc, name (display 700), area and distance, "from Rs 1,900" and variant chips, then the stacked score and "Rate this". While a city is in early rankings the row leads with rank and votes and the score stays, smaller: with few votes the scores sit close together. Rank 1 gets a gold-soft tint that fades to white. |
 | Filter bar | same | "Filters" opens a bottom sheet (`components/ui/sheet.tsx`, Base UI dialog) with area, minimum score and minimum votes and a "Show n restaurants" close; sort is a native select in the bar; "Near me" asks for the location only when tapped. Filters stay in the URL. |
 | Waiting list | `components/ranking/WaitingList.tsx` | "Not enough votes yet" rows with votes, what is still needed (in raters, like the badge), a progress bar toward the live rater threshold and a Rate button that deep-links into the flow. |
-| Places to try | `components/ranking/PlacesToTry.tsx` | Rows with no votes: name, area and distance, a Rate button; never a disc or a score, in A–Z order so it cannot read as a ranking. "Not ranked yet · from open map data" (the second part only when every row is from Overture); an area select and "Near me" in the browser; 10 rows, then "Show more". |
+| Contenders | `components/ranking/Contenders.tsx` | The places on the dish's list that nobody has rated yet (docs/01 D2a): name, area and distance, a Rate button; never a disc or a score, shuffled on the server at each render so the order cannot read as a ranking and no row gains from being first. Header "Contenders · Missing one? Add it." (the link opens the rate flow's suggest form); the open-data credit stays on /about/data and on unchecked restaurant pages. An area select and "Near me" in the browser; 10 rows, then "Show more". While "Rate the places you know" is open, this list, the waiting list and the ranking give way to the panel. |
 | Quick rate | `components/ranking/QuickRate.tsx`, `QuickRatePanel.tsx` | "Rate the places you know": a button on the static page; the list and its code load when opened. Each row has 10 score buttons of 44 px height (5 across below 640 px, 10 from there up, so each stays at least 44 px wide), and one tap saves. A rating given earlier shows "You gave it n · Change". Signed out the list is the same, and a tap opens the rate flow's score step with that score filled in. |
-| Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N places to try" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
+| Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N contenders" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
 | Trust box | `components/ranking/TrustBox.tsx` | Brand-soft card with three points; the rater count is the city's live threshold. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed card: icon, one-line title, one sentence, one action. Used on every empty list. |
 | Skeleton | `components/ui/skeleton.tsx`, `loading.tsx` files | The city, ranking and restaurant pages show their shape while rendering. The cached page swaps it for the content on load, so it and its page both have `min-h-dvh`: the footer stays below the fold in both, or a long list moves it (CLS). |
@@ -194,7 +194,10 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   chips, rank, "from" price, score and votes, Rank by week, the confirm / fix / remove actions,
   the menu photo box.
 - **Admin.** Overview cards with counts, one of them the held ratings; every list page as
-  `AdminHeader` + tabs + `AdminList`; the review cards keep their one-tap decisions, and a burst
+  `AdminHeader` + tabs + `AdminList`; `/admin/contenders` curates one dish in one city: the list
+  as the public sees it with Remove, the linked places the rule keeps out with Add, the removed
+  rows with Add back, a name search that adds a listed restaurant to this dish and any others
+  ticked, and a link to add a missing restaurant with those dishes pre-ticked; the review cards keep their one-tap decisions, and a burst
   card marks the ratings that look genuine and adds "Release the ones that look genuine".
   `/admin/analytics` has weekly raters, returning raters, share clicks and a sign-ins table split by
   normal and in-app browser.

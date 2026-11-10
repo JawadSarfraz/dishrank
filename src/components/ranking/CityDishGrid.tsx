@@ -38,8 +38,8 @@ export function CityDishGrid({ overview }: { overview: CityOverview }) {
             ) : (
               <span className="mt-auto flex flex-col gap-1">
                 <span className="text-sm text-muted-foreground">
-                  {d.placesToTry > 0
-                    ? `${d.placesToTry} ${d.placesToTry === 1 ? "place" : "places"} to try`
+                  {d.contenders > 0
+                    ? `${d.contenders} contender${d.contenders === 1 ? "" : "s"}`
                     : "Not enough votes yet"}
                 </span>
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-brand">

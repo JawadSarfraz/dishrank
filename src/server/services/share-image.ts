@@ -11,7 +11,7 @@ type RankingPage = NonNullable<Awaited<ReturnType<typeof getRankingPage>>>;
 
 export function shareImageFacts(r: RankingPage) {
   const votes = r.eligible.reduce((sum, row) => sum + row.votes, 0);
-  const places = r.placesToTryTotal;
+  const places = r.listedTotal;
   return {
     title: `Best ${r.dish.name} in ${r.city.name}`,
     /** Early rankings: the image leads with rank and votes, and the score is small. */

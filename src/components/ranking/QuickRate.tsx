@@ -2,7 +2,9 @@
 
 // "Rate the places you know" on a dish page. The page stays static: the list and its code load only
 // when it is opened, and ask the server who is looking. A signed-out visitor sees the same list and
-// signs in after tapping a score (QuickRatePanel).
+// signs in after tapping a score (QuickRatePanel). While it is open it stands in for the page's own
+// lists (its children), so no place appears twice; the server's shuffle seed comes along, so the
+// contenders keep the order the page showed.
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +16,18 @@ const QuickRatePanel = dynamic(() => import("./QuickRatePanel"), {
   loading: () => <p className="text-sm text-muted-foreground">Loading places…</p>,
 });
 
-export function QuickRate({ citySlug, dishSlug }: { citySlug: string; dishSlug: string }) {
+export function QuickRate({
+  citySlug,
+  dishSlug,
+  seed,
+  children,
+}: {
+  citySlug: string;
+  dishSlug: string;
+  seed: string;
+  /** The ranking, the waiting list and the contenders: shown while the panel is closed. */
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
 
   // From an invite link, or from "Rate more places": open the list once, and take the marker out
@@ -39,7 +52,7 @@ export function QuickRate({ citySlug, dishSlug }: { citySlug: string; dishSlug: 
       >
         {open ? "Hide the list" : "Rate the places you know"}
       </Button>
-      {open && <QuickRatePanel citySlug={citySlug} dishSlug={dishSlug} />}
+      {open ? <QuickRatePanel citySlug={citySlug} dishSlug={dishSlug} seed={seed} /> : children}
     </div>
   );
 }

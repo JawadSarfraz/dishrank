@@ -9,7 +9,7 @@ import { cache } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { Main } from "@/components/layout/Page";
-import { PlacesToTry } from "@/components/ranking/PlacesToTry";
+import { Contenders } from "@/components/ranking/Contenders";
 import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
@@ -48,13 +48,13 @@ const titleOf = (r: Ranking) => `Best ${r.dish.name} in ${r.city.name}`;
 function summaryOf(r: Ranking) {
   const votes = r.eligible.reduce((sum, row) => sum + row.votes, 0);
   const waiting = r.insufficient.length;
-  const places = r.placesToTryTotal;
+  const places = r.listedTotal;
   if (r.eligible.length === 0) {
     if (waiting > 0) {
       return `${waiting} restaurant${waiting === 1 ? " is" : "s are"} collecting votes. None has enough yet.`;
     }
     return places > 0
-      ? `${places} place${places === 1 ? "" : "s"} to try. None has a vote yet.`
+      ? `${places} contender${places === 1 ? "" : "s"}. None has a vote yet.`
       : `No restaurant has votes for ${r.dish.name} in ${r.city.name} yet.`;
   }
   const ranked = `${r.eligible.length} restaurant${r.eligible.length === 1 ? "" : "s"} ranked from ${formatVotes(votes)}`;
@@ -110,7 +110,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const { city, slug } = await params;
   const ranking = await load(city, slug);
   if (!ranking) notFound();
-  const { eligible, insufficient, placesToTry, thresholds, mode } = ranking;
+  const { eligible, insufficient, contenders, thresholds, mode } = ranking;
   const shareLead =
     eligible.length > 0
       ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
@@ -159,64 +159,67 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </p>
       )}
 
-      <QuickRate citySlug={ranking.city.slug} dishSlug={ranking.dish.slug} />
+      <QuickRate
+        citySlug={ranking.city.slug}
+        dishSlug={ranking.dish.slug}
+        seed={ranking.shuffleSeed}
+      >
+        {eligible.length > 0 && (
+          <RankingBrowser
+            citySlug={ranking.city.slug}
+            dishSlug={ranking.dish.slug}
+            early={mode === "bootstrap"}
+            rows={eligible.map((row) => ({
+              rank: row.rank,
+              slug: row.restaurant.slug,
+              name: row.restaurant.name,
+              area: row.restaurant.area,
+              score: row.score,
+              votes: row.votes,
+              price: row.price,
+              tags: row.variantTags,
+              lat: row.restaurant.lat,
+              lng: row.restaurant.lng,
+            }))}
+          />
+        )}
 
-      {eligible.length > 0 && (
-        <RankingBrowser
-          citySlug={ranking.city.slug}
-          dishSlug={ranking.dish.slug}
-          early={mode === "bootstrap"}
-          rows={eligible.map((row) => ({
-            rank: row.rank,
-            slug: row.restaurant.slug,
-            name: row.restaurant.name,
-            area: row.restaurant.area,
-            score: row.score,
-            votes: row.votes,
-            price: row.price,
-            tags: row.variantTags,
-            lat: row.restaurant.lat,
-            lng: row.restaurant.lng,
-          }))}
-        />
-      )}
+        {eligible.length === 0 && insufficient.length === 0 && contenders.length === 0 && (
+          <EmptyState
+            icon={<DishIcon slug={ranking.dish.slug} size={26} />}
+            title={`Nobody has rated ${ranking.dish.name} in ${ranking.city.name} yet`}
+            text={`Be the first. It takes four taps, and the restaurant ranks once ${thresholds.minRaters} people have rated it.`}
+            action={{ href: rateHref, label: `Rate ${ranking.dish.name}` }}
+          />
+        )}
 
-      {eligible.length === 0 && insufficient.length === 0 && placesToTry.length === 0 && (
-        <EmptyState
-          icon={<DishIcon slug={ranking.dish.slug} size={26} />}
-          title={`Nobody has rated ${ranking.dish.name} in ${ranking.city.name} yet`}
-          text={`Be the first. It takes four taps, and the restaurant ranks once ${thresholds.minRaters} people have rated it.`}
-          action={{ href: rateHref, label: `Rate ${ranking.dish.name}` }}
-        />
-      )}
+        {insufficient.length > 0 && (
+          <WaitingList
+            citySlug={ranking.city.slug}
+            dishSlug={ranking.dish.slug}
+            dishName={ranking.dish.name}
+            minRaters={thresholds.minRaters}
+            leadIn={eligible.length === 0}
+            rows={insufficient.map((row) => ({
+              id: row.restaurantDishId,
+              slug: row.restaurant.slug,
+              name: row.restaurant.name,
+              area: row.restaurant.area?.name ?? null,
+              votes: row.votes,
+              ranksNext: row.ratingsNeeded === 0,
+            }))}
+          />
+        )}
 
-      {insufficient.length > 0 && (
-        <WaitingList
-          citySlug={ranking.city.slug}
-          dishSlug={ranking.dish.slug}
-          dishName={ranking.dish.name}
-          minRaters={thresholds.minRaters}
-          leadIn={eligible.length === 0}
-          rows={insufficient.map((row) => ({
-            id: row.restaurantDishId,
-            slug: row.restaurant.slug,
-            name: row.restaurant.name,
-            area: row.restaurant.area?.name ?? null,
-            votes: row.votes,
-            ranksNext: row.ratingsNeeded === 0,
-          }))}
-        />
-      )}
-
-      {placesToTry.length > 0 && (
-        <PlacesToTry
-          citySlug={ranking.city.slug}
-          dishSlug={ranking.dish.slug}
-          total={ranking.placesToTryTotal}
-          fromMapData={ranking.placesFromMapData}
-          rows={placesToTry}
-        />
-      )}
+        {contenders.length > 0 && (
+          <Contenders
+            citySlug={ranking.city.slug}
+            dishSlug={ranking.dish.slug}
+            total={ranking.contendersTotal}
+            rows={contenders}
+          />
+        )}
+      </QuickRate>
 
       <p className="text-sm text-muted-foreground">
         A restaurant gets a rank for this dish once at least {thresholds.minRaters} different people

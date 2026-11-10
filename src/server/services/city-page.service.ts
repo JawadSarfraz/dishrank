@@ -14,8 +14,8 @@ export type CityDish = {
   name: string;
   /** Restaurants ranked for this dish in the city. */
   ranked: number;
-  /** Places linked to this dish with no votes yet ("Places to try" on its page). */
-  placesToTry: number;
+  /** Places on this dish's list in the city (docs/01 D2a): ranked, collecting votes, or checked. */
+  contenders: number;
   top: { slug: string; name: string; score: number; votes: number } | null;
 };
 
@@ -25,9 +25,9 @@ export async function getCityOverview(citySlug: string, now: Date = new Date()) 
   if (!city) return null;
   const cities = await listCitiesWithAreas();
   const dishes = await listLaunchDishes();
-  const { counts, tops, untried } = await listCityDishSummaries(city.id);
+  const { counts, tops, contenders } = await listCityDishSummaries(city.id);
   const ranked = new Map(counts.map((c) => [c.dishId, c._count._all]));
-  const placesToTry = new Map(untried.map((c) => [c.dishId, c._count._all]));
+  const listed = new Map(contenders.map((c) => [c.dishId, c._count._all]));
   const top = new Map(tops.map((t) => [t.dishId, t]));
   // The live thresholds: the pages' trust text reads the rater count from here, never a constant.
   const thresholds = thresholdsFor(city.launchedAt, now);
@@ -42,7 +42,7 @@ export async function getCityOverview(citySlug: string, now: Date = new Date()) 
         slug: d.slug,
         name: d.name,
         ranked: ranked.get(d.id) ?? 0,
-        placesToTry: placesToTry.get(d.id) ?? 0,
+        contenders: listed.get(d.id) ?? 0,
         top: first
           ? {
               slug: first.restaurant.slug,

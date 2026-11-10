@@ -113,4 +113,4 @@ Do not invent product behavior. Pick the simplest safe default, mark it with
 - **Review queue**: `ReviewItem` rows an admin resolves (unmatched menu items, dish proposals, flags, suspicious bursts, owner claims).
 - **Candidate**: an Overture place staged in `OvertureCandidate` (`NEW → CREATED / LINKED / SKIPPED`) for an admin to review on `/admin/import` or for the Auto-list to create; it is never public itself.
 - **Auto-list**: `/admin/import/auto-list`: creates restaurants from the clear NEW candidates by fixed rules; "Auto-listed, not checked" on `/admin/restaurants` is the spot-check.
-- **Places to try**: dish rows without votes on a ranking page, marked "Not ranked yet"; they never have a rank or a score.
+- **Contenders**: the places on a dish's list in a city: ranked, collecting votes, or on a listing a person checked with the dish ticked (unchecked auto-listed name matches are not listed). On a ranking page the unrated ones appear under "Contenders", shuffled; they never have a rank or a score. Curated on `/admin/contenders`.

@@ -47,14 +47,21 @@ export function SuggestRestaurant({
   city,
   signedIn,
   defaultName,
+  defaultOpen = false,
 }: {
   city: { id: string; slug: string; name: string; areas: { id: string; name: string }[] };
   signedIn: boolean;
   defaultName: string;
+  /** A dish page's "Missing one? Add it" links here with the form open. */
+  defaultOpen?: boolean;
 }) {
   const { message, pending, send } = useProposal();
   return (
-    <Disclosure summary="Can't find it? Suggest a restaurant">
+    <Disclosure
+      id="suggest-restaurant"
+      summary="Can't find it? Suggest a restaurant"
+      defaultOpen={defaultOpen}
+    >
       {signedIn ? (
         <form
           key={city.id}

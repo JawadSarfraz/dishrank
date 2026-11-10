@@ -49,7 +49,15 @@ export const ratingInput = z.strictObject({
 export type RatingInput = z.infer<typeof ratingInput>;
 
 /** "Rate the places you know": the places of one dish in one city. */
-export const quickRatePlacesInput = z.strictObject({ city: slug, dish: slug });
+export const quickRatePlacesInput = z.strictObject({
+  city: slug,
+  dish: slug,
+  /** The dish page's shuffle seed, so the list opens in the order the page shows. */
+  seed: z
+    .string()
+    .regex(/^[a-z0-9]{1,32}$/)
+    .optional(),
+});
 
 /** POST /api/v1/restaurant-dishes (creates a CANDIDATE if absent). */
 export const restaurantDishInput = z.strictObject({
@@ -258,6 +266,23 @@ export const adminTrustInput = z.strictObject({
 /** PATCH /api/v1/admin/users/:id: one change per request, the panel flag or the trust override. */
 export const adminUserUpdateInput = z.union([adminPanelInput, adminTrustInput]);
 export type AdminUserUpdateInput = z.infer<typeof adminUserUpdateInput>;
+
+/** /admin/contenders: which list; without a value, the first city and the first launch dish. */
+export const contenderQuery = z.object({ city: optionalQuery(slug), dish: optionalQuery(slug) });
+
+/** "Add" on /admin/contenders: a listed restaurant joins these dish lists, checked (docs/01 D2a). */
+export const contenderAddInput = z.strictObject({
+  restaurantId: id,
+  dishSlugs: z.array(slug).min(1).max(30),
+});
+export type ContenderAddInput = z.infer<typeof contenderAddInput>;
+
+/** "Remove" and "Add back" on /admin/contenders: one dish row's REMOVED status. */
+export const contenderRowInput = z.strictObject({
+  restaurantDishId: id,
+  action: z.enum(["remove", "restore"]),
+});
+export type ContenderRowInput = z.infer<typeof contenderRowInput>;
 
 /** /admin/rankings "End early rankings in 60 days": sets City.launchedAt once (docs/06). */
 export const cityLaunchInput = z.strictObject({ city: slug });

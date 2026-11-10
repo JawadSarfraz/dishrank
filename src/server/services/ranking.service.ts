@@ -1,6 +1,7 @@
 // RankingService (docs/04): rating weights, the Bayesian score, eligibility (bootstrap-aware), the
 // per-row recompute that runs after every rating write, and the ranking page's list (getRanking).
 // The nightly recomputeAll lives in ranking-nightly.service.ts.
+import { randomBytes } from "node:crypto";
 import type { RestaurantDishStatus } from "@/generated/prisma/enums";
 import { logEvent } from "@/server/log";
 import {
@@ -28,6 +29,7 @@ import {
   updateUserById,
 } from "@/server/repositories/user.repo";
 import { haversineKm } from "@/lib/geo";
+import { seededOrder } from "@/lib/shuffle";
 import { DAY_MS, RANKING, TRUST } from "./ranking.constants";
 
 // ---------- math (pure) ----------
@@ -442,11 +444,11 @@ export async function getRanking(
   return (await loadRanking(options, now))?.ranking ?? null;
 }
 
-/** Places to try on one page at most; the area filter and Near me work over these in the browser. */
-export const PLACES_TO_TRY_LIMIT = 200;
+/** Contenders on one page at most; the area filter and Near me work over these in the browser. */
+export const CONTENDERS_LIMIT = 200;
 
 /** Only what the row needs: every field of every row goes into the page's HTML. */
-export type PlaceToTry = {
+export type Contender = {
   slug: string;
   name: string;
   area: { slug: string; name: string } | null;
@@ -454,17 +456,27 @@ export type PlaceToTry = {
   lng: number | null;
 };
 
+/** A new order of the unranked contenders at each render of the page (src/lib/shuffle.ts). */
+export const newShuffleSeed = () => randomBytes(4).toString("hex");
+
 /**
- * The ranking page: the ranking, plus "Places to try": rows of the list with no votes yet, by name,
- * so the order never looks like a ranking. They come out of `insufficient` on the page only; the
- * API's `insufficient` keeps listing them.
+ * The ranking page: the ranking, plus the contenders nobody has rated yet (docs/01 D2a), in an
+ * order shuffled with `seed`, so no place collects votes just for being on top. The quick-rate list
+ * gets the seed from the page and shows them the same way. They come out of `insufficient` on the
+ * page only; the API's `insufficient` keeps listing them.
  */
-export async function getRankingPage(options: RankingOptions, now: Date = new Date()) {
+export async function getRankingPage(
+  options: RankingOptions,
+  now: Date = new Date(),
+  seed: string = newShuffleSeed(),
+) {
   const loaded = await loadRanking(options, now);
   if (!loaded) return null;
-  const untried = loaded.rows
-    .filter((r) => r.rankInCity === null && r.distinctRaters === 0)
-    .sort((a, b) => a.restaurant.name.localeCompare(b.restaurant.name));
+  const untried = seededOrder(
+    loaded.rows.filter((r) => r.rankInCity === null && r.distinctRaters === 0),
+    seed,
+    (r) => r.id,
+  );
   const rounded = (n: number | null) => (n === null ? null : Math.round(n * 100_000) / 100_000);
   return {
     ...loaded.ranking,
@@ -477,9 +489,11 @@ export async function getRankingPage(options: RankingOptions, now: Date = new Da
         ? Math.max(...loaded.rows.map((r) => r.distinctRaters))
         : null,
     insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
-    placesToTryTotal: untried.length,
-    placesFromMapData: untried.every((r) => r.restaurant.source === "OVERTURE"),
-    placesToTry: untried.slice(0, PLACES_TO_TRY_LIMIT).map((r): PlaceToTry => ({
+    /** Every place on the list: ranked, collecting votes, or a contender nobody has rated. */
+    listedTotal: loaded.rows.length,
+    contendersTotal: untried.length,
+    shuffleSeed: seed,
+    contenders: untried.slice(0, CONTENDERS_LIMIT).map((r): Contender => ({
       slug: r.restaurant.slug,
       name: r.restaurant.name,
       area: r.restaurant.area,

@@ -11,6 +11,7 @@ const SECTIONS = [
   ["/admin/review", "Review queue"],
   ["/admin/menus", "Menus"],
   ["/admin/restaurants", "Restaurants"],
+  ["/admin/contenders", "Contenders"],
   ["/admin/users", "Users"],
   ["/admin/rankings", "Rankings"],
   ["/admin/analytics", "Analytics"],

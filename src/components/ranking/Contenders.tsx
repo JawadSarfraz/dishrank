@@ -1,8 +1,10 @@
 "use client";
 
-// "Places to try": places linked to this dish that nobody has rated yet, so a dish page is useful
-// before it ranks anyone. Never a rank and never a score, and in alphabetical order so it cannot read
-// as one; the page is static, so the area filter and Near me work on the rows in the browser.
+// "Contenders" (docs/01 D2a): the places on a dish's list that nobody has rated yet, so a dish page
+// is useful before it ranks anyone. Never a rank and never a score; the order is shuffled on the
+// server at each render of the page, so no place collects votes just for being on top. The page is
+// static, so the area filter and Near me work on the rows in the browser. The list ends with the
+// way to nominate a place.
 import { MapPinIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -10,23 +12,24 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { formatKm } from "@/lib/format";
 import { haversineKm } from "@/lib/geo";
-import type { PlaceToTry } from "@/server/services/ranking.service";
+import type { Contender } from "@/server/services/ranking.service";
 import { useNearMe } from "./use-near-me";
 
 const FIRST = 10;
 const MORE = 20;
 
-export function PlacesToTry({
+/** Where a visitor nominates a place: the rate flow's "Suggest a restaurant", opened. */
+export const suggestPlacePath = (citySlug: string) =>
+  `/rate?city=${citySlug}&suggest=1#suggest-restaurant`;
+
+export function Contenders({
   rows,
   total,
-  fromMapData,
   citySlug,
   dishSlug,
 }: {
-  rows: PlaceToTry[];
-  /** Every place here comes from Overture, so the label may say so. */
-  fromMapData: boolean;
-  /** More places than `rows` carries (the page sends at most PLACES_TO_TRY_LIMIT). */
+  rows: Contender[];
+  /** More places than `rows` carries (the page sends at most CONTENDERS_LIMIT). */
   total: number;
   citySlug: string;
   dishSlug: string;
@@ -58,21 +61,29 @@ export function PlacesToTry({
   const left = list.length - shown.length;
 
   return (
-    <section aria-labelledby="places-to-try" className="flex flex-col gap-3">
+    <section aria-labelledby="contenders" className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
-        <h2 id="places-to-try" className="text-xl font-bold">
-          Places to try
+        <h2 id="contenders" className="text-xl font-bold">
+          Contenders
         </h2>
         <p className="text-sm text-muted-foreground">
-          {fromMapData ? "Not ranked yet · from open map data" : "Not ranked yet"}
+          Missing one?{" "}
+          <Link
+            href={suggestPlacePath(citySlug)}
+            prefetch={false}
+            className="font-medium text-brand underline-offset-4 hover:underline"
+          >
+            Add it
+          </Link>
+          .
         </p>
       </div>
       <div role="group" aria-label="Filter places" className="flex flex-wrap items-center gap-2">
-        <label className="sr-only" htmlFor="places-area">
+        <label className="sr-only" htmlFor="contenders-area">
           Area
         </label>
         <select
-          id="places-area"
+          id="contenders-area"
           className="field field-select h-11 w-auto min-w-0 font-medium"
           value={area}
           onChange={(e) => {
@@ -102,13 +113,13 @@ export function PlacesToTry({
       </div>
       {locating === "failed" && (
         <p role="alert" className="text-sm text-muted-foreground">
-          Your location is not available, so the list stays in A–Z order.
+          Your location is not available, so the list stays as it is.
         </p>
       )}
 
       {shown.length === 0 ? (
         <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed bg-card p-4">
-          <p className="font-medium">No place to try in this area yet.</p>
+          <p className="font-medium">No contender in this area yet.</p>
           <Button type="button" variant="secondary" onClick={() => setArea("")}>
             Show all {rows.length}
           </Button>

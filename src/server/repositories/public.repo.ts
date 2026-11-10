@@ -1,6 +1,6 @@
 // Reads for the public pages (ranking, restaurant, city and home pages, sitemap). They are cached by
 // ISR and never depend on who is looking.
-import type { RestaurantDishStatus } from "@/generated/prisma/client";
+import type { Prisma, RestaurantDishStatus } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 import type { Client } from "./transaction";
 
@@ -11,6 +11,21 @@ export const LISTED_STATUSES: RestaurantDishStatus[] = [
   "MENU_VERIFIED",
   "OWNER_VERIFIED",
 ];
+
+/**
+ * docs/01 D2a (2026-11-11): a dish row is on the public lists (a "contender") only when it ranks,
+ * has a counted rating, or its listing was checked by a person: created by hand, or an auto-listed
+ * place an admin marked "Looks right" or edited. Auto-listed rows that only match by a word in the
+ * place's name or category stay out; search and the rate flow still find the place.
+ */
+export const CONTENDER_FILTER = {
+  OR: [
+    { rankInCity: { not: null } },
+    { distinctRaters: { gt: 0 } },
+    { restaurant: { autoListedAt: null } },
+    { restaurant: { checkedAt: { not: null } } },
+  ],
+} satisfies Prisma.RestaurantDishWhereInput;
 
 export async function findCityBySlug(slug: string, client: Client = db) {
   return client.city.findUnique({
@@ -62,6 +77,7 @@ export async function listRankingRows(
     dishId,
     status: { in: LISTED_STATUSES },
     restaurant: { status: "ACTIVE" as const },
+    ...CONTENDER_FILTER,
   };
   // One after another: a transaction client is one connection.
   const ranked = await client.restaurantDish.findMany({
@@ -84,9 +100,9 @@ export async function listRankingRows(
   return [...ranked, ...waiting];
 }
 
-/** Per dish in a city: how many restaurants rank, the one ranked first, and the places to try. */
+/** Per dish in a city: how many restaurants rank, the one ranked first, and the contenders. */
 export async function listCityDishSummaries(cityId: string, client: Client = db) {
-  const [counts, tops, untried] = [
+  const [counts, tops, contenders] = [
     await client.restaurantDish.groupBy({
       by: ["dishId"],
       where: { cityId, rankInCity: { not: null } },
@@ -105,18 +121,42 @@ export async function listCityDishSummaries(cityId: string, client: Client = db)
       by: ["dishId"],
       where: {
         cityId,
-        rankInCity: null,
-        distinctRaters: 0,
         status: { in: LISTED_STATUSES },
         restaurant: { status: "ACTIVE" },
+        ...CONTENDER_FILTER,
       },
       _count: { _all: true },
     }),
   ];
-  return { counts, tops, untried };
+  return { counts, tops, contenders };
 }
 
-/** Dish rows listed on the public pages, per dish in every city (the Auto-list's dry run). */
+/** Every dish row of one (city, dish), any status, with what /admin/contenders decides on. */
+export async function listDishRowsForCuration(cityId: string, dishId: string, client: Client = db) {
+  return client.restaurantDish.findMany({
+    where: { cityId, dishId, restaurant: { status: { not: "DUPLICATE" } } },
+    select: {
+      id: true,
+      status: true,
+      score: true,
+      distinctRaters: true,
+      rankInCity: true,
+      restaurant: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          status: true,
+          autoListedAt: true,
+          checkedAt: true,
+          area: { select: { name: true } },
+        },
+      },
+    },
+  });
+}
+
+/** Dish rows linked per dish in every city, any listed status (the Auto-list's dry run), checked or not. */
 export async function countListedRowsPerDish(client: Client = db) {
   const rows = await client.restaurantDish.groupBy({
     by: ["dishId"],
