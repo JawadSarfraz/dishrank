@@ -44,7 +44,7 @@ export default async function CityPage({ params }: PageProps<"/[city]">) {
         <PageHeader
           eyebrow={
             overview.mode === "bootstrap" ? (
-              <Badge>Early rankings · {overview.minRaters} raters needed</Badge>
+              <Badge>New lists · {overview.minRaters} votes rank a place</Badge>
             ) : undefined
           }
           title={

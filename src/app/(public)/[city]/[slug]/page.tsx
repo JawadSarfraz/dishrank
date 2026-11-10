@@ -9,7 +9,7 @@ import { cache } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { Main } from "@/components/layout/Page";
-import { Contenders } from "@/components/ranking/Contenders";
+import { Contenders, suggestPlacePath } from "@/components/ranking/Contenders";
 import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
@@ -44,18 +44,24 @@ type Ranking = NonNullable<Awaited<ReturnType<typeof load>>>;
 
 const pathOf = (r: Ranking) => `/${r.city.slug}/best-${r.dish.slug}`;
 const titleOf = (r: Ranking) => `Best ${r.dish.name} in ${r.city.name}`;
+/** While nothing ranks, the page, its link preview and its share text ask for the vote instead. */
+const inviteOf = (r: Ranking) => `Vote: who makes the best ${r.dish.name} in ${r.city.name}?`;
+const rankRule = (r: Ranking) => `${r.thresholds.minRaters} votes put a place on the list.`;
+/** "four", for the two rater thresholds the product has; any other number stays a digit. */
+const inWords = (n: number) => ({ 4: "four", 8: "eight" })[n] ?? String(n);
 
+/** The line under the title. When a count is zero it is not shown: the invitation is (docs/12). */
 function summaryOf(r: Ranking) {
   const votes = r.eligible.reduce((sum, row) => sum + row.votes, 0);
   const waiting = r.insufficient.length;
   const places = r.listedTotal;
   if (r.eligible.length === 0) {
     if (waiting > 0) {
-      return `${waiting} restaurant${waiting === 1 ? " is" : "s are"} collecting votes. None has enough yet.`;
+      return `${waiting} restaurant${waiting === 1 ? "" : "s"} collecting votes · ${rankRule(r)}`;
     }
     return places > 0
-      ? `${places} contender${places === 1 ? "" : "s"}. None has a vote yet.`
-      : `No restaurant has votes for ${r.dish.name} in ${r.city.name} yet.`;
+      ? `${places} contender${places === 1 ? "" : "s"}. Voting is open.`
+      : "We're picking the contenders.";
   }
   const ranked = `${r.eligible.length} restaurant${r.eligible.length === 1 ? "" : "s"} ranked from ${formatVotes(votes)}`;
   return waiting > 0 ? `${ranked} · ${waiting} more collecting votes` : ranked;
@@ -75,11 +81,13 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
   const { city, slug } = await params;
   const ranking = await load(city, slug);
   if (!ranking) return { title: "Not found", robots: { index: false } };
-  const title = `${titleOf(ranking)} (${yearInPakistan()})`;
-  const description =
-    ranking.eligible.length > 0
-      ? `${summaryOf(ranking)}. Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`
-      : `${summaryOf(ranking)} Rate ${ranking.dish.name} to help rank the restaurants.`;
+  // Nothing ranked yet: the preview WhatsApp shows under a shared link is an invitation to vote,
+  // never a count of what is missing (the page is noindex meanwhile, so the title can say so too).
+  const open = ranking.eligible.length === 0;
+  const title = open ? inviteOf(ranking) : `${titleOf(ranking)} (${yearInPakistan()})`;
+  const description = open
+    ? `${summaryOf(ranking)} ${rankRule(ranking)} Rate the ones you've tried.`
+    : `${summaryOf(ranking)}. Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`;
   const image = shareImagePath(ranking);
   return {
     title,
@@ -114,9 +122,10 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const shareLead =
     eligible.length > 0
       ? `${titleOf(ranking)}, ranked by diners on ${BRAND.name}: ${topThree(ranking)}`
-      : `${titleOf(ranking)}: help rank them on ${BRAND.name}`;
+      : `${inviteOf(ranking)} ${rankRule(ranking)}`;
   const shareText = `${shareLead}\n\n${BRAND.shareCall}`;
   const rateHref = `/rate?city=${ranking.city.slug}`;
+  const empty = eligible.length === 0 && insufficient.length === 0 && contenders.length === 0;
 
   return (
     <Main className="min-h-dvh gap-5">
@@ -133,8 +142,8 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
       <header className="flex flex-col gap-3">
         {mode === "bootstrap" && (
           <Badge className="w-fit">
-            <span>Early rankings</span>
-            <span aria-hidden="true"> · {thresholds.minRaters} raters needed</span>
+            <span>New list</span>
+            <span aria-hidden="true"> · {thresholds.minRaters} votes rank a place</span>
           </Badge>
         )}
         <div className="flex items-start gap-3">
@@ -150,14 +159,20 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
         </div>
       </header>
 
-      {ranking.firstRankRaters !== null && (
-        <p className="font-medium">
-          {ranking.firstRankRaters < thresholds.minRaters
-            ? `${ranking.firstRankRaters} of ${thresholds.minRaters} raters so far for`
-            : "A few more ratings for"}{" "}
-          the first ranked {ranking.dish.name} in {ranking.city.name}
-        </p>
-      )}
+      {ranking.firstRankRaters !== null &&
+        (ranking.firstRankRaters === 0 ? (
+          <p className="font-medium">
+            Be one of the first {inWords(thresholds.minRaters)} to rate. You decide the first
+            ranking.
+          </p>
+        ) : (
+          <p className="font-medium">
+            {ranking.firstRankRaters < thresholds.minRaters
+              ? `${ranking.firstRankRaters} of ${thresholds.minRaters} raters so far for`
+              : "A few more ratings for"}{" "}
+            the first ranked {ranking.dish.name} in {ranking.city.name}
+          </p>
+        ))}
 
       <QuickRate
         citySlug={ranking.city.slug}
@@ -184,12 +199,13 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
           />
         )}
 
-        {eligible.length === 0 && insufficient.length === 0 && contenders.length === 0 && (
+        {empty && (
           <EmptyState
             icon={<DishIcon slug={ranking.dish.slug} size={26} />}
-            title={`Nobody has rated ${ranking.dish.name} in ${ranking.city.name} yet`}
-            text={`Be the first. It takes four taps, and the restaurant ranks once ${thresholds.minRaters} people have rated it.`}
-            action={{ href: rateHref, label: `Rate ${ranking.dish.name}` }}
+            title="We're picking the contenders"
+            text="Know a place that belongs here? Tell us. Or rate a place you've eaten at: it joins the list with your vote."
+            action={{ href: suggestPlacePath(ranking.city.slug), label: "Tell us" }}
+            secondary={{ href: rateHref, label: `Rate ${ranking.dish.name} somewhere` }}
           />
         )}
 
@@ -224,8 +240,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
       <p className="text-sm text-muted-foreground">
         A restaurant gets a rank for this dish once at least {thresholds.minRaters} different people
         have rated it there; recent votes and trusted raters count more.
-        {mode === "bootstrap" &&
-          ` While ${ranking.city.name} is new, fewer votes are needed: these are early rankings.`}{" "}
+        {mode === "bootstrap" && ` While ${ranking.city.name} is new, fewer votes are needed.`}{" "}
         <Link
           href="/how-rankings-work"
           className="font-medium text-brand underline-offset-4 hover:underline"

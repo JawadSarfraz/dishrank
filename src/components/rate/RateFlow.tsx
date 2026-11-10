@@ -706,8 +706,8 @@ function ScoreStep({
           ))}
         </div>
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>1 · wouldn&apos;t go back</span>
-          <span>10 · best I&apos;ve had</span>
+          <span>1 = bad</span>
+          <span>10 = best I&apos;ve had</span>
         </div>
       </fieldset>
 
@@ -906,7 +906,7 @@ function DoneStep({
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <ScoreBadge score={result.score!} votes={result.votes} size="lg" />
-              {result.mode === "bootstrap" && <Badge>Early rankings</Badge>}
+              {result.mode === "bootstrap" && <Badge>New list</Badge>}
             </div>
           </div>
         ) : (

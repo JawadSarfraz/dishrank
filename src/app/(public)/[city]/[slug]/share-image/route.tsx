@@ -162,7 +162,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/[city]/[slug]/s
               fontSize: 22,
             }}
           >
-            Early rankings
+            New list
           </div>
         )}
         <OgSiteAddress fontSize={26} />
@@ -172,7 +172,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/[city]/[slug]/s
           style={{
             display: "flex",
             fontFamily: "Bricolage Grotesque",
-            fontSize: top.length > 0 ? 56 : 68,
+            fontSize: top.length > 0 || title.length > 34 ? 56 : 68,
             lineHeight: 1.05,
             letterSpacing: -1.5,
           }}

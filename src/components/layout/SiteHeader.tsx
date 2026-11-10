@@ -48,7 +48,7 @@ export function SiteHeader({ beta }: { beta: boolean }) {
   const initial = (data?.user.name?.trim()[0] ?? data?.user.email[0] ?? "?").toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/95">
+    <header className="sticky top-0 z-40 border-b bg-background">
       <nav
         aria-label="Main"
         className="mx-auto flex h-14 w-full max-w-5xl items-center gap-2 px-4 sm:px-6"

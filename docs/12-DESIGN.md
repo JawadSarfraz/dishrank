@@ -26,6 +26,14 @@ screenshots of every screen at 360 px and 1280 px are in `tmp/design/before` and
   footer and the default share image.
 - **Voice.** Short, plain words; opinions, never facts about a restaurant (CLAUDE.md rule 9);
   every score shows its vote count; "Not enough votes yet" is an invitation, never an apology.
+  When a count is zero, the zero is not shown: the invitation is (2026-11-11). A dish with no
+  votes says "12 contenders. Voting is open." and "Be one of the first four to rate. You decide
+  the first ranking."; the badge says "New list · 4 votes rank a place", never "Early rankings ·
+  4 raters needed"; a dish with no contenders says "We're picking the contenders. Know a place
+  that belongs here? Tell us." with the way to rate a place beside it; and the link preview of
+  such a page (title, description, image) reads "Vote: who makes the best chicken karahi in
+  Islamabad? 4 votes put a place on the list." The 1–10 rows carry two anchors, "1 = bad" and
+  "10 = best I've had".
 - **Wordmark.** The mark, then two lines: "Kahan Khayen" in Bricolage Grotesque ExtraBold,
   tracking −0.025 em, over کہاں کھائیں in brand green (`Wordmark` in
   `src/components/brand/Logo.tsx`; sizes sm 16 px, md 18 px, lg 30 px). The Urdu name is Noto
@@ -133,7 +141,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 
 | Component | File | Notes |
 |---|---|---|
-| Header | `components/layout/SiteHeader.tsx` | Sticky, 56 px. Wordmark (with the Beta tag on its second line in beta mode), "Rate a dish" (hidden on /rate), then Sign in or the account menu: a 44 px initial disc opening My ratings, Owner (OWNER), Admin (ADMIN), Sign out. Reads the session in the browser, so public pages stay static. |
+| Header | `components/layout/SiteHeader.tsx` | Sticky, 56 px, solid background (list text showed through the translucent one). Wordmark (with the Beta tag on its second line in beta mode), "Rate a dish" (hidden on /rate), then Sign in or the account menu: a 44 px initial disc opening My ratings, Owner (OWNER), Admin (ADMIN), Sign out. Reads the session in the browser, so public pages stay static. |
 | Footer | `components/layout/Footer.tsx` | Wordmark, tagline, the six trust links (dispute included, rule 9), one line "scores are opinions". |
 | Button, ButtonLink | `components/ui/button.tsx`, `button-link.tsx` | default (brand), outline, secondary (brand-soft), ghost, destructive, link; sizes default 44 px, lg 48 px, sm 40 px and xs 32 px for dense admin rows only. A link that looks like a button is a real `<a>` (ButtonLink). |
 | Fields | `.field`, `.field-select` utilities | 44 px, 16 px text, white, brand focus ring; selects carry their own chevron. `Input` wraps the same look for forms. |
@@ -143,7 +151,7 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 | Filter bar | same | "Filters" opens a bottom sheet (`components/ui/sheet.tsx`, Base UI dialog) with area, minimum score and minimum votes and a "Show n restaurants" close; sort is a native select in the bar; "Near me" asks for the location only when tapped. Filters stay in the URL. |
 | Waiting list | `components/ranking/WaitingList.tsx` | "Not enough votes yet" rows with votes, what is still needed (in raters, like the badge), a progress bar toward the live rater threshold and a Rate button that deep-links into the flow. |
 | Contenders | `components/ranking/Contenders.tsx` | The places on the dish's list that nobody has rated yet (docs/01 D2a): name, area and distance, a Rate button; never a disc or a score, shuffled on the server at each render so the order cannot read as a ranking and no row gains from being first. Header "Contenders · Missing one? Add it." (the link opens the rate flow's suggest form); the open-data credit stays on /about/data and on unchecked restaurant pages. An area select and "Near me" in the browser; 10 rows, then "Show more". While "Rate the places you know" is open, this list, the waiting list and the ranking give way to the panel. |
-| Quick rate | `components/ranking/QuickRate.tsx`, `QuickRatePanel.tsx` | "Rate the places you know": a button on the static page; the list and its code load when opened. Each row has 10 score buttons of 44 px height (5 across below 640 px, 10 from there up, so each stays at least 44 px wide), and one tap saves. A rating given earlier shows "You gave it n · Change". Signed out the list is the same, and a tap opens the rate flow's score step with that score filled in. |
+| Quick rate | `components/ranking/QuickRate.tsx`, `QuickRatePanel.tsx` | "Rate the places you know": the filled primary button on a dish page (the loud one; the header's "Rate a dish" is secondary there); the list and its code load when opened. Each row has 10 score buttons of 44 px height (5 across below 640 px, 10 from there up, so each stays at least 44 px wide), and one tap saves. A rating given earlier shows "You gave it n · Change". Signed out the list is the same, and a tap opens the rate flow's score step with that score filled in. |
 | Dish tiles and chips | `components/ranking/CityDishGrid.tsx`, `components/rate/RateFlow.tsx` | Icon, dish name, "#1 name" with score and votes, or "N contenders" (else "Not enough votes yet") and "Rate one you know". Chips are 44 px pills with the dish icon. |
 | Trust box | `components/ranking/TrustBox.tsx` | Brand-soft card with three points; the rater count is the city's live threshold. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed card: icon, one-line title, one sentence, one action. Used on every empty list. |
@@ -163,8 +171,9 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 - **City.** The same with the city's name, the "Early rankings · n raters needed" chip while it
   applies, and "Popular dishes".
 - **Ranking.** Breadcrumb, chip, dish icon and title, the summary line ("3 restaurants ranked
-  from 16 votes · 1 more collecting votes"), while nothing ranks the progress line ("2 of 4 raters
-  so far for the first ranked Pizza in Islamabad"), the filter bar, the ranked list with medals, the
+  from 16 votes · 1 more collecting votes"; with no votes "12 contenders. Voting is open."), while
+  nothing ranks the progress line ("2 of 4 raters so far for the first ranked Pizza in Islamabad";
+  with no raters "Be one of the first four to rate. You decide the first ranking."), the filter bar, the ranked list with medals, the
   waiting list, the threshold note (live numbers) and Share. Empty: "Nobody has rated … yet" with
   a Rate button. Static (ISR); the browser does the filtering.
 - **Restaurant.** Name, "Owner on Kahan Khayen" when claimed, address, phone and Google Maps as

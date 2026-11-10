@@ -11,6 +11,7 @@ export function EmptyState({
   title,
   text,
   action,
+  secondary,
   size = "default",
   className,
 }: {
@@ -18,6 +19,8 @@ export function EmptyState({
   title: string;
   text?: string;
   action?: { href: string; label: string } | { onClick: () => void; label: string };
+  /** A quieter second way on, next to the action. */
+  secondary?: { href: string; label: string };
   size?: "default" | "compact";
   className?: string;
 }) {
@@ -38,16 +41,23 @@ export function EmptyState({
         {title}
       </p>
       {text && <p className="max-w-prose text-sm text-muted-foreground">{text}</p>}
-      {action &&
-        ("href" in action ? (
-          <ButtonLink href={action.href} className="mt-1">
-            {action.label}
-          </ButtonLink>
-        ) : (
-          <Button type="button" onClick={action.onClick} className="mt-1">
-            {action.label}
-          </Button>
-        ))}
+      {(action || secondary) && (
+        <div className="mt-1 flex flex-wrap justify-center gap-2">
+          {action &&
+            ("href" in action ? (
+              <ButtonLink href={action.href}>{action.label}</ButtonLink>
+            ) : (
+              <Button type="button" onClick={action.onClick}>
+                {action.label}
+              </Button>
+            ))}
+          {secondary && (
+            <ButtonLink variant="outline" href={secondary.href}>
+              {secondary.label}
+            </ButtonLink>
+          )}
+        </div>
+      )}
     </div>
   );
 }

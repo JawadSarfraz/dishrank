@@ -12,14 +12,17 @@ type RankingPage = NonNullable<Awaited<ReturnType<typeof getRankingPage>>>;
 export function shareImageFacts(r: RankingPage) {
   const votes = r.eligible.reduce((sum, row) => sum + row.votes, 0);
   const places = r.listedTotal;
+  const open = r.eligible.length === 0;
   return {
-    title: `Best ${r.dish.name} in ${r.city.name}`,
+    /** Nothing ranked: the picture asks for the vote (the preview under a shared WhatsApp link). */
+    title: open
+      ? `Vote: who makes the best ${r.dish.name} in ${r.city.name}?`
+      : `Best ${r.dish.name} in ${r.city.name}`,
     /** Early rankings: the image leads with rank and votes, and the score is small. */
     early: r.mode === "bootstrap",
-    summary:
-      r.eligible.length > 0
-        ? `${r.eligible.length} ranked from ${formatVotes(votes)} · ranked by diners`
-        : `${places > 0 ? `${places} ${places === 1 ? "place" : "places"} to try` : "Not enough votes yet"}. Rate one you know.`,
+    summary: open
+      ? `${places > 0 ? `${places} contender${places === 1 ? "" : "s"}. ` : ""}${r.thresholds.minRaters} votes put a place on the list.`
+      : `${r.eligible.length} ranked from ${formatVotes(votes)} · ranked by diners`,
     top: r.eligible.slice(0, 3).map((row) => ({
       rank: row.rank,
       name: row.restaurant.name,

@@ -91,6 +91,10 @@ function PlaceRow({
               </button>
             ))}
           </div>
+          <div aria-hidden="true" className="flex justify-between text-xs text-muted-foreground">
+            <span>1 = bad</span>
+            <span>10 = best I&apos;ve had</span>
+          </div>
           {state?.saved && !state.saving && (
             <p role="status" className="text-sm text-muted-foreground">
               {state.saved.held ? "Saved. It is waiting for a check before it counts." : "Saved."}

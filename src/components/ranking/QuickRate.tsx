@@ -45,7 +45,8 @@ export function QuickRate({
     <div className="flex flex-col gap-3">
       <Button
         type="button"
-        variant="outline"
+        variant={open ? "outline" : "default"}
+        size="lg"
         className="self-start"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}

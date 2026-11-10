@@ -17,7 +17,7 @@ test("ranking page: ranked list, contenders, and a new vote moves one to not-eno
   await expect(
     page.getByRole("heading", { level: 1, name: "Best Pizza in Islamabad" }),
   ).toBeVisible();
-  await expect(page.getByText("Early rankings", { exact: true })).toBeVisible();
+  await expect(page.getByText("New list", { exact: true })).toBeVisible();
 
   const ranked = page.getByRole("list", { name: "Ranked restaurants" });
   await expect(ranked.getByRole("listitem")).toHaveCount(1);
