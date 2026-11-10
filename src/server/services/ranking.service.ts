@@ -4,6 +4,7 @@
 import { randomBytes } from "node:crypto";
 import type { RestaurantDishStatus } from "@/generated/prisma/enums";
 import { logEvent } from "@/server/log";
+import { findFeaturedDish } from "@/server/repositories/geo.repo";
 import {
   findCityLaunch,
   findDishStat,
@@ -30,6 +31,7 @@ import {
 } from "@/server/repositories/user.repo";
 import { haversineKm } from "@/lib/geo";
 import { seededOrder } from "@/lib/shuffle";
+import { votingClosesLine } from "./featured";
 import { DAY_MS, RANKING, TRUST } from "./ranking.constants";
 
 // ---------- math (pure) ----------
@@ -472,6 +474,7 @@ export async function getRankingPage(
 ) {
   const loaded = await loadRanking(options, now);
   if (!loaded) return null;
+  const featured = await findFeaturedDish(loaded.city.id, loaded.dish.id);
   const untried = seededOrder(
     loaded.rows.filter((r) => r.rankInCity === null && r.distinctRaters === 0),
     seed,
@@ -493,6 +496,16 @@ export async function getRankingPage(
     listedTotal: loaded.rows.length,
     contendersTotal: untried.length,
     shuffleSeed: seed,
+    /** A featured dish says when voting for the round's results closes (the ranking never does). */
+    featured: featured
+      ? {
+          closingLine: votingClosesLine(
+            featured.city.featuredClosesAt,
+            featured.city.featuredRound,
+            now,
+          ),
+        }
+      : null,
     contenders: untried.slice(0, CONTENDERS_LIMIT).map((r): Contender => ({
       slug: r.restaurant.slug,
       name: r.restaurant.name,
@@ -583,5 +596,5 @@ async function loadRanking(options: RankingOptions, now: Date) {
     insufficient: insufficient.slice(0, limit),
     computedAt: now.toISOString(),
   };
-  return { ranking, rows, thresholds: t };
+  return { ranking, rows, thresholds: t, city, dish };
 }

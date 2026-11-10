@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { db } from "@/server/db";
+import { seedFeaturedDishesIfEmpty } from "@/server/repositories/geo.repo";
 import {
   countTaxonomy,
   upsertArea,
@@ -17,7 +18,22 @@ const slug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "must be a lowercase A
 const lat = z.number().min(-90).max(90);
 const lng = z.number().min(-180).max(180);
 
-const citiesFile = z.array(z.strictObject({ slug, name: z.string().min(1), lat, lng }));
+/** `featured`: the first round a new database leads with (docs/01 Home); an admin's later choice stays. */
+const citiesFile = z.array(
+  z.strictObject({
+    slug,
+    name: z.string().min(1),
+    lat,
+    lng,
+    featured: z
+      .strictObject({
+        dishes: z.array(slug).max(2),
+        round: z.string().min(1).max(40).optional(),
+        closesAt: z.iso.datetime().optional(),
+      })
+      .optional(),
+  }),
+);
 /** `radiusKm`: how far from its centre an area is suggested for Overture candidates (default 1.5). */
 const areasFile = z.array(
   z.strictObject({
@@ -98,6 +114,10 @@ export function buildSeedPlan(files: SeedFiles): SeedPlan {
     problems.push(`duplicate dish slug "${d}"`);
   for (const a of files.areas)
     if (!citySlugs.has(a.city)) problems.push(`area "${a.slug}" names unknown city "${a.city}"`);
+  const dishSlugs = new Set(files.dishes.map((x) => x.slug));
+  for (const c of files.cities)
+    for (const f of c.featured?.dishes ?? [])
+      if (!dishSlugs.has(f)) problems.push(`city "${c.slug}" features unknown dish "${f}"`);
   for (const x of files.dishes)
     if (!categorySlugs.has(x.category))
       problems.push(`dish "${x.slug}" names unknown category "${x.category}"`);
@@ -134,7 +154,7 @@ export function buildSeedPlan(files: SeedFiles): SeedPlan {
   return { ...files, aliases };
 }
 
-/** Idempotent upserts by slug in one transaction. Never sets or resets City.launchedAt. */
+/** Idempotent upserts by slug in one transaction. Never sets or resets City.launchedAt, and never replaces a featured round a city already has. */
 export async function applySeedPlan(plan: SeedPlan) {
   return db.$transaction(
     async (tx) => {
@@ -164,6 +184,19 @@ export async function applySeedPlan(plan: SeedPlan) {
       }
       for (const [alias, dishSlug] of plan.aliases) {
         await upsertDishAlias({ alias, dishId: dishIds.get(dishSlug)! }, tx);
+      }
+      // The first featured round, only for a city that has none yet: an admin's choice stays.
+      for (const c of plan.cities) {
+        if (!c.featured) continue;
+        await seedFeaturedDishesIfEmpty(
+          cityIds.get(c.slug)!,
+          c.featured.dishes.map((d) => dishIds.get(d)!),
+          {
+            featuredClosesAt: c.featured.closesAt ? new Date(c.featured.closesAt) : null,
+            featuredRound: c.featured.round ?? null,
+          },
+          tx,
+        );
       }
       return countTaxonomy(tx);
     },

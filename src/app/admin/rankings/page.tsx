@@ -1,4 +1,5 @@
 import { AdminHeader, AdminList } from "@/components/admin/AdminPage";
+import { FeaturedForm } from "@/components/admin/FeaturedForm";
 import { EndEarlyRankingsButton, RecomputeButton } from "@/components/admin/RankingsControls";
 import { Forbidden } from "@/components/auth/Forbidden";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ type RunSummary = {
 export default async function AdminRankingsPage() {
   const user = await requirePageRole("ADMIN", "/admin/rankings");
   if (!user) return <Forbidden />;
-  const { runs, cities } = await getRankingsAdmin(user);
+  const { runs, cities, launchDishes } = await getRankingsAdmin(user);
 
   return (
     <main className="flex flex-col gap-6">
@@ -78,6 +79,26 @@ export default async function AdminRankingsPage() {
             })}
           </AdminList>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">Featured dishes</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          The home page and the city page lead with these one or two dishes, and say &quot;Voting
+          for the {"<round>"} closes {"<day>"}&quot; until that day has passed. Only the line
+          closes: the ranking never does.
+        </p>
+        <AdminList>
+          {cities.map((c) => (
+            <li key={c.slug} className="px-4 py-3">
+              <FeaturedForm
+                city={{ slug: c.slug, name: c.name }}
+                dishes={launchDishes}
+                current={c.featured}
+              />
+            </li>
+          ))}
+        </AdminList>
       </section>
 
       <section className="flex flex-col gap-3">

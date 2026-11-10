@@ -355,10 +355,29 @@ model City {
   lat         Float
   lng         Float
   launchedAt  DateTime? // NULL until an admin presses "End early rankings in 60 days" on /admin/rankings; bootstrap thresholds while NULL and for 60 days after
+  featuredClosesAt DateTime? // voting for the featured round's results closes then (end of day, Pakistan); the line is hidden after it, the ranking never closes
+  featuredRound    String? // the round's name, e.g. "winter results" ("Voting for the winter results closes Sun 20 Dec")
   areas       Area[]
   restaurants Restaurant[]
   dishStats   DishStat[]
   candidates  OvertureCandidate[]
+  featured    FeaturedDish[]
+}
+
+/// One or two dishes a city's home page leads with (docs/01 Home, 2026-11-11), in position order;
+/// set on /admin/rankings, seeded from seed/cities.json when a city has none.
+model FeaturedDish {
+  id        String   @id @default(cuid())
+  cityId    String
+  dishId    String
+  position  Int // 1 or 2
+  createdAt DateTime @default(now())
+
+  city City @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  dish Dish @relation(fields: [dishId], references: [id])
+
+  @@unique([cityId, dishId])
+  @@unique([cityId, position])
 }
 
 model Area {
@@ -503,6 +522,7 @@ model Dish {
   menuItems        MenuItem[]
   dishStats        DishStat[]
   reviewItems      ReviewItem[]
+  featured         FeaturedDish[]
 }
 
 // One row per spelling of a dish; the dish name is stored as an alias too.

@@ -12,15 +12,12 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { formatKm } from "@/lib/format";
 import { haversineKm } from "@/lib/geo";
+import { suggestPlacePath } from "@/lib/paths";
 import type { Contender } from "@/server/services/ranking.service";
 import { useNearMe } from "./use-near-me";
 
 const FIRST = 10;
 const MORE = 20;
-
-/** Where a visitor nominates a place: the rate flow's "Suggest a restaurant", opened. */
-export const suggestPlacePath = (citySlug: string) =>
-  `/rate?city=${citySlug}&suggest=1#suggest-restaurant`;
 
 export function Contenders({
   rows,

@@ -284,6 +284,15 @@ export const contenderRowInput = z.strictObject({
 });
 export type ContenderRowInput = z.infer<typeof contenderRowInput>;
 
+/** /admin/rankings "Featured dishes": one or two launch dishes, the round's name and its closing day (Pakistan). */
+export const featuredInput = z.strictObject({
+  city: slug,
+  dishSlugs: z.array(slug).max(2),
+  roundName: optionalText(40),
+  closesOn: optionalQuery(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")),
+});
+export type FeaturedInput = z.infer<typeof featuredInput>;
+
 /** /admin/rankings "End early rankings in 60 days": sets City.launchedAt once (docs/06). */
 export const cityLaunchInput = z.strictObject({ city: slug });
 export type CityLaunchInput = z.infer<typeof cityLaunchInput>;

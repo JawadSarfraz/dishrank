@@ -29,6 +29,15 @@ export function formatNeeded(votes: number, minRaters: number, ranksNext: boolea
     : "needs a few more ratings to rank";
 }
 
+/** "Sun 20 Dec": a day in Pakistan, for the featured round's closing line (server pages only). */
+export const formatPkDay = (date: Date) =>
+  new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Karachi",
+  }).format(date);
+
 /** "1 dish", "12 dishes". */
 export const formatDishes = (n: number) => `${n} dish${n === 1 ? "" : "es"}`;
 

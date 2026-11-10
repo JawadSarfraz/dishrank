@@ -8,10 +8,12 @@ export async function upsertCity(
   c: { slug: string; name: string; lat: number; lng: number },
   client: Client = db,
 ) {
-  // launchedAt is never set or reset here: an admin sets it on launch day (docs/04).
+  // launchedAt is never set or reset here: an admin sets it on launch day (docs/04). Only these
+  // four fields are written: the seed's city objects carry more (the featured round).
+  const fields = { slug: c.slug, name: c.name, lat: c.lat, lng: c.lng };
   return client.city.upsert({
     where: { slug: c.slug },
-    create: c,
+    create: fields,
     update: { name: c.name, lat: c.lat, lng: c.lng },
     select: { id: true },
   });

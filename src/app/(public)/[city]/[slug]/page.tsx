@@ -9,7 +9,8 @@ import { cache } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { Main } from "@/components/layout/Page";
-import { Contenders, suggestPlacePath } from "@/components/ranking/Contenders";
+import { Contenders } from "@/components/ranking/Contenders";
+import { suggestPlacePath } from "@/lib/paths";
 import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
@@ -155,6 +156,9 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
               {titleOf(ranking)}
             </h1>
             <p className="text-base text-muted-foreground">{summaryOf(ranking)}</p>
+            {ranking.featured?.closingLine && (
+              <p className="text-sm font-medium text-brand">{ranking.featured.closingLine}</p>
+            )}
           </div>
         </div>
       </header>

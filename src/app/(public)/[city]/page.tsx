@@ -6,6 +6,7 @@ import { cache } from "react";
 import { Main, PageHeader, SectionHeader } from "@/components/layout/Page";
 import { CityDishGrid, CityPicker, TrustBox } from "@/components/ranking";
 import { DishSearch } from "@/components/ranking/DishSearch";
+import { ComingNext, FeaturedDishes } from "@/components/ranking/FeaturedDishes";
 import { Badge } from "@/components/ui/badge";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { getCityOverview } from "@/server/services/city-page.service";
@@ -56,10 +57,28 @@ export default async function CityPage({ params }: PageProps<"/[city]">) {
         />
         <DishSearch citySlug={city.slug} cityName={city.name} />
       </div>
-      <section aria-labelledby="dishes" className="flex flex-col gap-3">
-        <SectionHeader id="dishes" title="Popular dishes" />
-        <CityDishGrid overview={overview} />
-      </section>
+      {overview.featured.dishes.length > 0 && (
+        <section aria-labelledby="featured" className="flex flex-col gap-3">
+          <SectionHeader id="featured" title="Open for voting" />
+          <FeaturedDishes
+            citySlug={city.slug}
+            dishes={overview.featured.dishes}
+            closingLine={overview.featured.closingLine}
+          />
+        </section>
+      )}
+      {overview.open.length > 0 && (
+        <section aria-labelledby="dishes" className="flex flex-col gap-3">
+          <SectionHeader
+            id="dishes"
+            title={overview.featured.dishes.length > 0 ? "More dishes" : "Popular dishes"}
+          />
+          <CityDishGrid citySlug={city.slug} dishes={overview.open} />
+        </section>
+      )}
+      {overview.comingNext.length > 0 && (
+        <ComingNext citySlug={city.slug} dishes={overview.comingNext} />
+      )}
       <TrustBox minRaters={overview.minRaters} />
     </Main>
   );

@@ -165,11 +165,18 @@ files in `src/fonts/` (Satori cannot read WOFF2).
 
 ## Screens
 
-- **Home.** City pills, the question ("Where's the best *chicken karahi* in Islamabad?"), one
-  sentence, the dish search (Roman-Urdu tolerant), the dish grid (2 columns from 360 px, 3 from
-  640 px; names wrap, nothing scrolls sideways), the trust box. Clear in three seconds what this is.
-- **City.** The same with the city's name, the "Early rankings · n raters needed" chip while it
-  applies, and "Popular dishes".
+- **Home.** City pills, the question ("Where's the best *chicken karahi* in Islamabad?", the dish
+  being the city's first featured dish), one sentence, the dish search (Roman-Urdu tolerant), then
+  "Open for voting": the one or two featured dishes as large cards (`FeaturedDishes`: icon, name,
+  "#1 …" with score and votes or "12 contenders · Voting is open", "Vote →") and the round's line
+  "Voting for the winter results closes Sun 20 Dec" until that day has passed (the ranking never
+  closes); "More dishes": the smaller grid of the other dishes with at least one contender (2
+  columns from 360 px, 3 from 640 px; names wrap, nothing scrolls sideways); "Coming next": the
+  dishes with no contenders as chips, with "Tell us which places should be on the list"; the trust
+  box. Clear in three seconds what this is. The featured dishes, the round's name and its closing
+  day are set per city on /admin/rankings (2026-11-11).
+- **City.** The same with the city's name, the "New lists · n votes rank a place" chip while it
+  applies, "Open for voting", "More dishes" and "Coming next".
 - **Ranking.** Breadcrumb, chip, dish icon and title, the summary line ("3 restaurants ranked
   from 16 votes · 1 more collecting votes"; with no votes "12 contenders. Voting is open."), while
   nothing ranks the progress line ("2 of 4 raters so far for the first ranked Pizza in Islamabad";

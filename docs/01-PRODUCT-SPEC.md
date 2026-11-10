@@ -49,6 +49,7 @@ who ate there." Internal identifiers stay `dishrank`.
 
 ### Diner
 - D1. As a diner I can pick a city and a dish and see restaurants ranked for that dish, with score, number of votes, area and price band.
+- D1a. Home leads with one featured vote (2026-11-11). Per city an admin sets one or two featured dishes, a round name and the day voting for the round's results closes (end of that day, Pakistan time), on /admin/rankings; the seed features chicken karahi and mutton karahi in both cities, "winter results", closing Sunday 20 December 2026. The home page and the city page open with "Open for voting": the featured dishes as large cards, the headline uses the first one ("Where's the best chicken karahi in Islamabad?"), and a line says "Voting for the winter results closes Sun 20 Dec"; the same line sits under the title of each featured dish's page. After the day has passed the line disappears, nothing else changes: a ranking never closes. Below, "More dishes" is the smaller grid of the other dishes with at least one contender, and "Coming next" groups the dishes with no contenders yet as chips with "Tell us which places should be on the list" (the suggest-a-restaurant form).
 - D2. I can filter by area and sort by score / votes / price, or by distance when I share my location (our own restaurant coordinates).
 - D3. I can open a restaurant page and see all its dishes with scores, best dish first.
 - D2a. Before a dish ranks anywhere, its page still helps: "Contenders" lists the places on its list that nobody has rated yet, in an order shuffled on the server at each render of the page (never A to Z: the top row would collect votes just for being on top), with area and Near me filters, a Rate button, "Show more" and "Missing one? Add it", which opens the rate flow's suggest-a-restaurant form. A place is on a dish's list (a contender, 2026-11-11) only when it ranks for the dish, or has a counted rating for it, or its listing was checked by a person (created by hand, or auto-listed and marked "Looks right" or edited by an admin) with the dish ticked; auto-listed places that only match by a word in their name or category stay off every list, the quick-rate list and the home counts, but search and the rate flow still find them. An admin curates one dish in one city on /admin/contenders. The home dish grid says "N contenders" where nothing ranks yet. While "Rate the places you know" is open it stands in for the page's lists, so no place appears twice. Until something ranks, the page says how close it is, in the same unit as its badge: "2 of 4 raters so far for the first ranked Pizza in Islamabad", from the live thresholds and the place closest to a rank. When enough people have rated but the weight bar is not met, it says "A few more ratings for the first ranked Pizza in Islamabad".
@@ -80,8 +81,8 @@ who ate there." Internal identifiers stay `dishrank`.
 
 | Route | Purpose | Rendering |
 |---|---|---|
-| `/` | City picker + launch dish grid + "Rate a dish" CTA | ISR |
-| `/[city]` | Dish grid for the city with counts | ISR |
+| `/` | City picker + featured dishes ("Open for voting") + the other dishes with contenders + "Coming next" | ISR |
+| `/[city]` | The same for the city, with counts | ISR |
 | `/[city]/best-[dishSlug]` | **The ranking page** (SEO target). Eligible list + "not enough votes yet" list | ISR 1h + on-demand revalidate on rating |
 | `/[city]/r/[restaurantSlug]` | Restaurant page: dishes ranked, each with score/votes, rate buttons | ISR 1h |
 | `/rate` | Rating flow: search restaurant → pick dish → score → optional photo/comment | Client form + server action |

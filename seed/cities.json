@@ -1,4 +1,30 @@
 [
-  { "slug": "islamabad", "name": "Islamabad", "lat": 33.6844, "lng": 73.0479 },
-  { "slug": "rawalpindi", "name": "Rawalpindi", "lat": 33.5651, "lng": 73.0169 }
+  {
+    "slug": "islamabad",
+    "name": "Islamabad",
+    "lat": 33.6844,
+    "lng": 73.0479,
+    "featured": {
+      "dishes": [
+        "chicken-karahi",
+        "mutton-karahi"
+      ],
+      "round": "winter results",
+      "closesAt": "2026-12-20T18:59:59Z"
+    }
+  },
+  {
+    "slug": "rawalpindi",
+    "name": "Rawalpindi",
+    "lat": 33.5651,
+    "lng": 73.0169,
+    "featured": {
+      "dishes": [
+        "chicken-karahi",
+        "mutton-karahi"
+      ],
+      "round": "winter results",
+      "closesAt": "2026-12-20T18:59:59Z"
+    }
+  }
 ]

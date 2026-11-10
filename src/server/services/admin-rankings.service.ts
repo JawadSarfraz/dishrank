@@ -6,11 +6,17 @@ import { logEvent } from "@/server/log";
 import {
   countRankedRowsByCity,
   listCityLaunches,
+  listFeaturedDishes,
+  replaceFeaturedDishes,
   setCityLaunchedAtOnce,
 } from "@/server/repositories/geo.repo";
 import { listRecentJobRuns } from "@/server/repositories/ops.repo";
 import { findCityBySlug } from "@/server/repositories/public.repo";
+import { findDishesBySlugs, listLaunchDishes } from "@/server/repositories/taxonomy.repo";
+import { inTransaction } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
+import type { FeaturedInput } from "@/server/validation";
+import { endOfPakistanDay, pakistanDayOf } from "./featured";
 import { DAY_MS, RANKING } from "./ranking.constants";
 import { RECOMPUTE_JOB, recomputeAll } from "./ranking-nightly.service";
 import { thresholdsFor } from "./ranking.service";
@@ -20,8 +26,10 @@ export async function getRankingsAdmin(actor: SessionUser | null, now: Date = ne
   const runs = await listRecentJobRuns(RECOMPUTE_JOB, 10);
   const cities = await listCityLaunches();
   const ranked = await countRankedRowsByCity(RANKING.normal);
+  const launchDishes = (await listLaunchDishes()).map((d) => ({ slug: d.slug, name: d.name }));
   return {
     runs,
+    launchDishes,
     cities: cities.map((c) => {
       const counts = ranked.find((r) => r.cityId === c.id);
       return {
@@ -36,9 +44,51 @@ export async function getRankingsAdmin(actor: SessionUser | null, now: Date = ne
         wouldEndOn: new Date(now.getTime() + RANKING.bootstrapDays * DAY_MS),
         rankedNow: counts?.ranked ?? 0,
         stillRankedUnderNormalRules: counts?.kept ?? 0,
+        /** The featured round (docs/01 Home): what the form shows. */
+        featured: {
+          dishSlugs: c.featured.map((f) => f.dish.slug),
+          roundName: c.featuredRound,
+          closesOn: c.featuredClosesAt ? pakistanDayOf(c.featuredClosesAt) : null,
+        },
       };
     }),
   };
+}
+
+/**
+ * "Featured dishes" on /admin/rankings: replaces a city's one or two featured dishes and sets the
+ * round's name and closing day (end of that day in Pakistan). Returns every dish page that changes,
+ * the old ones included, so the caller can revalidate them.
+ */
+export async function setFeatured(actor: SessionUser | null, input: FeaturedInput) {
+  const admin = assertRole(actor, "ADMIN");
+  const city = await findCityBySlug(input.city);
+  if (!city) throw new AppError("CITY_NOT_FOUND", "City not found", 404);
+  const slugs = [...new Set(input.dishSlugs)];
+  const dishes = await findDishesBySlugs(slugs);
+  if (dishes.length !== slugs.length) {
+    throw new AppError("DISH_NOT_FOUND", "Pick dishes from the list", 400);
+  }
+  const previous = (await listFeaturedDishes(city.id)).map((f) => f.dish.slug);
+  const round = {
+    featuredClosesAt: input.closesOn ? endOfPakistanDay(input.closesOn) : null,
+    featuredRound: input.roundName ?? null,
+  };
+  await inTransaction((tx) =>
+    replaceFeaturedDishes(
+      city.id,
+      slugs.map((s) => dishes.find((d) => d.slug === s)!.id),
+      round,
+      tx,
+    ),
+  );
+  logEvent("admin.city.featured", {
+    userId: admin.id,
+    entityId: city.id,
+    dishSlugs: slugs,
+    ...round,
+  });
+  return { slug: city.slug, dishSlugs: [...new Set([...previous, ...slugs])] };
 }
 
 /** "Recompute now": the nightly job, run at once (409 JOB_RUNNING while another run is going). */

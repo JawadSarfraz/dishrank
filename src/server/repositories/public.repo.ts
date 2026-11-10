@@ -30,7 +30,14 @@ export const CONTENDER_FILTER = {
 export async function findCityBySlug(slug: string, client: Client = db) {
   return client.city.findUnique({
     where: { slug },
-    select: { id: true, slug: true, name: true, launchedAt: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      launchedAt: true,
+      featuredClosesAt: true,
+      featuredRound: true,
+    },
   });
 }
 
