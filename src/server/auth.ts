@@ -14,6 +14,7 @@ import { recordEvent } from "./services/analytics.service";
 import { isEmailBanned } from "./services/ban-list";
 import {
   PANEL_INVITE,
+  getPanelInviteLabel,
   getPanelInviteState,
   redeemPanelInvite,
 } from "./services/panel-invite.service";
@@ -21,6 +22,7 @@ import { SITE_MODE, newAccountDecision } from "./site";
 import { panelInviteToken } from "./validation";
 import { BRAND } from "@/lib/brand";
 import { isJoinWelcomeUrl } from "@/lib/panel-invite";
+import { SOURCE_TAG, newAccountSource, parseSourceTag } from "@/lib/source-tag";
 
 const googleClientId = env.GOOGLE_CLIENT_ID;
 const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -52,6 +54,9 @@ export const auth = betterAuth({
     additionalFields: {
       // Returned on the session user; `input: false` means no client request can ever set it.
       role: { type: "string", input: false, defaultValue: "USER" },
+      // Where the account came from (docs/01 D1b): set by the sign-up hook below, never by a client,
+      // and never returned.
+      source: { type: "string", required: false, input: false, returned: false },
     },
   },
   // Every check reads the session and role from the database, so role changes apply at once.
@@ -90,7 +95,18 @@ export const auth = betterAuth({
               message: `${BRAND.name} is a private beta and this Google account is not invited.`,
             });
           }
-          return { data: decision.admin ? { ...user, role: "ADMIN" } : user };
+          // docs/01 D1b: the invite link's label, else the visit's ?s= tag, else nothing; set once.
+          const source = newAccountSource(
+            invite ? await getPanelInviteLabel(invite) : null,
+            parseSourceTag(ctx?.getCookie(SOURCE_TAG.cookie)),
+          );
+          return {
+            data: {
+              ...user,
+              ...(decision.admin ? { role: "ADMIN" } : {}),
+              ...(source ? { source } : {}),
+            },
+          };
         },
       },
     },

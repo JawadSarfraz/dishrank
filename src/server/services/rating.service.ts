@@ -448,10 +448,10 @@ export async function createOrReplace(
     [written.droppedPhotoPath],
     ctx.storage === undefined ? getStorage() : ctx.storage,
   );
-  // Light analytics (Phase 6): the city and dish only.
+  // Light analytics (Phase 6): the city and dish, and the rater's source tag (docs/01 D1b).
   await recordEvent(
     "RATING_SUBMITTED",
-    { citySlug: restaurant.city.slug, dishSlug: dish.slug },
+    { citySlug: restaurant.city.slug, dishSlug: dish.slug, source: rater.source },
     now,
   );
   logEvent("rating.write", {

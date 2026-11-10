@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SourceTag } from "@/components/analytics/SourceTag";
 import { UrduNameDefs } from "@/components/brand/Logo";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {children}
           <PwaRegister />
           <InstallPrompt />
+          <SourceTag />
         </Toaster>
       </body>
     </html>

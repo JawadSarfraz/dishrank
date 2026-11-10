@@ -1,5 +1,5 @@
-// Light analytics (owner, Phase 6): event rows with a name, city and dish slug and a day; nothing
-// about who.
+// Light analytics (owner, Phase 6): event rows with a name, city and dish slug, a source tag
+// (docs/01 D1b) and a day; nothing about who.
 import type { AnalyticsEventName } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 
@@ -7,9 +7,37 @@ export async function insertAnalyticsEvent(data: {
   name: AnalyticsEventName;
   citySlug: string | null;
   dishSlug: string | null;
+  source: string | null;
   day: Date;
 }) {
   await db.analyticsEvent.create({ data, select: { id: true } });
+}
+
+/** Dish-page views and ratings per week (Monday) and source tag since `since` (docs/01 D1b). */
+export async function countEventsByWeekAndSource(since: Date) {
+  return db.$queryRaw<
+    { week: Date; name: AnalyticsEventName; source: string | null; count: number }[]
+  >`
+    SELECT date_trunc('week', day)::date AS week, name, source, count(*)::int AS count
+    FROM "AnalyticsEvent"
+    WHERE day >= ${since} AND name IN ('RANKING_VIEW', 'RATING_SUBMITTED')
+    GROUP BY 1, 2, 3`;
+}
+
+/**
+ * New raters per week and source: the week (Monday, Pakistan time) of each account's first counted
+ * rating, by the account's source. Counts only: no user leaves this query.
+ */
+export async function countNewRatersByWeekAndSource(since: Date) {
+  return db.$queryRaw<{ week: Date; source: string | null; newRaters: number }[]>`
+    WITH firsts AS (
+      SELECT "userId", min(date_trunc('week', "createdAt" + interval '5 hours'))::date AS week
+      FROM "Rating" WHERE status <> 'HIDDEN' GROUP BY "userId"
+    )
+    SELECT f.week, u.source, count(*)::int AS "newRaters"
+    FROM firsts f JOIN "User" u ON u.id = f."userId"
+    WHERE f.week >= ${since}
+    GROUP BY 1, 2`;
 }
 
 /** Events per week (weeks start on Monday) and name since `since`, newest week first. */

@@ -270,6 +270,7 @@ model User {
   trustOverride Float? // set by an admin on /admin/users (0.3 .. 1.5); wins over the trust table, also the nightly job's
   isPanel       Boolean   @default(false) // admin-only (never Better Auth input); trust 1.3 unless trustOverride is set, panel limits in docs/04
   panelRemovedAt DateTime? // an admin turned the panel off: an invite link does not put them back (docs/07 §7a)
+  source         String? // where the account came from (docs/01 D1b): the ?s= tag of the visit it signed up in, or the invite link's label; set once at sign-up, never shown (2026-11-11)
   ratingsCount  Int       @default(0)
   photoRatings  Int       @default(0)
   bannedAt      DateTime?
@@ -816,6 +817,7 @@ model AnalyticsEvent {
   name     AnalyticsEventName
   citySlug String?
   dishSlug String?
+  source   String? // the visit's ?s= tag (a browser event) or the rater's account source (a rating): a channel, never who (docs/01 D1b, 2026-11-11)
   day      DateTime           @db.Date // the day in Pakistan (UTC+5), not the moment
 
   @@index([name, day])

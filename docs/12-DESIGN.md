@@ -215,8 +215,9 @@ files in `src/fonts/` (Satori cannot read WOFF2).
   rows with Add back, a name search that adds a listed restaurant to this dish and any others
   ticked, and a link to add a missing restaurant with those dishes pre-ticked; the review cards keep their one-tap decisions, and a burst
   card marks the ratings that look genuine and adds "Release the ones that look genuine".
-  `/admin/analytics` has weekly raters, returning raters, share clicks and a sign-ins table split by
-  normal and in-app browser.
+  `/admin/analytics` has weekly raters, returning raters, share clicks, a sign-ins table split by
+  normal and in-app browser, and a Sources table (per week and source tag: dish-page visits, new
+  raters, ratings; "(none)" for untagged; docs/01 D1b).
 - **Trust pages.** `Prose` (`components/layout/Prose.tsx`): one reading column, brand links,
   tables for the trust levels.
 - **Share images** (`app/opengraph-image.tsx`, `app/(public)/[city]/[slug]/share-image/route.tsx`).

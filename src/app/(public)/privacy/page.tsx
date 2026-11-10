@@ -78,7 +78,10 @@ export default function PrivacyPage() {
           To see which pages are useful we count, per day, ratings saved, searches, views of ranking
           pages, taps on Share and sign-ins, with at most the city and dish and whether the sign-in
           began inside another app. These counts hold nothing about you: no account, no IP address,
-          no search words, no time of day. We use no third-party tracking or advertising cookies.
+          no search words, no time of day. We use no third-party tracking or advertising cookies. A
+          short tag on a link you arrived by (for example ?s=wa) tells us which channel brought you:
+          we keep it for the visit, and once on your account when you sign up, so we know which
+          channels bring raters. It says nothing about who you are.
         </p>
 
         <h2>Reports and disputes</h2>

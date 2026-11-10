@@ -1,12 +1,15 @@
 // Light analytics (owner, Phase 6): ratings, searches, ranking views, share clicks and sign-ins,
-// counted per day with at most the city and dish: no user, no IP, no query text, no exact time, no
-// third-party tracker. Recording never fails the request it belongs to.
+// counted per day with at most the city, the dish and a source tag (docs/01 D1b: the channel a visit
+// or an account came from): no user, no IP, no query text, no exact time, no third-party tracker.
+// Recording never fails the request it belongs to.
 import type { AnalyticsEventName } from "@/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { logEvent } from "@/server/log";
 import { RATE_LIMITS, assertRateLimit } from "@/server/rate-limit";
 import {
   countEventsByWeek,
+  countEventsByWeekAndSource,
+  countNewRatersByWeekAndSource,
   countRatersByWeek,
   insertAnalyticsEvent,
   topRankingViews,
@@ -30,7 +33,7 @@ export function pakistanDay(now: Date): Date {
 /** Counts one event; a failure is logged, never thrown. */
 export async function recordEvent(
   name: AnalyticsEventName,
-  where: { citySlug?: string | null; dishSlug?: string | null },
+  where: { citySlug?: string | null; dishSlug?: string | null; source?: string | null },
   now: Date = new Date(),
 ) {
   try {
@@ -38,6 +41,7 @@ export async function recordEvent(
       name,
       citySlug: where.citySlug ?? null,
       dishSlug: where.dishSlug ?? null,
+      source: where.source ?? null,
       day: pakistanDay(now),
     });
   } catch (error) {
@@ -59,7 +63,8 @@ const BROWSER_EVENTS = {
 
 /**
  * POST /api/v1/events: what only the browser can see (the pages are static). An event about a page
- * is counted for existing city and dish slugs only; limited per IP hash (`ip:{hash}:event`).
+ * is counted for existing city and dish slugs only, with the visit's source tag when the browser
+ * sends one; limited per IP hash (`ip:{hash}:event`).
  */
 export async function recordBrowserEvent(
   input: BrowserEventInput,
@@ -68,30 +73,74 @@ export async function recordBrowserEvent(
 ) {
   await assertRateLimit(`ip:${ipHash}:event`, RATE_LIMITS.event, now);
   const name = BROWSER_EVENTS[input.name];
+  const source = input.source ?? null;
   if (!("city" in input)) {
-    await recordEvent(name, {}, now);
+    await recordEvent(name, { source }, now);
     return { ok: true };
   }
   const [city, dish] = await Promise.all([findCityBySlug(input.city), findDishBySlug(input.dish)]);
   if (!city || !dish) throw new AppError("NOT_FOUND", "Unknown city or dish", 404);
-  await recordEvent(name, { citySlug: city.slug, dishSlug: dish.slug }, now);
+  await recordEvent(name, { citySlug: city.slug, dishSlug: dish.slug, source }, now);
   return { ok: true };
+}
+
+export type SourceRow = {
+  week: Date;
+  /** The tag, or null for visits and accounts without one. */
+  source: string | null;
+  /** Views of dish pages by visits with this tag. */
+  views: number;
+  /** Accounts with this source whose first counted rating fell in this week. */
+  newRaters: number;
+  /** Ratings by raters with this source. */
+  ratings: number;
+};
+
+/** /admin/analytics "Sources": one row per week and source tag that has anything to show. */
+function sourceRows(
+  events: { week: Date; name: AnalyticsEventName; source: string | null; count: number }[],
+  raters: { week: Date; source: string | null; newRaters: number }[],
+): SourceRow[] {
+  const rows = new Map<string, SourceRow>();
+  const row = (week: Date, source: string | null) => {
+    const key = `${week.getTime()}:${source ?? ""}`;
+    let r = rows.get(key);
+    if (!r) {
+      r = { week, source, views: 0, newRaters: 0, ratings: 0 };
+      rows.set(key, r);
+    }
+    return r;
+  };
+  for (const e of events) {
+    if (e.name === "RANKING_VIEW") row(e.week, e.source).views += e.count;
+    else if (e.name === "RATING_SUBMITTED") row(e.week, e.source).ratings += e.count;
+  }
+  for (const r of raters) row(r.week, r.source).newRaters += r.newRaters;
+  return [...rows.values()].sort(
+    (a, b) =>
+      b.week.getTime() - a.week.getTime() ||
+      b.views - a.views ||
+      b.ratings - a.ratings ||
+      (a.source ?? "").localeCompare(b.source ?? ""),
+  );
 }
 
 export const ANALYTICS_WEEKS = 12;
 
-/** /admin/analytics: weekly counts of each event, and this week's and the last 4 weeks' top pages. */
+/** /admin/analytics: weekly counts of each event, this week's and the last 4 weeks' top pages, and the weeks by source tag. */
 export async function getAnalyticsAdmin(actor: SessionUser | null, now: Date = new Date()) {
   assertRole(actor, "ADMIN");
   const today = pakistanDay(now);
   // Monday of this week (UTC dates; getUTCDay 0 = Sunday).
   const monday = new Date(today.getTime() - ((today.getUTCDay() + 6) % 7) * DAY_MS);
   const since = new Date(monday.getTime() - (ANALYTICS_WEEKS - 1) * 7 * DAY_MS);
-  const [rows, raters, thisWeek, lastFourWeeks] = await Promise.all([
+  const [rows, raters, thisWeek, lastFourWeeks, bySource, newBySource] = await Promise.all([
     countEventsByWeek(since),
     countRatersByWeek(since),
     topRankingViews(monday, 10),
     topRankingViews(new Date(monday.getTime() - 3 * 7 * DAY_MS), 10),
+    countEventsByWeekAndSource(since),
+    countNewRatersByWeekAndSource(since),
   ]);
   const weeks = Array.from({ length: ANALYTICS_WEEKS }, (_, i) => {
     const week = new Date(monday.getTime() - i * 7 * DAY_MS);
@@ -113,5 +162,5 @@ export async function getAnalyticsAdmin(actor: SessionUser | null, now: Date = n
       inAppCompleted: count("IN_APP_SIGN_IN_COMPLETED"),
     };
   });
-  return { weeks, thisWeek, lastFourWeeks };
+  return { weeks, thisWeek, lastFourWeeks, sources: sourceRows(bySource, newBySource) };
 }

@@ -133,7 +133,12 @@ export async function redeemPanelInvite(userId: string, token: string, now: Date
       const stats = await findTrustStats(userId, tx);
       await updateUserById(
         userId,
-        { isPanel: true, trustScore: trustFor({ ...stats!, isPanel: true }) },
+        {
+          isPanel: true,
+          trustScore: trustFor({ ...stats!, isPanel: true }),
+          // The link's label is the source of whoever joins by it (docs/01 D1b), set once.
+          ...(rater.source === null ? { source: invite.label } : {}),
+        },
         tx,
       );
       return { outcome: "joined", inviteId: invite.id };
@@ -149,6 +154,12 @@ export async function redeemPanelInvite(userId: string, token: string, now: Date
     recomputedRows: rows.length,
   });
   return { outcome: result.outcome, dishPages: await listDishPagesOfRows(rows) };
+}
+
+/** The link's label, the source of an account created through it (docs/01 D1b); null for no such link. */
+export async function getPanelInviteLabel(token: string) {
+  const invite = await findPanelInviteByHash(hashToken(token));
+  return invite?.label ?? null;
 }
 
 /** Why a link cannot be used, in words for the person holding it. */

@@ -252,7 +252,7 @@ Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and trig
 
 Owner, 2026-11-06. An admin creates a link with a label, a maximum number of uses (default 30) and an expiry (default 14 days). The token is 256 random bits; only its sha256 is stored, so the whole link is shown once, right after creating it. It never goes in a log.
 
-Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.3 unless an admin set an override, exempt from the burst rule, panel limits) and passes the beta allowlist. How:
+Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.3 unless an admin set an override, exempt from the burst rule, panel limits) and passes the beta allowlist. The link's label becomes the account's source when it has none yet (docs/01 D1b, 2026-11-11). How:
 
 1. `/join/<token>` (dynamic, `noindex`, `no-referrer`) shows what the panel is. Signed out: **Continue with Google** first validates the link and sets an HttpOnly cookie for 30 minutes (`startPanelInviteAction`, `ip:{hash}:panel-invite`). The return path is the fixed `/join/welcome`, so the token never enters the OAuth state, which Better Auth stores in clear in `Verification`.
 2. Better Auth's `user.create.before` hook lets a new, verified account past `BETA_ALLOWED_EMAILS` when that cookie holds a usable link and the sign-in names that path, so a cookie left by an abandoned sign-in gives nothing to the next person on that browser. A banned e-mail stays refused, link or not.

@@ -27,6 +27,7 @@ export async function findRater(id: string, client: Client = db) {
       trustScore: true,
       createdAt: true,
       bannedAt: true,
+      source: true,
     },
   });
 }

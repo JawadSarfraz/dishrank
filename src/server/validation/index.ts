@@ -2,6 +2,7 @@
 // Rules that need the database or the session (ownership, roles, rate limits) are enforced in
 // services, not here.
 import { z } from "zod";
+import { SOURCE_TAG } from "@/lib/source-tag";
 import { safeNextPath } from "@/server/roles";
 import { TRUST } from "@/server/services/ranking.constants";
 import {
@@ -168,13 +169,26 @@ export const ownerDishInput = z.discriminatedUnion("action", [
 ]);
 export type OwnerDishInput = z.infer<typeof ownerDishInput>;
 
-/** POST /api/v1/events: what the browser reports (light analytics): a name, a city and a dish at most. */
+/** A source tag (docs/01 D1b): lowercase letters and digits, 12 at most. */
+export const sourceTag = z.string().regex(SOURCE_TAG.pattern, "Invalid source tag");
+
+/** POST /api/v1/events: what the browser reports (light analytics): a name, a city and a dish at most, and the visit's source tag. */
 export const browserEventInput = z.discriminatedUnion("name", [
-  z.strictObject({ name: z.literal("ranking_view"), city: slug, dish: slug }),
-  z.strictObject({ name: z.literal("share_click"), city: slug, dish: slug }),
-  z.strictObject({ name: z.literal("sign_in_started") }),
-  z.strictObject({ name: z.literal("in_app_sign_in_started") }),
-  z.strictObject({ name: z.literal("in_app_left_browser") }),
+  z.strictObject({
+    name: z.literal("ranking_view"),
+    city: slug,
+    dish: slug,
+    source: sourceTag.optional(),
+  }),
+  z.strictObject({
+    name: z.literal("share_click"),
+    city: slug,
+    dish: slug,
+    source: sourceTag.optional(),
+  }),
+  z.strictObject({ name: z.literal("sign_in_started"), source: sourceTag.optional() }),
+  z.strictObject({ name: z.literal("in_app_sign_in_started"), source: sourceTag.optional() }),
+  z.strictObject({ name: z.literal("in_app_left_browser"), source: sourceTag.optional() }),
 ]);
 export type BrowserEventInput = z.infer<typeof browserEventInput>;
 

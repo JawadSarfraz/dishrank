@@ -31,6 +31,49 @@ function TopPages({
 }
 
 type Week = Awaited<ReturnType<typeof getAnalyticsAdmin>>["weeks"][number];
+type SourceRow = Awaited<ReturnType<typeof getAnalyticsAdmin>>["sources"][number];
+
+/** Per week and source tag (docs/01 D1b): dish-page visits, new raters and ratings. */
+function SourceTable({ rows }: { rows: SourceRow[] }) {
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">Nothing tagged yet.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card shadow-card">
+      <table className="w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50 text-left">
+            <th scope="col" className="px-4 py-2 font-medium">
+              Week of
+            </th>
+            <th scope="col" className="px-4 py-2 font-medium">
+              Source
+            </th>
+            {["Dish-page visits", "New raters", "Ratings"].map((label) => (
+              <th key={label} scope="col" className="px-4 py-2 text-right font-medium">
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr
+              key={`${r.week.toISOString()}:${r.source ?? ""}`}
+              className="border-b last:border-0"
+            >
+              <td className="px-4 py-2 whitespace-nowrap">{day.format(r.week)}</td>
+              <td className="px-4 py-2 font-mono">{r.source ?? "(none)"}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{r.views}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{r.newRaters}</td>
+              <td className="px-4 py-2 text-right tabular-nums">{r.ratings}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 function WeekTable({
   weeks,
@@ -110,6 +153,17 @@ export default async function AdminAnalyticsPage() {
             ["In-app: completed", (w) => w.inAppCompleted],
           ]}
         />
+      </section>
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-bold">Sources</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          A short tag on a landing link (?s=wa, ig, fb, li, rd, qr; the Share buttons add s=share)
+          is kept for the visit and saved once on the account at sign-up; whoever joins by an invite
+          link gets the link&apos;s label. Per week: visits to dish pages by tag, accounts whose
+          first rating fell in that week by their source, and ratings by the rater&apos;s source.
+          &quot;(none)&quot; is a visit or an account without one. Counted since 11 Nov 2026.
+        </p>
+        <SourceTable rows={data.sources} />
       </section>
       <div className="grid gap-4 md:grid-cols-2">
         <TopPages title="Most viewed this week" rows={data.thisWeek} />

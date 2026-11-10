@@ -5,6 +5,7 @@
 import { Share2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
+import { withShareTag } from "@/lib/source-tag";
 import { trackEvent } from "@/lib/track";
 
 export function ShareButton({
@@ -29,7 +30,8 @@ export function ShareButton({
 }) {
   async function share() {
     trackEvent({ name: "share_click", city, dish });
-    const url = new URL(path, window.location.origin).toString();
+    // The link carries s=share (docs/01 D1b), so visits it brings are counted as shares.
+    const url = withShareTag(new URL(path, window.location.origin)).toString();
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title, text, url });

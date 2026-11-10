@@ -42,7 +42,14 @@ export async function listPanelInvites(take: number) {
 export async function findPanelInviteByHash(tokenHash: string, client: Client = db) {
   return client.panelInvite.findUnique({
     where: { tokenHash },
-    select: { id: true, maxUses: true, usesCount: true, expiresAt: true, revokedAt: true },
+    select: {
+      id: true,
+      label: true,
+      maxUses: true,
+      usesCount: true,
+      expiresAt: true,
+      revokedAt: true,
+    },
   });
 }
 

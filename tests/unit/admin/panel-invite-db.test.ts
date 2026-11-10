@@ -260,12 +260,25 @@ describe("panel invite links (test DB)", () => {
       await expect(
         before(newAccount("b@test.local", false), ctxWith(token).ctx),
       ).rejects.toMatchObject({ body: { code: "BETA_INVITE_ONLY" } });
+      // The link's label is the new account's source (docs/01 D1b).
       await expect(before(newAccount("c@test.local"), ctxWith(token).ctx)).resolves.toMatchObject({
-        data: { email: "c@test.local" },
+        data: { email: "c@test.local", source: "Food group" },
       });
       await expect(
         before(newAccount("d@test.local"), ctxWith("not a token").ctx),
       ).rejects.toMatchObject({ body: { code: "BETA_INVITE_ONLY" } });
+    });
+
+    it("the link's label is the source of whoever joins by it, set once", async () => {
+      const { token } = await invite();
+      const diner = await makeUser("Diner");
+      expect((await redeemPanelInvite(diner.id, token, NOW)).outcome).toBe("joined");
+      expect((await userOf(diner.id)).source).toBe("Food group");
+
+      const tagged = await makeUser("Tagged");
+      await db.user.update({ where: { id: tagged.id }, data: { source: "wa" } });
+      expect((await redeemPanelInvite(tagged.id, token, NOW)).outcome).toBe("joined");
+      expect((await userOf(tagged.id)).source).toBe("wa");
     });
 
     it("a revoked link lets nobody in", async () => {
