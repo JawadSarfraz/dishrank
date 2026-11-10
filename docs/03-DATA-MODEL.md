@@ -268,7 +268,7 @@ model User {
   role          Role      @default(USER)
   trustScore    Float     @default(0.6) // 0.3 .. 1.5, see docs/04: the trust used at compute time
   trustOverride Float? // set by an admin on /admin/users (0.3 .. 1.5); wins over the trust table, also the nightly job's
-  isPanel       Boolean   @default(false) // admin-only (never Better Auth input); trust 1.3 unless trustOverride is set, panel limits in docs/04
+  isPanel       Boolean   @default(false) // admin-only (never Better Auth input); trust 1.0 unless trustOverride is set (2026-11-11; 1.3 before), panel limits in docs/04
   panelRemovedAt DateTime? // an admin turned the panel off: an invite link does not put them back (docs/07 §7a)
   source         String? // where the account came from (docs/01 D1b): the ?s= tag of the visit it signed up in, or the invite link's label; set once at sign-up, never shown (2026-11-11)
   ratingsCount  Int       @default(0)
@@ -906,7 +906,7 @@ CREATE INDEX IF NOT EXISTS dish_alias_trgm ON "DishAlias" USING gin ("alias" gin
 6f. `RestaurantDish.rankInCity` is set only by RankingService's re-rank (SQL eligibility, docs/04), which runs after every recompute, restaurant status change and merge.
 6c. `Restaurant.source` never changes after creation. `OVERTURE` restaurants come from an `OvertureCandidate` reviewed on /admin/import; `MANUAL` ones were typed by an admin.
 6d. `OvertureCandidate` rows are only added by `pnpm overture:sync` (one per GERS id, Meta and Microsoft records only, no Google links in `address` or `website`). A sync never changes an existing row except `lastSeenRelease`; review actions change only `status`, `skipReason`, `restaurantId`, `reviewedByUserId` and `reviewedAt`, and only from `NEW` (Reopen: `SKIPPED` → `NEW`).
-7. `User.isPanel = true` implies `trustScore = 1.3` unless `trustOverride` is set; only admins change `isPanel` and `trustOverride`.
+7. `User.isPanel = true` implies `trustScore = 1.0` (2026-11-11; 1.3 before) unless `trustOverride` is set; only admins change `isPanel` and `trustOverride`.
 
 ## Seed files
 

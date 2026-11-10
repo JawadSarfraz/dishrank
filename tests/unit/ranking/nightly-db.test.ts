@@ -47,7 +47,8 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
     const fresh = daysAgo(1, NOW);
 
     // Trust inputs (docs/04 table): 3 active ratings at 2 restaurants → 1.0; ten 10s at two
-    // restaurants → 0.6 (abuse control 4); 2 hidden ratings → 0.3; panel members keep 1.3.
+    // restaurants → 0.6 (abuse control 4); 2 hidden ratings → 0.3; panel members get the table's
+    // 1.0 even when a higher value is stored (2026-11-11: the old 1.3 is corrected overnight).
     const grows = await makeUser("Grows");
     for (const rd of [aRows[0], aRows[1], bRows[2]]) await makeRating(rd.id, grows.id, 8, fresh);
     const extreme = await makeUser("Extreme", { trustScore: 1 });
@@ -92,7 +93,7 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
     expect(await trustOf(grows.id)).toBe(1);
     expect(await trustOf(extreme.id)).toBe(0.6);
     expect(await trustOf(penalised.id)).toBe(0.3);
-    expect(await trustOf(panel[0].id)).toBe(1.3);
+    expect(await trustOf(panel[0].id)).toBe(1);
 
     expect(await statusOf(staleCandidate.id)).toBe("STALE");
     expect(await statusOf(staleOwner.id)).toBe("STALE");
@@ -100,10 +101,10 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
     expect(await statusOf(menuVerified.id)).toBe("MENU_VERIFIED");
 
     // The karahi row's aggregates were never written: now counted with the new trust (extreme
-    // 0.6, grows 1.0, panel 3 × 1.3) and ranked in bootstrap mode.
+    // 0.6, grows 1.0, panel 3 × 1.0) and ranked in bootstrap mode.
     const karahi = await db.restaurantDish.findUniqueOrThrow({ where: { id: aRows[0].id } });
     expect(karahi).toMatchObject({ ratingCount: 5, distinctRaters: 5, rankInCity: 1 });
-    expect(karahi.weightSum).toBeCloseTo((0.6 + 1 + 3 * 1.3) * 0.5 ** (1 / 180), 6);
+    expect(karahi.weightSum).toBeCloseTo((0.6 + 1 + 3 * 1) * 0.5 ** (1 / 180), 6);
     expect(await db.dishStat.count()).toBe(DISHES.length);
     // C for Chicken Karahi: both karahi rows' counted ratings, with the same weights as the rows.
     const decay = (days: number) => 0.5 ** (days / 180);
@@ -111,7 +112,7 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
       { w: 1 * decay(1), s: 8 }, // grows
       { w: 0.6 * decay(1), s: 10 }, // extreme at A (newest)
       { w: 0.6 * decay(1.05), s: 10 }, // extreme at B
-      ...panel.map(() => ({ w: 1.3 * decay(1), s: 9 })),
+      ...panel.map(() => ({ w: 1 * decay(1), s: 9 })),
     ];
     const stat = await db.dishStat.findFirstOrThrow({ where: { dishId: karahi.dishId } });
     expect(stat.ratingCount).toBe(6);
@@ -131,7 +132,7 @@ describe("nightly recomputeAll (docs/04, test DB)", () => {
       ok: true,
       summary: {
         trigger: "cli",
-        trust: { changed: 3 },
+        trust: { changed: 6 },
         dishStats: DISHES.length,
         rows: { recomputed: 10, failed: 0 },
         stale: 2,

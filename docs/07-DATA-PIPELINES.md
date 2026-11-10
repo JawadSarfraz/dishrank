@@ -252,7 +252,7 @@ Every resolution writes `resolvedByUserId`, `resolution`, `resolvedAt`, and trig
 
 Owner, 2026-11-06. An admin creates a link with a label, a maximum number of uses (default 30) and an expiry (default 14 days). The token is 256 random bits; only its sha256 is stored, so the whole link is shown once, right after creating it. It never goes in a log.
 
-Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.3 unless an admin set an override, exempt from the burst rule, panel limits) and passes the beta allowlist. The link's label becomes the account's source when it has none yet (docs/01 D1b, 2026-11-11). How:
+Whoever signs in through a link becomes a panel member (`isPanel`, trust 1.0 unless an admin set an override (2026-11-11; 1.3 before), exempt from the burst rule, panel limits) and passes the beta allowlist. The link's label becomes the account's source when it has none yet (docs/01 D1b, 2026-11-11). How:
 
 1. `/join/<token>` (dynamic, `noindex`, `no-referrer`) shows what the panel is. Signed out: **Continue with Google** first validates the link and sets an HttpOnly cookie for 30 minutes (`startPanelInviteAction`, `ip:{hash}:panel-invite`). The return path is the fixed `/join/welcome`, so the token never enters the OAuth state, which Better Auth stores in clear in `Verification`.
 2. Better Auth's `user.create.before` hook lets a new, verified account past `BETA_ALLOWED_EMAILS` when that cookie holds a usable link and the sign-in names that path, so a cookie left by an abandoned sign-in gives nothing to the next person on that browser. A banned e-mail stays refused, link or not.
@@ -265,7 +265,7 @@ Redeeming runs under the link's row lock, then the user's, so the limit holds ho
 
 ## 7. Panel operations (non-code, but the plan depends on it)
 
-- Recruit 8–12 panel members; admin sets `isPanel` on `/admin/users` (trust fixed at 1.3; 30 ratings/day, 10 per restaurant per day; no new-account burst hold; still blocked from restaurants they own).
+- Recruit 8–12 panel members; admin sets `isPanel` on `/admin/users` (trust 1.0 since 2026-11-11, 1.3 before; 30 ratings/day, 10 per restaurant per day; no new-account burst hold; still blocked from restaurants they own).
 - On-site locations: on the rating screen a panel member can tap "I'm at this restaurant now – share location"; the browser asks for permission each time. The location is kept as a `LocationObservation` (never on the rating), and only when the browser reports an accuracy of 50 m or better. When the restaurant has no location, or the observation is more than 150 m away (DECISION-PENDING), one OPEN `LOCATION_SUGGESTION` item collects the observations; accepting it sets the most accurate one with `locationSource PANEL_GPS`. Observations follow their restaurant into a merge.
 - Week 1–2 target: every launch dish has ≥ 10 restaurants with ≥ 4 panel ratings each in Islamabad → bootstrap-mode eligibility.
 - Panel uploads a menu photo at each visit (one tap on the restaurant page).

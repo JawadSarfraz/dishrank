@@ -1,5 +1,5 @@
 // Panel invite links (docs/07 §7a): an admin creates a link on /admin/users, and whoever signs in
-// through it becomes a panel member (trust 1.3, exempt from the burst rule) and passes the beta
+// through it becomes a panel member (trust 1.0, exempt from the burst rule) and passes the beta
 // allowlist. The token is 256 random bits and only its hash is stored, so the link is shown once.
 // Revoking or expiring a link stops new joins; people who joined stay on the panel until an admin
 // turns them off. Every rating they give still goes through RatingService.

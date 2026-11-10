@@ -61,7 +61,7 @@ Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCou
 | ≥ 3 active ratings at ≥ 2 restaurants (no photo needed; owner, 2026-11-06) | 1.0 |
 | ≥ 20 active ratings, no upheld flags against their ratings, ≥ 30% with photo | 1.2 |
 | Set by hand (`User.trustOverride`, admin only, /admin/users) | that value (0.3 to 1.5), also over the panel; the nightly job keeps it |
-| Panel member (`User.isPanel`, set by admin only) | 1.3, fixed: the nightly job skips panel users |
+| Panel member (`User.isPanel`, set by an admin or by an invite link) | 1.0 (owner, 2026-11-11; 1.3 before): the same as an established rater, so the top weight is earned by behaviour later, not handed out by a link. The nightly job applies this row to panel users too |
 | ≥ 2 of their ratings hidden by admin | 0.3 |
 | Banned | ratings set HIDDEN |
 
@@ -109,7 +109,7 @@ Finally it re-ranks the row's (city, dish) list (docs/03 invariant 6f): in SQL, 
 
 `src/server/services/ranking-nightly.service.ts`; the cron, the CLI and "Recompute now" on `/admin/rankings` run the same function. One run at a time: a run that started less than 30 minutes ago and has not finished refuses a second one (`409 JOB_RUNNING`).
 
-1. Recompute `User.trustScore` from the trust table, skipping panel users (`isPanel`; trust stays 1.3) and banned users. A rating write already does this for its rater; this catches what changed without one, and a write whose trust step failed. One scan finds the users whose trust would change; each is re-checked and written under its user row lock, so a panel toggle or an admin decision made meanwhile wins.
+1. Recompute `User.trustScore` from the trust table for every user who is not banned (panel users get the panel row's 1.0; 2026-11-11). A rating write already does this for its rater; this catches what changed without one, and a write whose trust step failed. One scan finds the users whose trust would change; each is re-checked and written under its user row lock, so a panel toggle or an admin decision made meanwhile wins.
 2. For each city × dish: `DishStat.meanScore` = weighted mean of all active ratings of users who are not banned (same weights, decay at the run's time), `ratingCount`. A city × dish without counted ratings keeps its old row (none of its dish rows has a score).
 3. For each RD with `ratingCount > 0`, a score, or an active rating (a recompute that failed after a commit is caught here): recompute as above (applies decay to all), without the per-row re-rank.
 4. Mark stale: `CANDIDATE/USER_CONFIRMED` with no rating or verification in 270 days → `STALE`; `MENU_VERIFIED/OWNER_VERIFIED` after 365 days → `STALE`. The age runs from the latest of `lastRatedAt`, `lastVerifiedAt` and `createdAt`, so a new row is never stale.

@@ -112,7 +112,7 @@ describe("ranking math (docs/04)", () => {
     expect(trustFor({ ...base, activeRatings: 40, activePhotoRatings: 40, hiddenRatings: 2 })).toBe(
       0.3,
     );
-    expect(trustFor({ ...base, isPanel: true, hiddenRatings: 5 })).toBe(1.3);
+    expect(trustFor({ ...base, isPanel: true, hiddenRatings: 5 })).toBe(1.0); // the panel row, 2026-11-11
     // An admin's override wins over every row, the panel included, within 0.3..1.5.
     expect(trustFor({ ...base, trustOverride: 1.1, hiddenRatings: 5 })).toBe(1.1);
     expect(trustFor({ ...base, trustOverride: 0.4, isPanel: true })).toBe(0.4);
@@ -143,6 +143,6 @@ describe("ranking math (docs/04)", () => {
     );
     expect(trustFor({ ...base, recentRatings: tens(2).slice(0, 9) })).toBe(1.2); // fewer than 10
     expect(trustFor({ ...base, hiddenRatings: 2, recentRatings: tens(2) })).toBe(0.3);
-    expect(trustFor({ ...base, isPanel: true, recentRatings: tens(2) })).toBe(1.3);
+    expect(trustFor({ ...base, isPanel: true, recentRatings: tens(2) })).toBe(1.0);
   });
 });

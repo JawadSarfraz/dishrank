@@ -98,8 +98,9 @@ export async function findTrustStats(userId: string, client: Client = db) {
 }
 
 /**
- * The nightly trust step's first pass: every user who is not on the panel or banned, with the
- * docs/04 table's inputs from one scan of the ratings, their override and their current trust. The
+ * The nightly trust step's first pass: every user who is not banned (panel members too, since
+ * 2026-11-11: the table's panel row is their value), with the docs/04 table's inputs from one scan
+ * of the ratings, their override, their panel flag and their current trust. The
  * step re-checks each user whose trust would change under the user's row lock (findTrustStats).
  */
 export async function listTrustSnapshot(client: Client = db) {
@@ -108,6 +109,7 @@ export async function listTrustSnapshot(client: Client = db) {
       id: string;
       trustScore: number;
       trustOverride: number | null;
+      isPanel: boolean;
       activeRatings: number;
       activePhotoRatings: number;
       activeRestaurants: number;
@@ -135,7 +137,7 @@ export async function listTrustSnapshot(client: Client = db) {
           AS ratings
       FROM ordered WHERE n <= ${TRUST.extremeScores.lastRatings} GROUP BY "userId"
     )
-    SELECT u.id, u."trustScore", u."trustOverride",
+    SELECT u.id, u."trustScore", u."trustOverride", u."isPanel",
       coalesce(c.active, 0) AS "activeRatings",
       coalesce(c.photos, 0) AS "activePhotoRatings",
       coalesce(p.restaurants, 0) AS "activeRestaurants",
@@ -145,7 +147,7 @@ export async function listTrustSnapshot(client: Client = db) {
     LEFT JOIN counts c ON c."userId" = u.id
     LEFT JOIN places p ON p."userId" = u.id
     LEFT JOIN recent r ON r."userId" = u.id
-    WHERE u."isPanel" = false AND u."bannedAt" IS NULL
+    WHERE u."bannedAt" IS NULL
     ORDER BY u.id`;
 }
 

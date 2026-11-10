@@ -1,6 +1,6 @@
 // /admin/users (docs/09 Prompt 4 item 10, docs/06 PATCH /api/v1/admin/users/:id): find users, turn
 // the panel flag on or off, and set a user's trust by hand. Both are set only here, by an admin:
-// panel on gives trust 1.3, an override gives its own value (kept by the nightly job), and turning
+// panel on gives trust 1.0 (the table's panel row), an override gives its own value (kept by the nightly job), and turning
 // either off returns the user to the docs/04 trust table at once. Trust is read at compute time, so
 // the user's dish rows are recomputed.
 import { AppError } from "@/server/errors";
@@ -60,7 +60,7 @@ export async function setPanel(actor: SessionUser | null, userId: string, isPane
     await lockUser(userId, tx);
     const stats = await findTrustStats(userId, tx);
     if (!stats) throw new AppError("NOT_FOUND", "User not found", 404);
-    // Panel trust is 1.3 (Decided 2026-10-22) unless an admin set an override; off → the table.
+    // Panel trust is 1.0 (owner, 2026-11-11; 1.3 before) unless an admin set an override; off → the table's other rows.
     const trustScore = trustFor({ ...stats, isPanel });
     // Turning a member off is remembered, so an invite link does not put them back (docs/07 §7a);
     // turning anyone on clears it.

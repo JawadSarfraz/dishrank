@@ -75,7 +75,7 @@ Tick each item with a file reference. Anything in **Security** or **Data policy*
 - [x] `.env.example` complete; README setup works on a clean machine. ✅ `.env.example` lists every variable (incl. `IP_HASH_SECRET`); CI's `vercel-build` job builds from a clean checkout.
 
 ## Launch day
-- [ ] Panel (≥ 8 users) has `isPanel` set (trust 1.3) and has rated ≥ 10 restaurants per launch dish. ⏳ owner.
+- [ ] Panel (≥ 8 users) has `isPanel` set (trust 1.0 since 2026-11-11) and has rated ≥ 10 restaurants per launch dish. ⏳ owner.
 - [ ] Every launch dish page in Islamabad shows ≥ 5 eligible restaurants (bootstrap mode). ⏳ owner.
 - [ ] Facebook-group partner post scheduled; share buttons tested on WhatsApp. ⏳ owner.
 - [ ] Dispute inbox monitored; admin review queue empty. ⏳ owner.

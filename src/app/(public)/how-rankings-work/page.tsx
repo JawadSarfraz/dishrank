@@ -25,7 +25,7 @@ const TRUST_ROWS: [string, string][] = [
     `At least ${TRUST.trusted.minActive} ratings, ${TRUST.trusted.minPhotoShare * 100}% or more with a photo, none of them flagged`,
     TRUST.trusted.trust.toFixed(1),
   ],
-  ["Panel member (trusted early raters chosen by our team)", TRUST.panel.toFixed(1)],
+  ["Panel member (invited early raters; no extra weight since 2026-11-11)", TRUST.panel.toFixed(1)],
   [
     `${TRUST.penalised.minHidden} or more ratings removed by our team`,
     TRUST.penalised.trust.toFixed(1),

@@ -37,8 +37,11 @@ export const TRUST = {
   established: { trust: 1.0, minActive: 3, minRestaurants: 2 },
   /** ≥ 20 active ratings, no upheld flags against them, ≥ 30% with a photo. */
   trusted: { trust: 1.2, minActive: 20, minPhotoShare: 0.3 },
-  /** Panel members: fixed, the nightly job skips them. */
-  panel: 1.3,
+  /**
+   * Panel members (owner, 2026-11-11; 1.3 before): the established rater's value. The top weight is
+   * earned by behaviour later, not handed out by a link. The nightly job applies this row to them.
+   */
+  panel: 1.0,
   /** ≥ 2 of the user's ratings hidden by an admin. */
   penalised: { trust: 0.3, minHidden: 2 },
   min: 0.3,

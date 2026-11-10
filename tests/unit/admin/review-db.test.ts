@@ -341,7 +341,7 @@ describe("/admin/review decisions (docs/07 §6, test DB)", () => {
   });
 
   it("location suggestions: approve sets the panel location (PANEL_GPS); reject leaves it", async () => {
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     const r = await makeRestaurant("Fixture No Location");
     await recordLocationObservation(actorOf(panel), {
       restaurantId: r.id,

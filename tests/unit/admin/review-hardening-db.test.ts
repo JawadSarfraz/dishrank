@@ -194,7 +194,7 @@ describe("review follow-ups (test DB)", () => {
   });
 
   it("a location card's fingerprint covers the restaurant's current location", async () => {
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     const r = await makeRestaurant("Fixture Location Seen");
     await recordLocationObservation(
       actorOf(panel),

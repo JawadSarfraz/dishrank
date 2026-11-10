@@ -119,7 +119,7 @@ export type TrustStats = {
 };
 
 /**
- * docs/04 trust table, in this order: an admin's override → panel 1.3 → ≥ 2 ratings hidden by an
+ * docs/04 trust table, in this order: an admin's override → panel 1.0 → ≥ 2 ratings hidden by an
  * admin 0.3 → the extreme-score pattern 0.6 → ≥ 20 active, no upheld flags, ≥ 30% with a photo 1.2
  * → ≥ 3 active at ≥ 2 restaurants 1.0 → 0.6.
  */
@@ -161,14 +161,15 @@ export function isExtremePattern(last: readonly { score: number; restaurantId: s
 
 /**
  * The docs/04 table for one user, under their row lock: what the nightly job runs for everyone and a
- * rating write runs for its rater. Panel members and banned users are skipped. Returns the new trust
- * when it changed, else null.
+ * rating write runs for its rater. Banned users are skipped; panel members get the table's panel row
+ * (2026-11-11). Returns the new trust when it changed, else null.
  */
 export async function applyTrustTable(userId: string, tx: Tx): Promise<number | null> {
   await lockUser(userId, tx);
   const rater = await findRater(userId, tx);
   const stats = await findTrustStats(userId, tx);
-  if (!rater || !stats || rater.isPanel || rater.bannedAt) return null;
+  // Panel members go through the table too (2026-11-11): its panel row is their value.
+  if (!rater || !stats || rater.bannedAt) return null;
   const trustScore = trustFor(stats);
   if (trustScore === rater.trustScore) return null;
   await updateUserById(userId, { trustScore }, tx);

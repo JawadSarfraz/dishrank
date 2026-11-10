@@ -105,7 +105,7 @@ Tasks
 - Launch checklist in docs/11
 
 Acceptance
-- docs/11 checklist fully ticked; production deployed on custom domain; 10 panel members onboarded with `isPanel` set (trust 1.3).
+- docs/11 checklist fully ticked; production deployed on custom domain; 10 panel members onboarded with `isPanel` set (trust 1.0 since 2026-11-11).
 
 ## Phase 7 — After launch (only if month-2 metrics are met)
 

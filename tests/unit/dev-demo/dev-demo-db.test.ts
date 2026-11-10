@@ -129,7 +129,7 @@ describe("pnpm dev:demo create and undo (test DB)", () => {
       where: { email: { endsWith: `@${DEMO.emailDomain}` } },
     });
     expect(users).toHaveLength(13);
-    expect(users.filter((u) => u.isPanel)).toMatchObject([{ trustScore: 1.3 }]);
+    expect(users.filter((u) => u.isPanel)).toMatchObject([{ trustScore: 1 }]);
     const demoAdmin = users.find((u) => u.role === "ADMIN")!;
     expect(
       await db.overtureCandidate.count({

@@ -24,7 +24,7 @@ describe("/rate page data (test DB)", () => {
       signedIn: true,
       isPanel: false,
     });
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     expect((await getRatePageData(actorOf(panel), step)).isPanel).toBe(true);
   });
 

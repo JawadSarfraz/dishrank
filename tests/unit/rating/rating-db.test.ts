@@ -80,7 +80,7 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
 
   it("an owner cannot rate their own restaurant, panel members included", async () => {
     const owner = await oldUser("Owner", { role: "OWNER" });
-    const panelOwner = await oldUser("Panel owner", { isPanel: true, trustScore: 1.3 });
+    const panelOwner = await oldUser("Panel owner", { isPanel: true, trustScore: 1 });
     const mine = await makeRestaurant("Fixture Mine", { claimedByUserId: owner.id });
     const panels = await makeRestaurant("Fixture Panel Owned", { claimedByUserId: panelOwner.id });
     await expect(rate(owner, mine.id, "chicken-karahi")).rejects.toMatchObject({
@@ -201,7 +201,7 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
   it("burst rule: panel members and older accounts never count toward it", async () => {
     const r = await makeRestaurant("Fixture Panel Burst");
     for (let i = 0; i < 3; i++) {
-      await rate(await newUser(`Panel ${i}`, { isPanel: true, trustScore: 1.3 }), r.id, "pizza");
+      await rate(await newUser(`Panel ${i}`, { isPanel: true, trustScore: 1 }), r.id, "pizza");
     }
     for (let i = 0; i < 3; i++) await rate(await oldUser(`Old ${i}`), r.id, "pizza");
     const fourNew = [];
@@ -213,7 +213,7 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
 
   it("rate limits: 15 a day and 3 per restaurant; panel members get 30 and 10", async () => {
     const user = await oldUser();
-    const panel = await oldUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await oldUser("Panel", { isPanel: true, trustScore: 1 });
     const r = await makeRestaurant("Fixture Limits");
     const other = await makeRestaurant("Fixture Limits Two");
 
@@ -427,14 +427,14 @@ describe("RatingService (docs/04 abuse controls, test DB)", () => {
     it("a panel member and a trust set by hand are left as they are", async () => {
       const a = await makeRestaurant("Trust A");
       const b = await makeRestaurant("Trust B");
-      const panel = await oldUser("Panel", { isPanel: true, trustScore: 1.3 });
+      const panel = await oldUser("Panel", { isPanel: true, trustScore: 1 });
       const byHand = await oldUser("By hand", { trustOverride: 0.4, trustScore: 0.4 });
       for (const user of [panel, byHand]) {
         await rate(user, a.id, "pizza");
         await rate(user, a.id, "chai");
         expect((await rate(user, b.id, "pizza")).otherPages).toEqual([]);
       }
-      expect(await trustOf(panel.id)).toBe(1.3);
+      expect(await trustOf(panel.id)).toBe(1);
       expect(await trustOf(byHand.id)).toBe(0.4);
     });
   });

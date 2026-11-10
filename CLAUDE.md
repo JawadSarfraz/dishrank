@@ -109,7 +109,7 @@ Do not invent product behavior. Pick the simplest safe default, mark it with
 - **RestaurantDish**: the fact that restaurant R serves dish D, with `status` (`CANDIDATE → USER_CONFIRMED → MENU_VERIFIED → OWNER_VERIFIED`, or `STALE` / `REMOVED`) and aggregate stats.
 - **Rating**: one user's 1–10 score for one RestaurantDish. One active rating per user per RestaurantDish; re-rating replaces it (history kept).
 - **Ranking**: the ordered list of eligible RestaurantDish rows for a (city, dish) by `score`.
-- **Panel**: trusted early raters (admin-only `isPanel` flag, trust fixed at 1.3), used to seed the first ratings.
+- **Panel**: invited early raters (admin-only `isPanel` flag; trust 1.0 since 2026-11-11, the same as an established rater, 1.3 before), used to seed the first ratings.
 - **Review queue**: `ReviewItem` rows an admin resolves (unmatched menu items, dish proposals, flags, suspicious bursts, owner claims).
 - **Candidate**: an Overture place staged in `OvertureCandidate` (`NEW → CREATED / LINKED / SKIPPED`) for an admin to review on `/admin/import` or for the Auto-list to create; it is never public itself.
 - **Auto-list**: `/admin/import/auto-list`: creates restaurants from the clear NEW candidates by fixed rules; "Auto-listed, not checked" on `/admin/restaurants` is the spot-check.

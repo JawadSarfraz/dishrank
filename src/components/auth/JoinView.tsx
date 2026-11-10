@@ -7,7 +7,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BRAND } from "@/lib/brand";
 import { RATE_LIMITS } from "@/server/rate-limit";
 import type { getJoinPageState } from "@/server/services/panel-invite.service";
-import { TRUST } from "@/server/services/ranking.constants";
 
 export function JoinView({
   view,
@@ -44,8 +43,8 @@ export function JoinView({
       </div>
       <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">
         <li>
-          Your ratings count {TRUST.panel} times, and you can rate up to{" "}
-          {RATE_LIMITS.ratingPanel.limit} dishes a day.
+          Your ratings count like any regular rater&apos;s and are never held as a new
+          account&apos;s; you can rate up to {RATE_LIMITS.ratingPanel.limit} dishes a day.
         </li>
         <li>Only rate places where you&apos;ve really had the dish, and say what you think.</li>
         <li>You can&apos;t rate a restaurant you own or work for.</li>

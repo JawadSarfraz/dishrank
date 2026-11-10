@@ -37,7 +37,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps<"/admin
     <main className="flex flex-col gap-5">
       <AdminHeader
         title="Users"
-        help="Panel members are trusted early raters: trust 1.3, 30 ratings a day and 10 per restaurant, never held by the new-account burst rule, still blocked from their own restaurants (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table."
+        help="Panel members are invited early raters: trust 1.0 like any established rater (the top weight is earned later, not given by a link), 30 ratings a day and 10 per restaurant, never held by the new-account burst rule, still blocked from their own restaurants (docs/04). Turning the panel off returns trust to the docs/04 table. A trust set by hand (0.3 to 1.5) wins over both and the nightly job keeps it; Clear returns to the table."
       />
       <PanelInvites
         invites={invites}

@@ -142,7 +142,7 @@ function shuffled<T>(items: readonly T[], random: () => number): T[] {
 /**
  * Ratings for the demo targets, oldest first (the rate limiter and the burst rule count earlier
  * writes, so they must arrive in time order). With bootstrap thresholds (4 raters, weight 2.5) a
- * "ranked" row gets the panel member and 3-5 others (1.3 + 3 × 0.6) or 5-6 others (5 × 0.6); an
+ * "ranked" row gets the panel member and 3-5 others (1.0 + 3 × 0.6) or 5-6 others (5 × 0.6); an
  * "almost" row gets 2-3 raters and shows "needs N more".
  */
 export function planRatings(

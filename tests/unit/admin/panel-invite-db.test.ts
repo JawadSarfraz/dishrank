@@ -70,7 +70,7 @@ describe("panel invite links (test DB)", () => {
     expect(PANEL_INVITE).toMatchObject({ maxUses: 30, days: 14 });
   });
 
-  it("joining makes a panel member with trust 1.3, recomputes their rows, and is listed", async () => {
+  it("joining makes a panel member with trust 1.0, recomputes their rows, and is listed", async () => {
     const { invite: row, token } = await invite();
     const diner = await makeUser("Diner");
     const restaurant = await makeRestaurant("Fixture Grill");
@@ -80,17 +80,17 @@ describe("panel invite links (test DB)", () => {
     const result = await redeemPanelInvite(diner.id, token, NOW);
     expect(result.outcome).toBe("joined");
     expect(result.dishPages).toMatchObject([{ dishSlug: "pizza" }]);
-    expect(await userOf(diner.id)).toMatchObject({ isPanel: true, trustScore: 1.3 });
+    expect(await userOf(diner.id)).toMatchObject({ isPanel: true, trustScore: 1 });
     expect(
       (await db.restaurantDish.findUniqueOrThrow({ where: { id: dish.id } })).weightSum,
-    ).toBeCloseTo(1.3, 2);
+    ).toBeCloseTo(1, 2);
 
     const [listed] = await listPanelInvites(admin, NOW);
     expect(listed).toMatchObject({ id: row.id, state: "usable", usesCount: 1 });
     expect(listed!.uses).toMatchObject([{ user: { id: diner.id, name: "Diner" } }]);
   });
 
-  it("an admin's trust override still wins over the panel's 1.3", async () => {
+  it("an admin's trust override still wins over the panel's 1.0", async () => {
     const { token } = await invite();
     const diner = await makeUser("Diner", { trustOverride: 0.4, trustScore: 0.4 });
     await redeemPanelInvite(diner.id, token, NOW);
@@ -102,7 +102,7 @@ describe("panel invite links (test DB)", () => {
     const diner = await makeUser("Diner");
     expect((await redeemPanelInvite(diner.id, token, NOW)).outcome).toBe("joined");
     expect((await redeemPanelInvite(diner.id, token, NOW)).outcome).toBe("already");
-    const member = await makeUser("Member", { isPanel: true, trustScore: 1.3 });
+    const member = await makeUser("Member", { isPanel: true, trustScore: 1 });
     expect((await redeemPanelInvite(member.id, token, NOW)).outcome).toBe("already");
     expect(await db.panelInvite.findUniqueOrThrow({ where: { id: row.id } })).toMatchObject({
       usesCount: 1,
@@ -131,7 +131,7 @@ describe("panel invite links (test DB)", () => {
     const late = await makeUser("Late");
     expect((await redeemPanelInvite(late.id, token, NOW)).outcome).toBe("revoked");
     expect(await userOf(late.id)).toMatchObject({ isPanel: false, trustScore: 0.6 });
-    expect(await userOf(early.id)).toMatchObject({ isPanel: true, trustScore: 1.3 });
+    expect(await userOf(early.id)).toMatchObject({ isPanel: true, trustScore: 1 });
     // Revoking again keeps the first date.
     await revokePanelInvite(admin, row.id, later(1));
     expect((await db.panelInvite.findUniqueOrThrow({ where: { id: row.id } })).revokedAt).toEqual(
@@ -299,7 +299,7 @@ describe("panel invite links (test DB)", () => {
 
       const { ctx, setCookie } = ctxWith(token);
       await hooks.session!.create!.after!(session, ctx);
-      expect(await userOf(diner.id)).toMatchObject({ isPanel: true, trustScore: 1.3 });
+      expect(await userOf(diner.id)).toMatchObject({ isPanel: true, trustScore: 1 });
       expect(setCookie).toHaveBeenCalledWith(
         PANEL_INVITE.cookie,
         "",

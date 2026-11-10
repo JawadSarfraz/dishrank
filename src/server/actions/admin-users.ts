@@ -18,7 +18,7 @@ import {
 import { id } from "@/server/validation/common";
 import { runAction } from "./result";
 
-/** Panel on (trust 1.3) or off (trust from the docs/04 table); the user's rows are recomputed. */
+/** Panel on (trust 1.0, the table's panel row) or off (the table's other rows); the user's rows are recomputed. */
 export async function setPanelAction(userId: unknown, input: unknown) {
   return runAction("admin.user.panel", async () => {
     const actor = await requireRole("ADMIN");

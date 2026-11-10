@@ -66,8 +66,8 @@ async function startJob(name: string, now: Date) {
 }
 
 /**
- * Step 1: trust from the docs/04 table for every user who is not on the panel or banned; an admin's
- * override wins (trustFor). One scan finds whose trust would change; each of those is re-checked
+ * Step 1: trust from the docs/04 table for every user who is not banned (panel members get the
+ * panel row, 2026-11-11); an admin's override wins (trustFor). One scan finds whose trust would change; each of those is re-checked
  * and written under the user's row lock, so a panel toggle, an override or an admin decision made
  * meanwhile is never overwritten.
  */
@@ -77,7 +77,7 @@ async function recomputeTrust() {
   for (const u of users) {
     const expected = trustFor({
       trustOverride: u.trustOverride,
-      isPanel: false,
+      isPanel: u.isPanel,
       activeRatings: u.activeRatings,
       activePhotoRatings: u.activePhotoRatings,
       activeRestaurants: u.activeRestaurants,

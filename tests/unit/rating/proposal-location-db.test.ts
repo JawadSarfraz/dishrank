@@ -81,7 +81,7 @@ describe("panel location observations (docs/07 §7, test DB)", () => {
 
   it("only panel members, only 50 m or better", async () => {
     const diner = await makeUser("Diner");
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     const r = await makeRestaurant("Fixture Located", { ...F7, locationSource: "OVERTURE" });
     await expect(observe(diner, r.id, F7)).rejects.toMatchObject({
       code: "PANEL_ONLY",
@@ -97,7 +97,7 @@ describe("panel location observations (docs/07 §7, test DB)", () => {
   });
 
   it("an observation near the known location is kept without a suggestion", async () => {
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     const r = await makeRestaurant("Fixture Near", { ...F7, locationSource: "OVERTURE" });
     expect(await observe(panel, r.id, metresNorth(80))).toMatchObject({
       suggestion: "none",
@@ -108,7 +108,7 @@ describe("panel location observations (docs/07 §7, test DB)", () => {
   });
 
   it("an unknown or far-off location gets one suggestion that keeps the most accurate observation", async () => {
-    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1.3 });
+    const panel = await makeUser("Panel", { isPanel: true, trustScore: 1 });
     const unknown = await makeRestaurant("Fixture Unknown");
     expect(await observe(panel, unknown.id, F7, 30)).toMatchObject({
       suggestion: "created",
