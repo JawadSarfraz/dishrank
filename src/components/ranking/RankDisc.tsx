@@ -46,6 +46,7 @@ export function RankDisc({
         "inline-flex shrink-0 items-center justify-center rounded-full font-display font-extrabold tabular-nums",
         SIZES[size],
         first ? "bg-gold text-ink" : "bg-ink text-white",
+        first && size === "md" && "text-xl",
         first && size === "podium" && "size-13 text-[28px]",
         className,
       )}

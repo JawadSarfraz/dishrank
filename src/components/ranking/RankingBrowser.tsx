@@ -4,13 +4,17 @@
 // filters and sorts them in the browser. Filters live in the URL (?area=&min=&votes=&sort=) so a
 // link keeps them; on phones they open in a bottom sheet. "Near me" asks for the location only when
 // tapped, never sends it anywhere, and puts restaurants without a location last. Ranks are city-wide
-// and never renumbered.
+// and never renumbered. Each row (spec §4, Ranking row) is one link to the restaurant page: the rank
+// (#1 in a gold circle, others a plain numeral), name and area, the rater count large and the score
+// small; rating a ranked place goes through "Rate the places you know" above the list.
 import { MapPinIcon, SlidersHorizontalIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useSyncExternalStore } from "react";
+import { CONTROL_BUTTON, CONTROL_SELECT, ListHeader } from "@/components/dish/PlaceRow";
 import { RankDisc } from "@/components/ranking/RankDisc";
-import { ScoreBadge } from "@/components/ranking/ScoreBadge";
+import { ScorePill } from "@/components/ranking/ScoreBadge";
 import { Button } from "@/components/ui/button";
+import { RowList } from "@/components/ui/kit";
 import {
   Sheet,
   SheetClose,
@@ -77,18 +81,7 @@ function parse(search: string): Filters {
   };
 }
 
-export function RankingBrowser({
-  rows,
-  citySlug,
-  dishSlug,
-  early,
-}: {
-  rows: BrowserRow[];
-  citySlug: string;
-  dishSlug: string;
-  /** Early rankings: with few votes the scores sit close together, so the votes lead. */
-  early: boolean;
-}) {
+export function RankingBrowser({ rows, citySlug }: { rows: BrowserRow[]; citySlug: string }) {
   const filters = parse(useSyncExternalStore(subscribe, readSearch, serverSearch));
   const { here, locating, locate } = useNearMe();
 
@@ -134,11 +127,18 @@ export function RankingBrowser({
   const reset = () => update({ area: "", min: 0, votes: 0 });
 
   return (
-    <div className="flex flex-col gap-3">
-      <div role="group" aria-label="Filter and sort" className="flex flex-wrap items-center gap-2">
+    <section aria-labelledby="full-ranking" className="flex flex-col gap-3">
+      {/* An ISR page cannot say "3 days ago", and the ranking has no stored update time to show. */}
+      <ListHeader
+        id="full-ranking"
+        title="Full ranking"
+        count={`${rows.length} ranked`}
+        note="Scores out of 10"
+      />
+      <div role="group" aria-label="Filter and sort" className="flex items-center gap-2">
         <Sheet>
-          <SheetTrigger render={<Button variant="outline" size="sm" className="h-11 text-base" />}>
-            <SlidersHorizontalIcon aria-hidden="true" />
+          <SheetTrigger render={<Button variant="outline" className={CONTROL_BUTTON} />}>
+            <SlidersHorizontalIcon aria-hidden="true" className="size-[18px]" />
             Filters
             {activeFilters > 0 && (
               <span className="inline-flex size-5 items-center justify-center rounded-full bg-brand text-xs font-bold text-white">
@@ -147,13 +147,13 @@ export function RankingBrowser({
               </span>
             )}
           </SheetTrigger>
-          <SheetContent side="bottom" className="mx-auto w-full sm:max-w-md sm:rounded-t-2xl">
+          <SheetContent side="bottom" className="mx-auto w-full sm:max-w-md sm:rounded-t-sheet">
             <SheetHeader>
               <SheetTitle>Filters</SheetTitle>
               <SheetDescription>Rank numbers stay as they are for the whole city.</SheetDescription>
             </SheetHeader>
             <div className="flex flex-col gap-4 px-4">
-              <label className="flex flex-col gap-1 text-sm font-medium">
+              <label className="flex flex-col gap-1 text-sm font-semibold">
                 Area
                 <select
                   className="field field-select"
@@ -168,7 +168,7 @@ export function RankingBrowser({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
+              <label className="flex flex-col gap-1 text-sm font-semibold">
                 Minimum score
                 <select
                   className="field field-select"
@@ -182,7 +182,7 @@ export function RankingBrowser({
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-1 text-sm font-medium">
+              <label className="flex flex-col gap-1 text-sm font-semibold">
                 Minimum votes
                 <select
                   className="field field-select"
@@ -212,7 +212,7 @@ export function RankingBrowser({
         </label>
         <select
           id="ranking-sort"
-          className="field field-select h-11 w-auto min-w-0 font-medium"
+          className={`${CONTROL_SELECT} w-auto min-w-0 flex-1`}
           value={filters.sort}
           onChange={(e) => update({ sort: e.target.value as Sort })}
         >
@@ -225,14 +225,13 @@ export function RankingBrowser({
         <Button
           type="button"
           variant="outline"
-          size="sm"
-          className="h-11 text-base"
+          className={CONTROL_BUTTON}
           onClick={() => locate(() => update({ sort: "distance" }))}
           disabled={locating === "busy"}
           aria-pressed={here !== null}
           aria-label="Near me"
         >
-          <MapPinIcon aria-hidden="true" />
+          <MapPinIcon aria-hidden="true" className="size-[18px]" />
           <span className="hidden min-[400px]:inline">
             {locating === "busy" ? "Finding you…" : here ? "Near me (on)" : "Near me"}
           </span>
@@ -248,67 +247,66 @@ export function RankingBrowser({
       )}
 
       {shown.length === 0 ? (
-        <div className="flex flex-col items-start gap-2 rounded-xl border border-dashed bg-card p-4">
-          <p className="font-medium">No restaurant matches these filters.</p>
+        <div className="flex flex-col items-start gap-3 rounded-card border border-dashed border-dash bg-card p-4">
+          <p className="font-semibold">No restaurant matches these filters.</p>
           {activeFilters > 0 && (
-            <Button type="button" variant="secondary" onClick={reset}>
+            <Button type="button" variant="outline" onClick={reset}>
               Show all {rows.length}
             </Button>
           )}
         </div>
       ) : (
-        <ol
-          aria-label="Ranked restaurants"
-          className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card shadow-card"
-        >
+        <RowList ordered aria-label="Ranked restaurants">
           {shown.map((r) => (
-            <li
-              key={r.slug}
-              className={`flex items-start gap-3 px-3 py-3 sm:px-4 ${
-                r.rank === 1 ? "bg-linear-to-r from-gold-soft via-gold-soft/40 to-card" : ""
-              }`}
-            >
-              <RankDisc rank={r.rank} className="mt-1" />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <Link
-                  href={`/${citySlug}/r/${r.slug}`}
-                  className="inline-flex min-h-11 items-center font-display text-lg leading-tight font-bold break-anywhere underline-offset-4 hover:underline"
-                >
-                  {r.name}
-                </Link>
-                <span className="text-sm text-muted-foreground">
-                  {[r.area?.name, r.km !== null ? formatKm(r.km) : null]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-                {(r.price !== null || r.tags.length > 0) && (
-                  <span className="flex flex-wrap items-center gap-1.5 pt-1 text-sm">
-                    {r.price !== null && <span>{formatFromPrice(r.price)}</span>}
-                    {r.tags.map((t) => (
-                      <span key={t} className="rounded-full bg-muted px-2 py-0.5 text-xs">
-                        {t}
-                      </span>
-                    ))}
+            <li key={r.slug}>
+              <Link
+                href={`/${citySlug}/r/${r.slug}`}
+                className="group grid min-h-17 grid-cols-[36px_minmax(0,1fr)_44px_minmax(40px,auto)] items-center gap-2 py-2.5 pr-3 pl-2.5 hover:bg-sand/60"
+              >
+                <RankDisc rank={r.rank} plain className="justify-self-center" />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-base leading-[22px] font-bold break-anywhere underline-offset-2 group-hover:underline">
+                    {r.name}
                   </span>
-                )}
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                {early ? (
-                  <ScoreBadge score={r.score} votes={r.votes} size="sm" layout="votes-first" />
-                ) : (
-                  <ScoreBadge score={r.score} votes={r.votes} size="lg" layout="stack" />
-                )}
-                <Link
-                  href={`/rate?city=${citySlug}&r=${r.slug}&d=${dishSlug}`}
-                  className="inline-flex min-h-11 items-center text-sm font-medium text-brand underline-offset-4 hover:underline"
-                >
-                  Rate this
-                </Link>
-              </div>
+                  <span className="text-[13px] leading-[18px] text-muted-foreground">
+                    {[
+                      r.area?.name,
+                      r.km !== null ? formatKm(r.km) : null,
+                      r.price !== null ? formatFromPrice(r.price) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  {r.tags.length > 0 && (
+                    <span className="flex flex-wrap gap-1.5 pt-0.5">
+                      {r.tags.map((t) => (
+                        <span
+                          key={t}
+                          className="rounded-full bg-sand px-2 py-0.5 text-xs font-semibold"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </span>
+                <span className="flex flex-col items-center">
+                  <span className="font-display text-[22px] leading-6 font-extrabold tabular-nums">
+                    {r.votes}
+                  </span>
+                  <span className="text-[11px] leading-[14px] font-semibold text-muted-foreground">
+                    {r.votes === 1 ? "rater" : "raters"}
+                  </span>
+                </span>
+                <span className="justify-self-end">
+                  <span className="sr-only">Score </span>
+                  <ScorePill score={r.score} size="sm" />
+                </span>
+              </Link>
             </li>
           ))}
-        </ol>
+        </RowList>
       )}
-    </div>
+    </section>
   );
 }

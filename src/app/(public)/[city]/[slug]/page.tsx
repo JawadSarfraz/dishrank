@@ -1,16 +1,21 @@
 // The ranking page /[city]/best-[dish] (docs/01, docs/04): Next.js has no partial segments, so this
 // [slug] segment answers only slugs with the "best-" prefix. ISR, one cached page per city × dish:
 // it never reads searchParams; the filter bar works on the rows in the browser.
+//
+// Layout (spec §5, "Dish page"): the dish header (no-photo band, or photo) with Back and Share, then
+// the white sheet: status badge, the voting-open invitation with the "first four" seats or the
+// podium, "Rate the places you know" (QuickRate), the lists, the small print. Everything outside the
+// lists carries data-rate-hide, so it steps aside in rate mode (QuickRate swaps the lists itself).
 import type { Metadata } from "next";
-import { ChevronRightIcon } from "lucide-react";
-import Link from "next/link";
+import { ClockIcon } from "lucide-react";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
+import { DishHeader, DishTitle } from "@/components/dish/DishHeader";
+import { hasDishPhoto } from "@/components/dish/DishMedia";
+import { Podium } from "@/components/dish/Podium";
 import { JsonLd } from "@/components/layout/JsonLd";
-import { Main } from "@/components/layout/Page";
 import { Contenders } from "@/components/ranking/Contenders";
-import { suggestPlacePath } from "@/lib/paths";
 import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
@@ -18,13 +23,15 @@ import { ViewBeacon } from "@/components/ranking/ViewBeacon";
 import { WaitingList } from "@/components/ranking/WaitingList";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { InlineLink, Seats, SmallPrint } from "@/components/ui/kit";
 import { BRAND } from "@/lib/brand";
 import { formatScore, formatVotes } from "@/lib/format";
 import { dishPageIndexable } from "@/lib/indexing";
+import { suggestPlacePath } from "@/lib/paths";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { rankingJsonLd } from "@/server/seo";
 import { getRankingPage } from "@/server/services/ranking.service";
-import { shareImagePath } from "@/server/services/share-image";
+import { shareImagePath, statusImagePath } from "@/server/services/share-image";
 import { yearInPakistan } from "@/server/site";
 
 export const revalidate = 3600;
@@ -118,6 +125,53 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
   };
 }
 
+/** The status badge (spec §4): "New list · 4 votes rank a place", or "Early ranking · 7 of 14 places
+ * ranked" (M is every place on the list, at least the N ranked ones, so never zero). */
+function StatusBadge({ ranking }: { ranking: Ranking }) {
+  const { eligible, thresholds, mode, listedTotal } = ranking;
+  if (eligible.length === 0) {
+    return (
+      <Badge dot>
+        <span>
+          <span>New list</span> · {thresholds.minRaters} votes rank a place
+        </span>
+      </Badge>
+    );
+  }
+  const places = Math.max(listedTotal, eligible.length);
+  const ranked = `${eligible.length} of ${places} place${places === 1 ? "" : "s"} ranked`;
+  return <Badge dot>{mode === "bootstrap" ? `Early ranking · ${ranked}` : ranked}</Badge>;
+}
+
+/** Voting open (spec §4, "First four" seats): who has rated the place closest to a rank, as seats. */
+function SeatsBlock({ ranking, raters }: { ranking: Ranking; raters: number }) {
+  const { minRaters } = ranking.thresholds;
+  const filled = Math.min(raters, minRaters);
+  return (
+    <div className="flex flex-col gap-3 rounded-card bg-blush p-4">
+      {/* Seats only while they fit at 360 px; past five the sentence says it alone. */}
+      {minRaters <= 5 && (
+        <Seats total={minRaters} filled={filled} you={filled >= minRaters ? "none" : "invite"} />
+      )}
+      <p className="text-sm leading-5">
+        {raters === 0 ? (
+          <>
+            <strong className="font-bold">Pehla vote aap ka?</strong> A place joins the ranking
+            after {minRaters} diners rate it.
+          </>
+        ) : (
+          <>
+            {raters < minRaters
+              ? `${raters} of ${minRaters} raters so far for`
+              : "A few more ratings for"}{" "}
+            the first ranked {ranking.dish.name} in {ranking.city.name}.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 export default async function RankingPage({ params }: PageProps<"/[city]/[slug]">) {
   const { city, slug } = await params;
   const ranking = await load(city, slug);
@@ -130,142 +184,193 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
   const shareText = `${shareLead}\n\n${BRAND.shareCall}`;
   const rateHref = `/rate?city=${ranking.city.slug}`;
   const empty = eligible.length === 0 && insufficient.length === 0 && contenders.length === 0;
+  const isRanked = eligible.length > 0;
+  const photo = hasDishPhoto(ranking.dish.slug);
+  const shareLabel = isRanked ? "Share this ranking" : "Share this list";
+  const share = { title: titleOf(ranking), text: shareText, path: pathOf(ranking) };
+  const restaurantPath = (restaurantSlug: string) => `/${ranking.city.slug}/r/${restaurantSlug}`;
+
+  const badge = (
+    <div className="flex flex-col items-start gap-2">
+      <StatusBadge ranking={ranking} />
+      {ranking.featured?.closingLine && (
+        <p className="flex items-center gap-1.5 text-[13px] leading-[18px] font-semibold text-brand-dark">
+          <ClockIcon aria-hidden="true" className="size-4 shrink-0" />
+          {ranking.featured.closingLine}
+        </p>
+      )}
+    </div>
+  );
 
   return (
-    <Main className="min-h-dvh gap-5">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
-        <Link
-          href={`/${ranking.city.slug}`}
-          className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline"
-        >
-          {ranking.city.name}
-        </Link>
-        <ChevronRightIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-        <span className="text-muted-foreground">{ranking.dish.name}</span>
-      </nav>
-      <header className="flex flex-col gap-3">
-        {mode === "bootstrap" && (
-          <Badge className="w-fit">
-            <span>New list</span>
-            <span aria-hidden="true"> · {thresholds.minRaters} votes rank a place</span>
-          </Badge>
-        )}
-        <div className="flex items-start gap-3">
-          <span className="mt-1 flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-            <DishIcon slug={ranking.dish.slug} size={26} />
-          </span>
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-3xl font-extrabold break-anywhere sm:text-4xl">
-              {titleOf(ranking)}
-            </h1>
-            <p className="text-base text-muted-foreground">{summaryOf(ranking)}</p>
-            {ranking.featured?.closingLine && (
-              <p className="text-sm font-medium text-brand">{ranking.featured.closingLine}</p>
+    <main className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col sm:px-6 sm:pt-6">
+      <DishHeader
+        city={ranking.city}
+        dish={ranking.dish}
+        title={titleOf(ranking)}
+        share={{ ...share, label: shareLabel }}
+        photo={photo}
+      />
+
+      {/* The sheet overlaps the header by 28 px; in rate mode the header steps aside, so it does not. */}
+      <div className="relative -mt-7 flex flex-col rounded-t-sheet bg-background px-4 pt-5 pb-7 sm:px-6 [body[data-rate-mode]_&]:mt-0">
+        <div data-rate-hide="" className="flex flex-col">
+          {photo ? (
+            <DishTitle
+              city={ranking.city}
+              dish={ranking.dish}
+              title={titleOf(ranking)}
+              badge={badge}
+            />
+          ) : (
+            badge
+          )}
+
+          {isRanked ? (
+            <>
+              <p className="mt-2.5 text-[15px] leading-5 text-muted-foreground">
+                Ranked by people who ate there.
+              </p>
+              <div className="mt-5">
+                <Podium
+                  places={eligible.slice(0, 3).map((row) => ({
+                    rank: row.rank,
+                    href: restaurantPath(row.restaurant.slug),
+                    name: row.restaurant.name,
+                    area: row.restaurant.area?.name ?? null,
+                    votes: row.votes,
+                    score: row.score,
+                  }))}
+                />
+              </div>
+            </>
+          ) : (
+            ranking.firstRankRaters !== null && (
+              <>
+                <p className="mt-2.5 text-base leading-[23px]">
+                  {ranking.firstRankRaters === 0
+                    ? `Be one of the first ${inWords(thresholds.minRaters)} to rate. You decide the first ranking.`
+                    : summaryOf(ranking)}
+                </p>
+                <div className="mt-4">
+                  <SeatsBlock ranking={ranking} raters={ranking.firstRankRaters} />
+                </div>
+              </>
+            )
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-7">
+          <QuickRate
+            citySlug={ranking.city.slug}
+            dishSlug={ranking.dish.slug}
+            seed={ranking.shuffleSeed}
+          >
+            {isRanked && (
+              <RankingBrowser
+                citySlug={ranking.city.slug}
+                rows={eligible.map((row) => ({
+                  rank: row.rank,
+                  slug: row.restaurant.slug,
+                  name: row.restaurant.name,
+                  area: row.restaurant.area,
+                  score: row.score,
+                  votes: row.votes,
+                  price: row.price,
+                  tags: row.variantTags,
+                  lat: row.restaurant.lat,
+                  lng: row.restaurant.lng,
+                }))}
+              />
             )}
+
+            {empty && (
+              <EmptyState
+                icon={<DishIcon slug={ranking.dish.slug} size={26} />}
+                title="We're picking the contenders"
+                text="Know a place that belongs here? Tell us. Or rate a place you've eaten at: it joins the list with your vote."
+                action={{ href: suggestPlacePath(ranking.city.slug), label: "Tell us" }}
+                secondary={{ href: rateHref, label: `Rate ${ranking.dish.name} somewhere` }}
+              />
+            )}
+
+            {/* Nothing ranked: the places collecting votes, then the contenders, each its own list. */}
+            {!isRanked && insufficient.length > 0 && (
+              <WaitingList
+                citySlug={ranking.city.slug}
+                dishSlug={ranking.dish.slug}
+                dishName={ranking.dish.name}
+                minRaters={thresholds.minRaters}
+                leadIn
+                rows={insufficient.map((row) => ({
+                  id: row.restaurantDishId,
+                  slug: row.restaurant.slug,
+                  name: row.restaurant.name,
+                  area: row.restaurant.area?.name ?? null,
+                  votes: row.votes,
+                  ranksNext: row.ratingsNeeded === 0,
+                }))}
+              />
+            )}
+
+            {!isRanked && contenders.length > 0 && (
+              <Contenders
+                citySlug={ranking.city.slug}
+                dishSlug={ranking.dish.slug}
+                minRaters={thresholds.minRaters}
+                total={ranking.contendersTotal}
+                rows={contenders}
+              />
+            )}
+
+            {/* Ranked: one "Still need votes" list, the places with raters first. */}
+            {isRanked && (insufficient.length > 0 || contenders.length > 0) && (
+              <Contenders
+                variant="ranked"
+                citySlug={ranking.city.slug}
+                dishSlug={ranking.dish.slug}
+                minRaters={thresholds.minRaters}
+                total={ranking.contendersTotal}
+                rows={contenders}
+                waiting={insufficient.map((row) => ({
+                  id: row.restaurantDishId,
+                  slug: row.restaurant.slug,
+                  name: row.restaurant.name,
+                  area: row.restaurant.area,
+                  lat: row.restaurant.lat,
+                  lng: row.restaurant.lng,
+                  votes: row.votes,
+                  ranksNext: row.ratingsNeeded === 0,
+                }))}
+              />
+            )}
+          </QuickRate>
+
+          <div data-rate-hide="" className="flex flex-col gap-5">
+            <SmallPrint>
+              A place gets a rank for this dish once {thresholds.minRaters} different people have
+              rated it there.{isRanked && " Recent votes count more."}
+              {mode === "bootstrap" &&
+                ` While ${ranking.city.name} is new, fewer votes are needed.`}{" "}
+              Scores are diners&apos; opinions, not facts about a restaurant.{" "}
+              <InlineLink href="/how-rankings-work">How rankings work</InlineLink>
+            </SmallPrint>
+
+            <ShareButton
+              city={ranking.city.slug}
+              dish={ranking.dish.slug}
+              title={share.title}
+              text={share.text}
+              path={share.path}
+              label={shareLabel}
+              statusImage={statusImagePath(ranking)}
+            />
           </div>
         </div>
-      </header>
-
-      {ranking.firstRankRaters !== null &&
-        (ranking.firstRankRaters === 0 ? (
-          <p className="font-medium">
-            Be one of the first {inWords(thresholds.minRaters)} to rate. You decide the first
-            ranking.
-          </p>
-        ) : (
-          <p className="font-medium">
-            {ranking.firstRankRaters < thresholds.minRaters
-              ? `${ranking.firstRankRaters} of ${thresholds.minRaters} raters so far for`
-              : "A few more ratings for"}{" "}
-            the first ranked {ranking.dish.name} in {ranking.city.name}
-          </p>
-        ))}
-
-      <QuickRate
-        citySlug={ranking.city.slug}
-        dishSlug={ranking.dish.slug}
-        seed={ranking.shuffleSeed}
-      >
-        {eligible.length > 0 && (
-          <RankingBrowser
-            citySlug={ranking.city.slug}
-            dishSlug={ranking.dish.slug}
-            early={mode === "bootstrap"}
-            rows={eligible.map((row) => ({
-              rank: row.rank,
-              slug: row.restaurant.slug,
-              name: row.restaurant.name,
-              area: row.restaurant.area,
-              score: row.score,
-              votes: row.votes,
-              price: row.price,
-              tags: row.variantTags,
-              lat: row.restaurant.lat,
-              lng: row.restaurant.lng,
-            }))}
-          />
-        )}
-
-        {empty && (
-          <EmptyState
-            icon={<DishIcon slug={ranking.dish.slug} size={26} />}
-            title="We're picking the contenders"
-            text="Know a place that belongs here? Tell us. Or rate a place you've eaten at: it joins the list with your vote."
-            action={{ href: suggestPlacePath(ranking.city.slug), label: "Tell us" }}
-            secondary={{ href: rateHref, label: `Rate ${ranking.dish.name} somewhere` }}
-          />
-        )}
-
-        {insufficient.length > 0 && (
-          <WaitingList
-            citySlug={ranking.city.slug}
-            dishSlug={ranking.dish.slug}
-            dishName={ranking.dish.name}
-            minRaters={thresholds.minRaters}
-            leadIn={eligible.length === 0}
-            rows={insufficient.map((row) => ({
-              id: row.restaurantDishId,
-              slug: row.restaurant.slug,
-              name: row.restaurant.name,
-              area: row.restaurant.area?.name ?? null,
-              votes: row.votes,
-              ranksNext: row.ratingsNeeded === 0,
-            }))}
-          />
-        )}
-
-        {contenders.length > 0 && (
-          <Contenders
-            citySlug={ranking.city.slug}
-            dishSlug={ranking.dish.slug}
-            total={ranking.contendersTotal}
-            rows={contenders}
-          />
-        )}
-      </QuickRate>
-
-      <p className="text-sm text-muted-foreground">
-        A restaurant gets a rank for this dish once at least {thresholds.minRaters} different people
-        have rated it there; recent votes and trusted raters count more.
-        {mode === "bootstrap" && ` While ${ranking.city.name} is new, fewer votes are needed.`}{" "}
-        <Link
-          href="/how-rankings-work"
-          className="font-medium text-brand underline-offset-4 hover:underline"
-        >
-          How rankings work
-        </Link>
-      </p>
-
-      <ShareButton
-        city={ranking.city.slug}
-        dish={ranking.dish.slug}
-        title={titleOf(ranking)}
-        text={shareText}
-        path={pathOf(ranking)}
-      />
+      </div>
       <ViewBeacon city={ranking.city.slug} dish={ranking.dish.slug} />
 
-      {eligible.length > 0 && (
+      {isRanked && (
         <JsonLd
           data={rankingJsonLd({
             title: titleOf(ranking),
@@ -283,6 +388,6 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
           })}
         />
       )}
-    </Main>
+    </main>
   );
 }
