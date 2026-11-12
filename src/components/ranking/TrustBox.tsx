@@ -14,7 +14,7 @@ export function TrustBox({ minRaters }: { minRaters: number }) {
     },
     {
       icon: UsersIcon,
-      text: `A place ranks once at least ${minRaters} different people have rated the dish there.`,
+      text: `A place joins the ranking once at least ${minRaters} diners have rated it.`,
     },
     { icon: BanIcon, text: "Rankings are never for sale." },
   ];

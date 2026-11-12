@@ -56,7 +56,9 @@ const pathOf = (r: Ranking) => `/${r.city.slug}/best-${r.dish.slug}`;
 const titleOf = (r: Ranking) => `Best ${r.dish.name} in ${r.city.name}`;
 /** While nothing ranks, the page, its link preview and its share text ask for the vote instead. */
 const inviteOf = (r: Ranking) => `Vote: who makes the best ${r.dish.name} in ${r.city.name}?`;
-const rankRule = (r: Ranking) => `${r.thresholds.minRaters} votes put a place on the list.`;
+/** Never promises exactly N (owner, 2026-11-13): the weight bar can ask for a few more ratings. */
+const rankRule = (r: Ranking) =>
+  `A place joins the ranking once at least ${r.thresholds.minRaters} diners have rated it.`;
 /** "four", for the two rater thresholds the product has; any other number stays a digit. */
 const inWords = (n: number) => ({ 4: "four", 8: "eight" })[n] ?? String(n);
 
@@ -126,7 +128,7 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
   };
 }
 
-/** The status badge (spec §4): "New list · 4 votes rank a place", or "Early ranking · 7 of 14 places
+/** The status badge (spec §4): "New list · 4+ votes rank a place", or "Early ranking · 7 of 14 places
  * ranked" (M is every place on the list, at least the N ranked ones, so never zero). */
 function StatusBadge({ ranking }: { ranking: Ranking }) {
   const { eligible, thresholds, mode, listedTotal } = ranking;
@@ -134,7 +136,7 @@ function StatusBadge({ ranking }: { ranking: Ranking }) {
     return (
       <Badge dot>
         <span>
-          <span>New list</span> · {thresholds.minRaters} votes rank a place
+          <span>New list</span> · {thresholds.minRaters}+ votes rank a place
         </span>
       </Badge>
     );
@@ -157,8 +159,8 @@ function SeatsBlock({ ranking, raters }: { ranking: Ranking; raters: number }) {
       <p className="text-sm leading-5">
         {raters === 0 ? (
           <>
-            <strong className="font-bold">Pehla vote aap ka?</strong> A place joins the ranking
-            after {minRaters} diners rate it.
+            <strong className="font-bold">Pehla vote aap ka?</strong> A place joins the ranking once
+            at least {minRaters} diners have rated it.
           </>
         ) : (
           <>
@@ -353,8 +355,8 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
 
           <div data-rate-hide="" className="flex flex-col gap-5">
             <SmallPrint>
-              A place gets a rank for this dish once {thresholds.minRaters} different people have
-              rated it there.{isRanked && " Recent votes count more."}
+              A place joins the ranking once at least {thresholds.minRaters} diners have rated it.
+              {isRanked && " Recent votes count more."}
               {mode === "bootstrap" &&
                 ` While ${ranking.city.name} is new, fewer votes are needed.`}{" "}
               Scores are diners&apos; opinions, not facts about a restaurant.{" "}

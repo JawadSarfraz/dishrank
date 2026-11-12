@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "cn";
 
 // Small labels. The default is the status badge (spec §4): a blush pill with brand-dark 13 px
-// bold text ("New list · 4 votes rank a place"); add `dot` for the 8 px brand dot in front. Admin
+// bold text ("New list · 4+ votes rank a place"); add `dot` for the 8 px brand dot in front. Admin
 // labels use the smaller variants. Never a score (that is ScorePill with its rater count).
 const badgeVariants = cva(
   "group/badge inline-flex w-fit shrink-0 items-center justify-center gap-1.5 rounded-full border border-transparent font-bold whitespace-nowrap [&>svg]:pointer-events-none [&>svg]:size-3.5",

@@ -54,7 +54,7 @@ and rater count big and the score small, gold only for rank 1. One light theme.
   ("Score 8.4", or the score pill beside "12 raters").
 - **Never render a count of zero.** When a number would be zero, the invitation shows instead: "Be
   one of the first four to rate. You decide the first ranking.", "We're picking the contenders.",
-  "Be the first to rate it here". The status badge says "New list · 4 votes rank a place" (the live
+  "Be the first to rate it here". The status badge says "New list · 4+ votes rank a place" (the live
   threshold), never "0 of 4".
 - **Signed-in diner, not "real person".** The trust block says "Every rating is given on Kahan
   Khayen by a signed-in diner. Nothing paid, copied or generated." Sign-in cannot prove more.
@@ -250,7 +250,7 @@ spec draws some search fields at 15 px; the build keeps 16 px). h1–h3 get `tex
 | --- | --- | --- |
 | Button | `components/ui/button.tsx` | Variants: `default` (Primary: brand, white bold, `rounded-button`; hover `brand-dark`, pressed `brand-press`; disabled `line` fill and muted text), `cta` (Primary with `shadow-cta`, dish pages), `outline` (white, 1.5 px ink border, `rounded-field`, hover sand), `pill` (the Rate pill: blush, `brand-dark`, fully round), `secondary` (blush), `ghost`, `round` (44 px white circle; add `shadow-float` on photos), `destructive`, `link` (ink, underlined, 44 px tap height). Sizes: `default` 48 px, `lg` 52 px, `xl` 56 px (17 px text), `pill` 44 px, `icon` 44 px; `sm` 40 px, `xs` 32 px, `icon-sm` 40 px and `icon-xs` 32 px for dense admin rows only. |
 | ButtonLink | `components/ui/button-link.tsx` | A link that looks like a button is a real `<a>`, same variants and sizes. |
-| Badge | `components/ui/badge.tsx` | `default` is the status badge: blush pill, `brand-dark` 13 px bold, with `dot` for the 8 px brand dot ("New list · 4 votes rank a place", "Early ranking · 7 of 14 places ranked"). `secondary`, `outline`, `destructive`, `gold` are small admin labels (`gold` unused). Never a score. |
+| Badge | `components/ui/badge.tsx` | `default` is the status badge: blush pill, `brand-dark` 13 px bold, with `dot` for the 8 px brand dot ("New list · 4+ votes rank a place", "Early ranking · 7 of 14 places ranked"). `secondary`, `outline`, `destructive`, `gold` are small admin labels (`gold` unused). Never a score. |
 | Kit | `components/ui/kit.tsx` | Server-safe small parts. `Sticker` ("Voting open": brand, white Display 800 13 px uppercase, −4°, white border; `onTile` inverts it to white with `brand-dark` text; one per screen). `CountChip` ("14 places", "3 ranked": ink on photos, white on tiles). `NumberOneChip` (20 px gold "1"). `LiveDot`. `RowList` (one bordered list: `rounded-card`, `shadow-card`, 1 px dividers; `ordered` for an `<ol>`). `AddRow` ("Missing one? Add it.": 56 px, dashed `dash` border). `Seats` (the "first four": earlier raters as ink circles with a tick, the visitor's seat as a tilted 52 px brand circle "You?" / "You", the rest dashed `seat` circles numbered; decorative, the sentence beside it carries the meaning). `SmallPrint`. `InlineLink` (ink, 600, underlined). |
 | Card | `components/ui/card.tsx` | White, 1 px line border, `rounded-card`, `shadow-card`. |
 | EmptyState | `components/ui/empty-state.tsx` | Dashed `dash` card: an icon in a blush disc, a one-line Display title, one sentence, **one** action (optionally a quieter Outline second way). Every empty list has one. |
@@ -340,7 +340,7 @@ Phones, top to bottom:
    the second featured dish first (OPEN-QUESTIONS 2026-11-13: the design shows one featured card),
    then every dish with a place on its list; 2 columns, 3 from 640 px, gap 12. The home shows six
    on phones and an Outline "See all 19 dishes" to the city page's `#dishes`; the city page shows
-   them all and, in early rankings, the badge "New lists · 4 votes rank a place".
+   them all and, in early rankings, the badge "New lists · 4+ votes rank a place".
 5. **Coming next** (`ComingNext`): the dishes with no contenders as 44 px chips with a small tile
    and glyph, and "Tell us which places should be on the list".
 6. **Trust block** (`TrustBox`): ink, `rounded-block`, padding 20: "Why these ranks can be trusted",
@@ -374,9 +374,9 @@ Rawalpindi, dish by dish" on a city page).
 - **Sheet**: white, `rounded-t-sheet`, overlapping the header by 28 px, padding 20 / 16. The
   status badge, and the featured round's closing line in `brand-dark` when there is one.
 - **Voting open** (nothing ranked): "Be one of the first four to rate. You decide the first
-  ranking." while nobody has rated, else the summary ("2 restaurants collecting votes · 4 votes put
-  a place on the list."). The seats block (blush, `rounded-card`): the seats while the threshold is
-  5 or fewer, then "**Pehla vote aap ka?** A place joins the ranking after 4 diners rate it." only
+  ranking." while nobody has rated, else the summary ("2 restaurants collecting votes · A place joins the ranking once at least 4 diners have
+  rated it."). The seats block (blush, `rounded-card`): the seats while the threshold is
+  5 or fewer, then "**Pehla vote aap ka?** A place joins the ranking once at least 4 diners have rated it." only
   when nobody has rated; otherwise "2 of 4 raters so far for the first ranked Chicken Karahi in
   Islamabad." (or "A few more ratings for…" when only weight is short).
 - **Ranked**: "Ranked by people who ate there." and the **podium** (`Podium`): DOM order 1, 2, 3,
@@ -392,8 +392,8 @@ Rawalpindi, dish by dish" on a city page).
   for the location only when tapped; filters stay in the URL), then the ranking rows
   (`RankingBrowser`): grid `36px 1fr 44px 40px`, min 68 px, each a link to the restaurant: rank,
   name over area · distance · "from Rs 1,900" and variant chips, rater count (22 px) over
-  "raters", score pill. Then **"Still need votes"** + "N places", "A place joins the ranking after
-  4 diners rate it.": the places with raters first ("G-13 · 2 more raters and it ranks"), then the
+  "raters", score pill. Then **"Still need votes"** + "N places", "A place joins the ranking once
+  at least 4 diners have rated it.": the places with raters first ("G-13 · 2 more raters and it ranks"), then the
   contenders ("be the first to rate"), three rows until "Show all N places" (which brings the area
   select and Near me). Voting open: the waiting list (when places have raters), then
   **"Contenders"** + "14 places", "Not ranked yet, in random order.", the area select and Near me
@@ -406,7 +406,7 @@ Rawalpindi, dish by dish" on a city page).
   opinions, not facts about a restaurant. How rankings work". Then the Share button ("Share this
   ranking" / "Share this list") with "Get the WhatsApp status image" under it.
 - **Link preview** (title, description, image): while nothing ranks, "Vote: who makes the best
-  Chicken Karahi in Islamabad?" and "… 4 votes put a place on the list."; the page is `noindex`
+  Chicken Karahi in Islamabad?" and "… A place joins the ranking once at least 4 diners have rated it."; the page is `noindex`
   until three places rank (`src/lib/indexing.ts`).
 
 ### Rate mode and success

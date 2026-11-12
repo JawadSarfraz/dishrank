@@ -40,7 +40,7 @@ export function WaitingList({
         note={
           leadIn
             ? `Your rating can put the first ${dishName} on the list.`
-            : `A place joins the ranking after ${minRaters} diners rate it.`
+            : `A place joins the ranking once at least ${minRaters} diners have rated it.`
         }
       />
       <RowList>

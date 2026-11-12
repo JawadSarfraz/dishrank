@@ -94,7 +94,7 @@ export function CityHome({
           </p>
           {!home && overview.mode === "bootstrap" && (
             <Badge dot className="mt-3">
-              New lists · {overview.minRaters} votes rank a place
+              New lists · {overview.minRaters}+ votes rank a place
             </Badge>
           )}
           <div className="mt-3.5 lg:mt-6">

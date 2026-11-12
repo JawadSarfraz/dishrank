@@ -61,7 +61,7 @@ export function shareImageFacts(r: RankingPage) {
           call: leading === 0 ? "Pehla vote aap ka?" : "Agla vote aap ka?",
           note:
             leading === 0
-              ? `A place needs at least ${minRaters} raters to rank.`
+              ? `A place joins the ranking once at least ${minRaters} diners have rated it.`
               : leading < minRaters
                 ? `${leading} of ${minRaters} raters so far for the first ranked place.`
                 : "A few more ratings for the first ranked place.",

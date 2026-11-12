@@ -121,7 +121,7 @@ export function Contenders({
           size="sub"
           title="Still need votes"
           count={placesLabel(everyPlace)}
-          note={`A place joins the ranking after ${minRaters} diners rate it.`}
+          note={`A place joins the ranking once at least ${minRaters} diners have rated it.`}
         />
       ) : (
         <ListHeader
