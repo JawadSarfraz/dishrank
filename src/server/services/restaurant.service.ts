@@ -60,6 +60,7 @@ import {
   findAutoListedCandidateOf,
   moveCandidatesToRestaurant,
 } from "@/server/repositories/overture.repo";
+import { findCityBySlug, listCityDishSummaries } from "@/server/repositories/public.repo";
 import { findDishesBySlugs } from "@/server/repositories/taxonomy.repo";
 import { inTransaction, type Tx } from "@/server/repositories/transaction";
 import { assertRole, type SessionUser } from "@/server/roles";
@@ -71,7 +72,7 @@ import type {
 } from "@/server/validation";
 import { recordEvent } from "./analytics.service";
 import { rethrowConflict } from "./conflict";
-import { recomputeEach, rerankRestaurant } from "./ranking.service";
+import { recomputeEach, rerankRestaurant, thresholdsFor } from "./ranking.service";
 import { deleteUnusedPhotos } from "./upload.service";
 import type { StorageAdapter } from "@/server/storage";
 import { cleanText } from "./matching/normalize";
@@ -548,6 +549,29 @@ export async function getPublicRestaurant(slug: string): Promise<RestaurantLooku
     claimed,
     unchecked,
   };
+}
+
+/**
+ * What the restaurant page adds to its dish rows (read only; the JSON route does not call it): how
+ * many places rank for each dish in the city ("#2 of 7"), and the raters a place needs to rank
+ * there now. Reads nothing when no dish here ranks or collects votes.
+ */
+export async function getRestaurantPageContext(
+  citySlug: string,
+  dishes: readonly Pick<PublicRestaurantDish, "dish" | "rankInCity" | "votes">[],
+  now: Date = new Date(),
+): Promise<{ rankedInCity: Record<string, number>; minRaters: number | null }> {
+  const anyRanked = dishes.some((d) => d.rankInCity !== null);
+  const anyWaiting = dishes.some((d) => d.rankInCity === null && d.votes > 0);
+  if (!anyRanked && !anyWaiting) return { rankedInCity: {}, minRaters: null };
+  const city = await findCityBySlug(citySlug);
+  if (!city) return { rankedInCity: {}, minRaters: null };
+  const rankedInCity: Record<string, number> = {};
+  if (anyRanked) {
+    const { counts } = await listCityDishSummaries(city.id);
+    for (const c of counts) rankedInCity[c.dishId] = c._count._all;
+  }
+  return { rankedInCity, minRaters: thresholdsFor(city.launchedAt, now).minRaters };
 }
 
 export const ADMIN_PAGE_SIZE = 25;

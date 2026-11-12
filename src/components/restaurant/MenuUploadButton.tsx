@@ -71,9 +71,9 @@ export function MenuUploadButton({ restaurantId }: { restaurantId: string }) {
   return (
     <section
       aria-labelledby={`${inputId}-title`}
-      className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-card"
+      className="flex flex-col gap-3 rounded-card border bg-card p-4 shadow-card"
     >
-      <h2 id={`${inputId}-title`} className="text-xl font-bold">
+      <h2 id={`${inputId}-title`} className="font-display text-xl leading-6 font-extrabold">
         Menu photo
       </h2>
       <input
@@ -91,11 +91,13 @@ export function MenuUploadButton({ restaurantId }: { restaurantId: string }) {
       <label
         htmlFor={inputId}
         aria-disabled={busy}
-        className="inline-flex min-h-11 w-fit cursor-pointer items-center rounded-lg border bg-card px-4 text-base font-medium hover:bg-muted aria-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2"
+        className="pressable inline-flex h-12 w-fit cursor-pointer items-center justify-center rounded-field border-[1.5px] border-ink bg-card px-5 text-[15px] font-bold text-ink hover:bg-sand aria-disabled:border-line-strong aria-disabled:text-muted-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink"
       >
         {status?.startsWith("Thanks") ? "Upload another page" : "Upload menu photo"}
       </label>
-      <p className="text-sm text-muted-foreground">One page per photo, flat and in good light.</p>
+      <p className="-mt-1 text-sm text-muted-foreground">
+        One page per photo, flat and in good light.
+      </p>
       {status && (
         <p role="status" className="text-sm">
           {status}
