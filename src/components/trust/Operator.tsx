@@ -4,7 +4,7 @@ import { OPERATOR } from "@/server/site";
 
 function Placeholder({ text }: { text: string }) {
   return (
-    <span className="rounded border border-dashed bg-card px-1.5 font-mono text-sm text-muted-foreground">
+    <span className="rounded-chip border border-dashed border-dash bg-card px-1.5 font-mono text-sm break-anywhere text-muted-foreground">
       [{text}]
     </span>
   );

@@ -53,9 +53,12 @@ export function OpenInBrowser({ browser }: { browser: InAppBrowser }) {
   }
 
   return (
-    <div ref={box} className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-3 text-sm">
+    <div
+      ref={box}
+      className="flex flex-col gap-3 rounded-card border bg-card p-4 text-[15px] leading-[22px] text-ink shadow-card"
+    >
       <p>
-        <span className="font-medium">
+        <span className="font-bold">
           Google sign-in doesn&apos;t work in {APP_NAMES[browser.app]}.
         </span>{" "}
         {browser.os === "ios" ? (
@@ -68,7 +71,7 @@ export function OpenInBrowser({ browser }: { browser: InAppBrowser }) {
           "Open this page in your browser and sign in there."
         )}
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         {browser.os === "android" && (
           <a
             href={chromeIntentUrl(pageUrl)}

@@ -29,19 +29,19 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Disclosure summary="Delete my account">
       {isAdmin ? (
-        <p className="text-sm">
+        <p className="text-sm leading-5 text-muted-foreground">
           An admin account cannot delete itself. Ask another admin, or remove the admin role first.
         </p>
       ) : (
         <form
-          className="flex flex-col gap-3 text-sm"
+          className="flex flex-col gap-3 text-sm leading-5"
           onSubmit={(e) => {
             e.preventDefault();
             remove();
           }}
         >
           <p>This deletes, for good:</p>
-          <ul className="flex list-disc flex-col gap-1 pl-5">
+          <ul className="flex list-disc flex-col gap-1 pl-5 marker:text-brand">
             <li>your account and sign-in;</li>
             <li>all your ratings, comments and photos (the rankings are updated);</li>
             <li>
@@ -52,7 +52,7 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
             Menu photos you sent stay with their restaurant, without your name. A restaurant you
             manage is no longer yours.
           </p>
-          <label className="flex flex-col gap-1 font-medium">
+          <label className="flex flex-col gap-1.5 font-bold">
             Type DELETE to confirm
             <input
               value={confirm}
@@ -62,7 +62,7 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
             />
           </label>
           {error && (
-            <p role="alert" className="text-destructive">
+            <p role="alert" className="font-semibold text-destructive">
               {error}
             </p>
           )}
@@ -70,7 +70,7 @@ export function DeleteAccount({ isAdmin }: { isAdmin: boolean }) {
             type="submit"
             variant="destructive"
             disabled={pending || confirm !== "DELETE"}
-            className="w-fit"
+            className="sm:w-fit"
           >
             {pending ? "Deleting…" : "Delete my account"}
           </Button>

@@ -1,8 +1,8 @@
 // Plain-language privacy draft (docs/08 Phase 4). Not reviewed by a lawyer yet: the banner says so.
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
-import Link from "next/link";
 import { LegalDraftNotice } from "@/components/trust/LegalDraftNotice";
 import { ContactEmail, OperatorName } from "@/components/trust/Operator";
 import { BRAND } from "@/lib/brand";

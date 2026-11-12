@@ -65,18 +65,32 @@ export function JoinPanel({
   if (inApp && !signedInAs) return <OpenInBrowser browser={inApp} />;
 
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col gap-2">
       {signedInAs ? (
-        <Button type="button" size="lg" onClick={join} disabled={pending}>
+        <Button
+          type="button"
+          variant="cta"
+          size="xl"
+          onClick={join}
+          disabled={pending}
+          className="h-auto min-h-14 w-full py-2 text-center whitespace-normal"
+        >
           {pending ? "Joining…" : `Join as ${signedInAs}`}
         </Button>
       ) : (
-        <Button type="button" size="lg" onClick={viaGoogle} disabled={pending}>
+        <Button
+          type="button"
+          variant="cta"
+          size="xl"
+          onClick={viaGoogle}
+          disabled={pending}
+          className="h-auto min-h-14 w-full py-2 text-center whitespace-normal"
+        >
           {pending ? "Opening Google…" : "Continue with Google"}
         </Button>
       )}
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-semibold text-destructive">
           {error}
         </p>
       )}

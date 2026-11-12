@@ -27,7 +27,7 @@ export function SignOutButton() {
   }
 
   return (
-    <Button type="button" variant="outline" onClick={signOut} disabled={pending} className="w-fit">
+    <Button type="button" variant="outline" onClick={signOut} disabled={pending}>
       <LogOutIcon aria-hidden="true" /> {pending ? "Signing out…" : "Sign out"}
     </Button>
   );

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { CircleAlertIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { SignInButton } from "@/components/auth/SignInButton";
 import { Wordmark } from "@/components/brand/Logo";
 import { Main } from "@/components/layout/Page";
+import { InlineLink, SmallPrint } from "@/components/ui/kit";
 import { BRAND } from "@/lib/brand";
 import { getSessionUser, googleSignInEnabled } from "@/server/auth";
 import { safeCallbackPath, signedInRedirectPath } from "@/server/roles";
@@ -30,41 +31,41 @@ export default async function SignInPage({ searchParams }: PageProps<"/sign-in">
   const problem = errorText(error);
 
   return (
-    <Main width="narrow" className="justify-center gap-6 py-12">
-      <div className="flex flex-col items-start gap-4">
+    <Main width="narrow" className="justify-center gap-6 py-10 sm:max-w-md">
+      <div className="flex flex-col items-start gap-5">
         <Wordmark size="lg" />
-        <h1 className="text-3xl font-extrabold sm:text-4xl">Sign in</h1>
-        <p className="max-w-prose text-muted-foreground">
-          One tap with your Google account. It keeps one rating per person per dish; your e-mail
-          address is never shown on {BRAND.name}.
-        </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="font-display text-[28px] leading-[30px] font-extrabold tracking-[-0.015em] lg:text-[34px] lg:leading-[38px]">
+            Sign in
+          </h1>
+          <p className="max-w-prose text-base leading-[23px] text-muted-foreground">
+            One tap with your Google account. It keeps one rating per person per dish; your e-mail
+            address is never shown on {BRAND.name}.
+          </p>
+        </div>
       </div>
       {problem && (
         <p
           role="alert"
-          className="rounded-xl border border-destructive/30 bg-card px-4 py-3 text-sm"
+          className="flex items-start gap-3 rounded-field border border-ink bg-card px-4 py-3 text-sm leading-5 font-semibold"
         >
-          {problem}
+          <CircleAlertIcon aria-hidden="true" className="mt-px size-5 shrink-0 text-brand" />
+          <span>{problem}</span>
         </p>
       )}
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-card">
+      <div className="flex flex-col gap-4 rounded-block bg-blush p-4">
         {googleSignInEnabled ? (
           <SignInButton callbackURL={callbackURL} className="w-full" />
         ) : (
-          <p role="alert">Google sign-in is not configured yet.</p>
+          <p role="alert" className="text-[15px] font-semibold">
+            Google sign-in is not configured yet.
+          </p>
         )}
-        <p className="text-xs text-muted-foreground">
-          By signing in you agree to the{" "}
-          <Link href="/terms" className="underline underline-offset-2">
-            terms
-          </Link>
-          . What we keep and why:{" "}
-          <Link href="/privacy" className="underline underline-offset-2">
-            privacy
-          </Link>
-          .
-        </p>
       </div>
+      <SmallPrint>
+        By signing in you agree to the <InlineLink href="/terms">terms</InlineLink>. What we keep
+        and why: <InlineLink href="/privacy">privacy</InlineLink>.
+      </SmallPrint>
     </Main>
   );
 }

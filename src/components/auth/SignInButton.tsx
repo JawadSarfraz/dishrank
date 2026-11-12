@@ -35,7 +35,7 @@ export function SignInButton({
         {pending ? "Opening Google…" : "Continue with Google"}
       </Button>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-semibold text-destructive">
           {error}
         </p>
       ) : null}

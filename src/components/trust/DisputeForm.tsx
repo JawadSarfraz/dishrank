@@ -2,11 +2,13 @@
 
 // The /dispute form: anyone, signed in or not, can tell us a listing or ranking is wrong. It becomes
 // a review item for the admins.
+import { CheckIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { describeActionError } from "@/components/admin/action-error";
+import { Button } from "@/components/ui/button";
 import { fileDisputeAction } from "@/server/actions/report";
 
-const field = "rounded-lg border border-input bg-transparent px-3 py-2 text-base";
+const label = "flex flex-col gap-1.5 text-[15px] leading-5 font-bold";
 
 export function DisputeForm() {
   const [page, setPage] = useState("");
@@ -35,7 +37,16 @@ export function DisputeForm() {
 
   if (sent) {
     return (
-      <p role="status" className="rounded-lg border px-3 py-3">
+      <p
+        role="status"
+        className="flex max-w-prose items-center gap-3 rounded-block bg-blush p-4 text-[15px] font-bold"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success text-white"
+        >
+          <CheckIcon className="size-5" strokeWidth={3} />
+        </span>
         Thanks. Our team will look at it.
       </p>
     );
@@ -43,23 +54,23 @@ export function DisputeForm() {
 
   return (
     <form
-      className="flex flex-col gap-3"
+      className="flex max-w-prose flex-col gap-4 rounded-card border bg-card p-4 shadow-card"
       onSubmit={(e) => {
         e.preventDefault();
         send();
       }}
     >
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={label}>
         Which page or restaurant is it about? (optional)
         <input
           value={page}
           onChange={(e) => setPage(e.target.value)}
           maxLength={300}
           placeholder="A link or a name"
-          className={`${field} h-11`}
+          className="field font-normal"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={label}>
         What is wrong?
         <textarea
           value={message}
@@ -68,28 +79,24 @@ export function DisputeForm() {
           minLength={10}
           maxLength={1000}
           rows={5}
-          className={field}
+          className="field py-3 font-normal"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={label}>
         How can we reach you? (optional)
         <input
           value={contact}
           onChange={(e) => setContact(e.target.value)}
           maxLength={200}
           placeholder="E-mail or phone"
-          className={`${field} h-11`}
+          className="field font-normal"
         />
       </label>
-      <button
-        type="submit"
-        disabled={pending}
-        className="min-h-11 rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground"
-      >
+      <Button type="submit" size="lg" disabled={pending} className="sm:w-fit sm:px-10">
         {pending ? "Sending…" : "Send"}
-      </button>
+      </Button>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-semibold text-destructive">
           {error}
         </p>
       )}

@@ -197,7 +197,7 @@ function CandidateCard({
       )}
 
       {(c.likelyRestaurants.length > 0 || c.likelyCandidates.length > 0) && (
-        <div className="flex flex-col gap-1 rounded-lg bg-gold-soft p-3 text-sm text-gold-text">
+        <div className="flex flex-col gap-1 rounded-lg bg-blush p-3 text-sm text-ink">
           <p className="font-medium">Likely duplicate of:</p>
           <ul className="flex flex-col gap-1">
             {c.likelyRestaurants.map((r) => (

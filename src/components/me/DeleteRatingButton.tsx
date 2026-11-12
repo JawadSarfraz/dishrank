@@ -17,7 +17,7 @@ export function DeleteRatingButton({ ratingId, label }: { ratingId: string; labe
       <button
         type="button"
         disabled={pending}
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-destructive underline-offset-4 hover:underline disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-destructive underline underline-offset-4 hover:text-brand-press disabled:opacity-50"
         onClick={() => {
           if (!window.confirm(`Delete your rating of ${label}?`)) return;
           startTransition(async () => {
@@ -35,7 +35,7 @@ export function DeleteRatingButton({ ratingId, label }: { ratingId: string; labe
         {pending ? "Deleting…" : "Delete"}
       </button>
       {error && (
-        <span role="alert" className="text-sm text-destructive">
+        <span role="alert" className="text-sm font-semibold text-destructive">
           {error}
         </span>
       )}

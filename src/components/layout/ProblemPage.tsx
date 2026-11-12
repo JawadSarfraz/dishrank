@@ -1,7 +1,8 @@
 // The one shape for every "this is not the page you wanted" screen (docs/12-DESIGN.md): the 404,
-// the error page, Forbidden, Offline and the last-resort global error. An icon in a brand-soft
-// disc, a title, one line, and one or two actions, centred in the page column like an EmptyState.
-// Server-safe: no hooks, so the global error page can use it without a layout.
+// the error page, Forbidden, Offline and the last-resort global error. A tilted tile in the
+// no-photo tile red with a white icon, the hero title, one line, and one or two actions (Primary,
+// then Outline), centred in the page column. Server-safe: no hooks, so the global error page can
+// use it without a layout.
 import { Main } from "@/components/layout/Page";
 
 export function ProblemPage({
@@ -17,15 +18,21 @@ export function ProblemPage({
   children: React.ReactNode;
 }) {
   return (
-    <Main width="narrow" className="items-center justify-center py-16 text-center">
-      <span className="flex size-16 items-center justify-center rounded-full bg-brand-soft text-brand">
+    <Main width="narrow" className="items-center justify-center gap-6 py-16 text-center">
+      <span className="flex size-[72px] -rotate-4 items-center justify-center rounded-card bg-tile-tamatar text-white shadow-float">
         {icon}
       </span>
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-extrabold text-balance sm:text-4xl">{title}</h1>
-        <p className="max-w-prose text-base text-pretty text-muted-foreground">{text}</p>
+      <div className="flex flex-col items-center gap-2">
+        <h1 className="font-display text-[28px] leading-[30px] font-extrabold tracking-[-0.015em] text-balance lg:text-[40px] lg:leading-[44px]">
+          {title}
+        </h1>
+        <p className="max-w-prose text-base leading-[23px] text-pretty text-muted-foreground">
+          {text}
+        </p>
       </div>
-      <div className="flex flex-wrap justify-center gap-2">{children}</div>
+      <div className="flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row">
+        {children}
+      </div>
     </Main>
   );
 }

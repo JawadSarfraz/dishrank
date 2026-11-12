@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { BanIcon } from "lucide-react";
+import Link from "next/link";
 import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
-import Link from "next/link";
+import { InkBlock } from "@/components/trust/InkBlock";
 import { ContactEmail, OperatorName } from "@/components/trust/Operator";
 import { BRAND } from "@/lib/brand";
 
@@ -18,7 +20,7 @@ export default function AboutPage() {
     <Main width="narrow">
       <Prose>
         <h1>About {BRAND.name}</h1>
-        <p>
+        <p className="text-[17px] leading-[25px]">
           The best place for Chicken Karahi is rarely the best place for biryani. {BRAND.name} asks
           diners to rate one dish at a time, from 1 to 10, and ranks restaurants for each dish
           separately. A restaurant never gets one overall score.
@@ -48,9 +50,12 @@ export default function AboutPage() {
           I built it because a star rating for a whole restaurant never told me where to get the
           best plate of one dish.
         </p>
-        <p>
-          We earn nothing today. No restaurant has paid us, and no one can pay to change a ranking.
-        </p>
+        <InkBlock icon={<BanIcon />}>
+          <p>
+            We earn nothing today. No restaurant has paid us, and no one can pay to change a
+            ranking.
+          </p>
+        </InkBlock>
       </Prose>
     </Main>
   );

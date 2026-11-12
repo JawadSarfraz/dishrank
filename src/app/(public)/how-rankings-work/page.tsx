@@ -1,9 +1,11 @@
 // docs/04 in plain words. The numbers come from ranking.constants.ts, so the page and the algorithm
 // never disagree.
 import type { Metadata } from "next";
-import { Main } from "@/components/layout/Page";
-import { Prose } from "@/components/layout/Prose";
+import { ScaleIcon } from "lucide-react";
 import Link from "next/link";
+import { Main } from "@/components/layout/Page";
+import { Callout, Prose } from "@/components/layout/Prose";
+import { SmallPrint } from "@/components/ui/kit";
 import { BURST, RANKING, TRUST } from "@/server/services/ranking.constants";
 import { BRAND } from "@/lib/brand";
 
@@ -43,7 +45,7 @@ export default function HowRankingsWorkPage() {
     <Main width="narrow">
       <Prose>
         <h1>How rankings work</h1>
-        <p>
+        <p className="text-[17px] leading-[25px]">
           {BRAND.name} ranks restaurants one dish at a time. A restaurant&apos;s place for Chicken
           Karahi comes only from ratings of its Chicken Karahi. In one sentence: the score is an
           average of recent ratings from different people, pulled toward the city average until
@@ -82,15 +84,18 @@ export default function HowRankingsWorkPage() {
           have rated it there, their ratings together count for at least{" "}
           {normal.minWeight.toFixed(1)} (see above), and the dish is confirmed:{" "}
           {RANKING.promoteRaters} different people have rated it, or we have seen it on the menu, or
-          the owner has confirmed it. Everything else is listed under &quot;Not enough votes
-          yet&quot;, with how many more raters it needs, and places nobody has rated yet are under
-          &quot;Contenders&quot;. Neither ever gets a number.
+          the owner has confirmed it. Everything else is listed under &quot;Still need votes&quot;,
+          with how many more raters it needs, and places nobody has rated yet are under
+          &quot;Contenders&quot; (on a list that already ranks, at the end of &quot;Still need
+          votes&quot;). Neither ever gets a rank number.
         </p>
-        <p>
-          <strong>Early rankings.</strong> While a city is new on {BRAND.name}, a rank needs{" "}
-          {bootstrap.minRaters} different people and a weight of {bootstrap.minWeight.toFixed(1)}.
-          Those pages say &quot;Early rankings&quot;.
-        </p>
+        <Callout icon={<ScaleIcon />}>
+          <p>
+            <strong>Early rankings.</strong> While a city is new on {BRAND.name}, a rank needs{" "}
+            {bootstrap.minRaters} different people and a weight of {bootstrap.minWeight.toFixed(1)}.
+            Those pages say &quot;Early rankings&quot;.
+          </p>
+        </Callout>
         <p>
           Equal scores are ordered by more votes, then the most recent rating, then name. Rank
           numbers are for the whole city: filtering by area or sorting by price never renumbers
@@ -98,27 +103,41 @@ export default function HowRankingsWorkPage() {
         </p>
 
         <h2>Trust levels</h2>
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Rater</th>
-              <th scope="col">A rating counts</th>
-            </tr>
-          </thead>
-          <tbody>
-            {TRUST_ROWS.map(([who, weight]) => (
-              <tr key={who}>
-                <td>{who}</td>
-                <td className="tabular-nums">{weight}</td>
+        <div className="overflow-hidden rounded-card border bg-card shadow-card">
+          <table className="w-full border-collapse text-left text-sm leading-5">
+            <thead className="bg-sand">
+              <tr>
+                <th scope="col" className="px-4 py-2.5 text-[13px] font-bold">
+                  Rater
+                </th>
+                <th scope="col" className="w-[38%] px-4 py-2.5 text-right text-[13px] font-bold">
+                  A rating counts
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="text-sm text-muted-foreground">
+            </thead>
+            <tbody className="divide-y divide-line">
+              {TRUST_ROWS.map(([who, weight]) => (
+                <tr key={who}>
+                  <td className="px-4 py-3 align-top break-anywhere">{who}</td>
+                  <td
+                    className={
+                      /^\d+(\.\d+)?$/.test(weight)
+                        ? "px-4 py-3 text-right align-top font-display text-lg leading-5 font-extrabold tabular-nums"
+                        : "px-4 py-3 text-right align-top font-semibold"
+                    }
+                  >
+                    {weight}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <SmallPrint className="max-w-prose">
           Trust levels are worked out again after each of your ratings and every night, except one
           our team set by hand. A rater whose last 10 ratings are all 10s or all 1s counts as a new
           account until that changes.
-        </p>
+        </SmallPrint>
 
         <h2>Keeping it fair</h2>
         <ul>
@@ -145,7 +164,7 @@ export default function HowRankingsWorkPage() {
           night we recompute everything, so older ratings slowly count less.
         </p>
 
-        <p>
+        <p className="mt-2 border-t pt-5">
           Something wrong? <Link href="/dispute">Tell us on the dispute page</Link>.
         </p>
       </Prose>
