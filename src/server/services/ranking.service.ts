@@ -30,6 +30,7 @@ import {
   updateUserById,
 } from "@/server/repositories/user.repo";
 import { haversineKm } from "@/lib/geo";
+import { formatPkDay } from "@/lib/format";
 import { seededOrder } from "@/lib/shuffle";
 import { votingClosesLine } from "./featured";
 import { DAY_MS, RANKING, TRUST } from "./ranking.constants";
@@ -523,6 +524,11 @@ export async function getRankingPage(
             featured.city.featuredRound,
             now,
           ),
+          /** "Sun 20 Dec" while voting for the round is open, for the link preview. */
+          closesOn:
+            featured.city.featuredClosesAt && featured.city.featuredClosesAt > now
+              ? formatPkDay(featured.city.featuredClosesAt)
+              : null,
         }
       : null,
     contenders: untried.slice(0, CONTENDERS_LIMIT).map((r): Contender => ({

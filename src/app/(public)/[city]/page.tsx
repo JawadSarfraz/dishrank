@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { CityHome } from "@/components/home/CityHome";
+import { cityDescription } from "@/lib/descriptions";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { getCityOverview } from "@/server/services/city-page.service";
 import { yearInPakistan } from "@/server/site";
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/[city]">): Promis
   const name = overview.city.name;
   return {
     title: `Best food in ${name} by dish (${yearInPakistan()})`,
-    description: `Restaurants in ${name} ranked for each dish by diners' ratings: chicken karahi, biryani, nihari, burgers and more.`,
+    description: cityDescription(name),
     alternates: { canonical: `/${overview.city.slug}` },
   };
 }

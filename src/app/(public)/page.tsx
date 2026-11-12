@@ -3,6 +3,7 @@
 // dishes" on the city page), the dishes still waiting for contenders, and why the ranks can be
 // trusted. ISR: nothing here reads the session.
 import type { Metadata } from "next";
+import { HOME_DESCRIPTION } from "@/lib/descriptions";
 import { CityHome } from "@/components/home/CityHome";
 import { Main } from "@/components/layout/Page";
 import { BRAND } from "@/lib/brand";
@@ -14,8 +15,7 @@ export const metadata: Metadata = {
   title: {
     absolute: `${BRAND.name} – the best restaurants for each dish in Islamabad and Rawalpindi`,
   },
-  description:
-    "Pick a dish and see restaurants ranked by diners' ratings of that dish: chicken karahi, biryani, nihari, burgers and more.",
+  description: HOME_DESCRIPTION,
   alternates: { canonical: "/" },
 };
 

@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InlineLink, Seats, SmallPrint } from "@/components/ui/kit";
 import { BRAND } from "@/lib/brand";
+import { dishDescription } from "@/lib/descriptions";
 import { formatPkDate, formatScore, formatVotes } from "@/lib/format";
 import { dishPageIndexable } from "@/lib/indexing";
 import { suggestPlacePath } from "@/lib/paths";
@@ -97,9 +98,12 @@ export async function generateMetadata({ params }: PageProps<"/[city]/[slug]">):
   // never a count of what is missing (the page is noindex meanwhile, so the title can say so too).
   const open = ranking.eligible.length === 0;
   const title = open ? inviteOf(ranking) : `${titleOf(ranking)} (${yearInPakistan()})`;
-  const description = open
-    ? `${summaryOf(ranking)} ${rankRule(ranking)} Rate the ones you've tried.`
-    : `${summaryOf(ranking)}. Top: ${topThree(ranking)}. Ranked by dish from diners' ratings.`;
+  const first = ranking.eligible[0];
+  const description = dishDescription({
+    top: first ? { name: first.restaurant.name, raters: first.votes } : null,
+    contenders: ranking.listedTotal,
+    closesOn: ranking.featured?.closesOn ?? null,
+  });
   const image = shareImagePath(ranking);
   return {
     title,

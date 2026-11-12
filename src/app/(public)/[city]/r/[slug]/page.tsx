@@ -28,6 +28,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { EmptyState } from "@/components/ui/empty-state";
 import { AddRow, InlineLink, SmallPrint } from "@/components/ui/kit";
 import { BRAND } from "@/lib/brand";
+import { restaurantDescription } from "@/lib/descriptions";
 import { restaurantPageIndexable } from "@/lib/indexing";
 import { formatAddress, formatScore, formatVotes } from "@/lib/format";
 import { restaurantJsonLd } from "@/server/seo";
@@ -59,9 +60,19 @@ export async function generateMetadata({
   const best = dishes.find((d) => d.rankInCity !== null);
   const rankedDishes = dishes.filter((d) => d.rankInCity !== null).length;
   const title = `${restaurant.name}, ${place}`;
-  const description = best
-    ? `${restaurant.name} in ${place}: ${best.dish.name} is #${best.rankInCity} in ${restaurant.city.name} (${formatScore(best.score ?? 0)} · ${formatVotes(best.votes)}). Dish-by-dish scores from diners.`
-    : `${restaurant.name} in ${place}: dish-by-dish scores from diners' ratings.`;
+  const description = restaurantDescription({
+    name: restaurant.name,
+    place,
+    city: restaurant.city.name,
+    best: best
+      ? {
+          dish: best.dish.name,
+          rank: best.rankInCity!,
+          score: formatScore(best.score ?? 0),
+          votes: formatVotes(best.votes),
+        }
+      : null,
+  });
   const path = `/${restaurant.city.slug}/r/${restaurant.slug}`;
   return {
     title,
