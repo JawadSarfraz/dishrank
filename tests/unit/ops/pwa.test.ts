@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 // The installable app (owner, Part 3): the manifest names the brand and real icon files, and the
 // service worker loads and caches only static files (never a page, an API call or another origin).
 import fs from "node:fs";
@@ -30,7 +31,12 @@ describe("installable app (PWA)", () => {
     expect(m.icons?.length).toBeGreaterThanOrEqual(3);
     for (const icon of m.icons ?? []) {
       const [w, h] = icon.sizes!.split("x").map(Number);
-      expect(pngSize(path.join(ROOT, "public", icon.src))).toEqual({ width: w, height: h });
+      const [file, query] = icon.src.split("?");
+      expect(pngSize(path.join(ROOT, "public", file!))).toEqual({ width: w, height: h });
+      // A new icon is a new URL, so installed apps and caches fetch it (2026-11-14).
+      const bytes = fs.readFileSync(path.join(ROOT, "public", file!));
+      const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 10);
+      expect(query).toBe(`v=${hash}`);
     }
     expect(m.icons?.some((i) => i.purpose === "maskable")).toBe(true);
   });
@@ -54,6 +60,13 @@ describe("installable app (PWA)", () => {
     expect(Object.keys(listeners).sort()).toEqual(["activate", "fetch", "install"]);
     const isStatic = (url: string) =>
       (context as { isStaticAsset: (u: URL) => boolean }).isStaticAsset(new URL(url));
+    // Only hashed build files are answered from the cache first; the icons and the manifest keep
+    // their names, so they go to the network first (an old icon must not stick).
+    const immutable = (url: string) =>
+      (context as { isImmutable: (u: URL) => boolean }).isImmutable(new URL(url));
+    expect(immutable("https://dishrank.example/_next/static/chunks/app.js")).toBe(true);
+    expect(immutable("https://dishrank.example/icons/icon-192.png")).toBe(false);
+    expect(immutable("https://dishrank.example/manifest.webmanifest")).toBe(false);
     for (const url of [
       "https://dishrank.example/_next/static/chunks/app.js",
       "https://dishrank.example/_next/static/media/font.woff2",

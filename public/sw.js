@@ -1,17 +1,25 @@
 /*
  * Kahan Khayen's service worker (docs/12-DESIGN.md, "Installable"). It caches only static files
  * (/_next/static, the icons, the manifest) and the offline page, so the app opens quickly and shows
- * something when the network is gone. It never caches a page with personal data (signed-in, admin,
+ * something when the network is gone. Build files have a hash in their name and are served from
+ * the cache first. The manifest and the icons keep their names, so they come from the network
+ * first and from the cache only offline: a new icon or theme colour reaches an installed app
+ * (2026-11-14; before, the cached green icons and manifest were served forever). It never caches a page with personal data (signed-in, admin,
  * owner pages), an API response or anything else: every other request goes to the network as is.
  */
-const VERSION = "2026-11-06";
+const VERSION = "2026-11-14";
 const CACHE = "dishrank-static-" + VERSION;
 const OFFLINE_URL = "/offline";
 const STATIC_PREFIXES = ["/_next/static/", "/icons/"];
 const STATIC_PATHS = ["/manifest.webmanifest", "/icon.svg", "/apple-icon.png", "/favicon.ico"];
 const MAX_ENTRIES = 300;
 
-/** Only hashed build files and the icons: safe to serve from the cache first. */
+/** Hashed build files: their content never changes under a name, so the cache can answer first. */
+function isImmutable(url) {
+  return url.origin === self.location.origin && url.pathname.indexOf("/_next/static/") === 0;
+}
+
+/** Static files the service worker may keep: build files, the icons and the manifest. */
 function isStaticAsset(url) {
   if (url.origin !== self.location.origin) return false;
   var path = url.pathname;
@@ -92,6 +100,20 @@ async function cacheFirst(request) {
   return res;
 }
 
+/** The network's answer, kept for offline use; the cached copy only when the network fails. */
+async function networkFirst(request) {
+  var cache = await caches.open(CACHE);
+  try {
+    var res = await fetch(request);
+    if (res.ok) cache.put(request, res.clone()).catch(function () {});
+    return res;
+  } catch {
+    var hit = await cache.match(request);
+    if (hit) return hit;
+    throw new Error("offline");
+  }
+}
+
 /** Keeps the cache small: the oldest entries go once there are too many (hashed files pile up). */
 async function trim(cache) {
   var keys = await cache.keys();
@@ -118,8 +140,12 @@ self.addEventListener("fetch", function (event) {
   var request = event.request;
   if (request.method !== "GET") return;
   var url = new URL(request.url);
-  if (isStaticAsset(url)) {
+  if (isImmutable(url)) {
     event.respondWith(cacheFirst(request));
+    return;
+  }
+  if (isStaticAsset(url)) {
+    event.respondWith(networkFirst(request));
     return;
   }
   // A page that cannot be reached shows the offline page; the page itself is never cached.

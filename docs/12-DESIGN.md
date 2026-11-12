@@ -515,11 +515,14 @@ button sizes. No other redesign work there.
 ## Installable (PWA)
 
 - `src/app/manifest.ts` serves `/manifest.webmanifest` from `BRAND`: standalone display, start URL
-  `/`, theme and background colours (still the earlier values, see Brand), 192 and 512 px icons and
-  a maskable 512 px icon.
+  `/`, theme colour brand red and background white, 192 and 512 px icons and a maskable 512 px
+  icon. Each icon URL carries a hash of the file (`/icons/icon-192.png?v=…`), so a new icon is a new
+  URL and an installed app picks it up at its next update check.
 - `public/sw.js` (registered by `components/pwa/PwaRegister.tsx` on production builds) caches only
-  `/_next/static/*`, `/icons/*`, the manifest and the favicon, plus the `/offline` page. Pages, API
-  responses and anything signed-in are never cached.
+  `/_next/static/*` (cache first: the names are hashed), `/icons/*`, the manifest and the favicon
+  (network first, the cache only offline, so a new icon or colour is never hidden by an old copy),
+  plus the `/offline` page. Pages, API responses and anything signed-in are never cached. Bump its
+  `VERSION` when its rules change: the old cache is dropped on activation.
 - `components/pwa/InstallPrompt.tsx` offers "Add Kahan Khayen to your home screen" after the second
   saved rating or on a second-day visit, with Add and Not now (hidden 30 days); on iPhone "Share →
   Add to Home Screen" (`src/lib/pwa-prompt.ts`, localStorage in try/catch). Never inside the
