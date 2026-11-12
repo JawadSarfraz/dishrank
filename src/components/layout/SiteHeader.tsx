@@ -93,7 +93,7 @@ export function SiteHeader({ beta }: { beta: boolean }) {
         </Link>
 
         {/* Desktop: the full row. */}
-        <div className="hidden items-center gap-1 lg:flex">
+        <div className="hidden items-center gap-1 whitespace-nowrap xl:flex">
           <Link
             href={`/${city}#dishes`}
             className="inline-flex min-h-11 items-center rounded-control px-3 text-[15px] font-semibold text-ink hover:bg-sand"
@@ -107,7 +107,7 @@ export function SiteHeader({ beta }: { beta: boolean }) {
             How rankings work
           </Link>
         </div>
-        <div className="ml-auto hidden items-center gap-3 lg:flex">
+        <div className="ml-auto hidden items-center gap-3 whitespace-nowrap lg:flex">
           <div
             role="group"
             aria-label="City"
@@ -132,7 +132,7 @@ export function SiteHeader({ beta }: { beta: boolean }) {
               );
             })}
           </div>
-          <div className="w-[210px]">
+          <div className="w-[180px] xl:w-[210px]">
             {desktop && <DishSearch citySlug={city} cityName={cityName} popover />}
           </div>
           {pathname !== "/rate" && (

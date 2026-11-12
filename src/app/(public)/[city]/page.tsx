@@ -1,13 +1,9 @@
-// /[city] (docs/01): the city's launch dishes with how many restaurants rank, the top one each,
-// and a dish search. ISR.
+// /[city] (docs/01, spec §5 Home): the same layout as the home page, for this city, with every
+// dish card. ISR.
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { Main, PageHeader, SectionHeader } from "@/components/layout/Page";
-import { CityDishGrid, CityPicker, TrustBox } from "@/components/ranking";
-import { DishSearch } from "@/components/ranking/DishSearch";
-import { ComingNext, FeaturedDishes } from "@/components/ranking/FeaturedDishes";
-import { Badge } from "@/components/ui/badge";
+import { CityHome } from "@/components/home/CityHome";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { getCityOverview } from "@/server/services/city-page.service";
 import { yearInPakistan } from "@/server/site";
@@ -36,50 +32,16 @@ export async function generateMetadata({ params }: PageProps<"/[city]">): Promis
 export default async function CityPage({ params }: PageProps<"/[city]">) {
   const overview = await load((await params).city);
   if (!overview) notFound();
-  const { city } = overview;
 
   return (
-    <Main className="min-h-dvh gap-8">
-      <div className="flex flex-col gap-4 pt-2 sm:pt-4">
-        <CityPicker cities={overview.cities} current={city.slug} />
-        <PageHeader
-          eyebrow={
-            overview.mode === "bootstrap" ? (
-              <Badge>New lists · {overview.minRaters} votes rank a place</Badge>
-            ) : undefined
-          }
-          title={
-            <>
-              Best food in {city.name}, <span className="text-brand">dish by dish</span>
-            </>
-          }
-          lede="Pick a dish to see the restaurants ranked for it."
-        />
-        <DishSearch citySlug={city.slug} cityName={city.name} />
-      </div>
-      {overview.featured.dishes.length > 0 && (
-        <section aria-labelledby="featured" className="flex flex-col gap-3">
-          <SectionHeader id="featured" title="Open for voting" />
-          <FeaturedDishes
-            citySlug={city.slug}
-            dishes={overview.featured.dishes}
-            closingLine={overview.featured.closingLine}
-          />
-        </section>
-      )}
-      {overview.open.length > 0 && (
-        <section aria-labelledby="dishes" className="flex flex-col gap-3">
-          <SectionHeader
-            id="dishes"
-            title={overview.featured.dishes.length > 0 ? "More dishes" : "Popular dishes"}
-          />
-          <CityDishGrid citySlug={city.slug} dishes={overview.open} />
-        </section>
-      )}
-      {overview.comingNext.length > 0 && (
-        <ComingNext citySlug={city.slug} dishes={overview.comingNext} />
-      )}
-      <TrustBox minRaters={overview.minRaters} />
-    </Main>
+    <CityHome
+      overview={overview}
+      variant="city"
+      fallbackTitle={
+        <>
+          Best food in {overview.city.name}, <span className="text-brand">dish by dish</span>
+        </>
+      }
+    />
   );
 }
