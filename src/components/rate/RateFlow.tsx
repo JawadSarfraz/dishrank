@@ -9,15 +9,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { DishIcon } from "@/components/brand/DishIcon";
 import { SignInButton } from "@/components/auth/SignInButton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Disclosure } from "@/components/ui/disclosure";
+import { RowList, Seats } from "@/components/ui/kit";
 import { describeActionError } from "@/components/admin/action-error";
-import { ScoreBadge } from "@/components/ranking/ScoreBadge";
 import { ShareButton } from "@/components/ranking/ShareButton";
 import { BRAND } from "@/lib/brand";
-import { formatAddress, formatNeeded, formatScore, formatVotes } from "@/lib/format";
+import { cn } from "cn";
+import { formatAddress, formatScore, formatVotes } from "@/lib/format";
 import { withPendingScore } from "@/lib/pending-score";
 import { PWA_EVENTS, noteRating } from "@/lib/pwa-prompt";
 import { myRatingAction, submitRatingAction } from "@/server/actions/rating";
@@ -25,6 +25,7 @@ import type { RatingResult } from "@/server/services/rating.service";
 import type { RatePageData, RateRestaurant } from "@/server/services/rate-page.service";
 import { PanelLocationButton } from "./PanelLocationButton";
 import { PhotoPicker } from "./PhotoPicker";
+import { ScoreGrid, scoreButton } from "./ScoreGrid";
 import { Steps } from "./Steps";
 import { ProposeDish, SuggestRestaurant } from "./SuggestForms";
 
@@ -38,8 +39,13 @@ type SearchHit = {
   address: string | null;
 };
 
+/** A dish to pick (spec §4 look: 44 px pill, 1.5 px line-strong border, ink on white). */
 const chip =
-  "inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-card px-4 text-base font-medium transition-colors active:bg-muted aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-white";
+  "pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border-[1.5px] border-line-strong bg-card px-4 text-[15px] font-semibold text-ink hover:border-ink";
+
+/** A step's title: the page's h1 (spec type scale, hero title 28 / 30). */
+const stepTitle =
+  "font-display text-[28px] leading-[30px] font-extrabold tracking-[-0.015em] text-balance";
 
 function rateUrl(city: string, restaurant: RateRestaurant | null, dish: DishRef | null) {
   const params = new URLSearchParams({ city });
@@ -312,15 +318,20 @@ function RestaurantStep({
 
   return (
     <section aria-labelledby="step-restaurant" className="flex flex-col gap-4">
-      <h2 id="step-restaurant" className="text-3xl font-extrabold">
+      <h1 id="step-restaurant" className={stepTitle}>
         Where did you eat?
-      </h2>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="City">
+      </h1>
+      {/* The city switch (spec §4): two equal buttons in a sand track. */}
+      <div
+        className="grid auto-cols-fr grid-flow-col gap-1 rounded-button bg-sand p-1"
+        role="group"
+        aria-label="City"
+      >
         {cities.map((c) => (
           <button
             key={c.slug}
             type="button"
-            className={chip}
+            className="h-11 rounded-control px-3 text-[15px] font-semibold text-ink transition-colors duration-150 aria-pressed:bg-ink aria-pressed:font-bold aria-pressed:text-white"
             aria-pressed={c.slug === citySlug}
             onClick={() => onCity(c.slug)}
           >
@@ -328,12 +339,12 @@ function RestaurantStep({
           </button>
         ))}
       </div>
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className="flex flex-col gap-1.5 text-sm leading-5 font-semibold">
         Restaurant
         <span className="relative">
           <SearchIcon
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-ink"
           />
           <input
             type="search"
@@ -342,7 +353,7 @@ function RestaurantStep({
             placeholder="e.g. Butt Karahi"
             autoComplete="off"
             enterKeyHint="search"
-            className="field h-12 pl-11 font-normal"
+            className="field h-12 pl-11 text-[15px] font-normal"
           />
         </span>
       </label>
@@ -351,29 +362,37 @@ function RestaurantStep({
           {error}
         </p>
       )}
-      <ul aria-live="polite" className="flex flex-col gap-2">
-        {hits?.map((hit) => (
-          <li key={hit.id}>
-            <button
-              type="button"
-              onClick={() => onPick(hit)}
-              className="flex min-h-14 w-full flex-col items-start justify-center rounded-xl border bg-card px-4 py-2 text-left shadow-card transition-colors hover:border-brand/40 active:bg-muted"
-            >
-              <span className="font-display text-lg leading-tight font-bold break-anywhere">
-                {hit.name}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {[hit.area, hit.address && formatAddress(hit.address)].filter(Boolean).join(" · ")}
-              </span>
-            </button>
-          </li>
-        ))}
-        {hits && hits.length === 0 && (
-          <li className="rounded-xl border border-dashed bg-card px-4 py-3 text-sm text-muted-foreground">
-            No restaurant found in {city?.name}. Check the spelling, or suggest it below.
-          </li>
+      <div aria-live="polite">
+        {hits && hits.length > 0 && (
+          <RowList>
+            {hits.map((hit) => (
+              <li key={hit.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(hit)}
+                  className="flex min-h-[68px] w-full flex-col items-start justify-center gap-0.5 px-4 py-2.5 text-left transition-colors duration-150 hover:bg-sand active:bg-sand"
+                >
+                  <span className="text-base leading-[22px] font-bold break-anywhere">
+                    {hit.name}
+                  </span>
+                  {(hit.area || hit.address) && (
+                    <span className="text-[13px] leading-[18px] text-muted-foreground">
+                      {[hit.area, hit.address && formatAddress(hit.address)]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </RowList>
         )}
-      </ul>
+        {hits && hits.length === 0 && (
+          <p className="rounded-card bg-sand px-4 py-3 text-sm leading-5">
+            No restaurant found in {city?.name}. Check the spelling, or suggest it below.
+          </p>
+        )}
+      </div>
       {city && (
         <SuggestRestaurant
           city={city}
@@ -438,22 +457,24 @@ function DishStep({
         detail={restaurant.area}
         onChange={onChangeRestaurant}
       />
-      <h2 id="step-dish" className="text-3xl font-extrabold">
+      <h1 id="step-dish" className={stepTitle}>
         What did you eat?
-      </h2>
+      </h1>
       {loading ? (
-        <p role="status" className="min-h-24 text-sm text-muted-foreground">
-          Loading this restaurant&apos;s dishes…
-        </p>
+        <div role="status" className="flex min-h-24 flex-col gap-2">
+          <span className="sr-only">Loading this restaurant&apos;s dishes…</span>
+          <span aria-hidden="true" className="h-5 w-36 rounded-chip bg-blush" />
+          <span aria-hidden="true" className="h-11 w-full rounded-full bg-blush" />
+        </div>
       ) : (
         <DishChips restaurant={restaurant} popular={popular} onPick={onPick} />
       )}
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className="flex flex-col gap-1.5 text-sm leading-5 font-semibold">
         Search all dishes
         <span className="relative">
           <SearchIcon
             aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-3.5 size-5 -translate-y-1/2 text-ink"
           />
           <input
             type="search"
@@ -461,7 +482,7 @@ function DishStep({
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. karahi, kadai, nihari"
             autoComplete="off"
-            className="field h-12 pl-11 font-normal"
+            className="field h-12 pl-11 text-[15px] font-normal"
           />
         </span>
       </label>
@@ -476,7 +497,9 @@ function DishStep({
             </li>
           ))}
           {found.length === 0 && (
-            <li className="text-sm text-muted-foreground">No dish matches “{q.trim()}”.</li>
+            <li className="text-sm leading-5 text-muted-foreground">
+              No dish matches “{q.trim()}”.
+            </li>
           )}
         </ul>
       )}
@@ -504,7 +527,9 @@ function DishChips({
     <>
       {restaurant.dishes.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">On the menu here</h3>
+          <h2 className="text-sm leading-5 font-semibold text-muted-foreground">
+            On the menu here
+          </h2>
           <ul className="flex flex-wrap gap-2">
             {restaurant.dishes.map((d) => (
               <li key={d.id}>
@@ -512,7 +537,7 @@ function DishChips({
                   <DishIcon slug={d.slug} size={18} />
                   {d.name}
                   {d.votes > 0 && (
-                    <span className="text-sm font-normal text-muted-foreground">
+                    <span className="text-[13px] font-normal text-muted-foreground">
                       · {formatVotes(d.votes)}
                     </span>
                   )}
@@ -523,7 +548,7 @@ function DishChips({
         </div>
       )}
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-muted-foreground">Popular dishes</h3>
+        <h2 className="text-sm leading-5 font-semibold text-muted-foreground">Popular dishes</h2>
         <ul className="flex flex-wrap gap-2">
           {popular.map((d) => (
             <li key={d.id}>
@@ -552,13 +577,13 @@ function Pill({
   onChange: () => void;
 }) {
   return (
-    <p className="flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2 shadow-card">
+    <p className="flex min-h-[60px] items-center justify-between gap-3 rounded-card border bg-card py-2 pr-3 pl-4 shadow-card">
       <span className="flex min-w-0 flex-col">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <span className="font-display text-base leading-tight font-bold break-anywhere">
+        <span className="text-xs leading-4 font-semibold text-muted-foreground">{label}</span>
+        <span className="text-base leading-[22px] font-bold break-anywhere">
           {value}
           {detail && (
-            <span className="font-sans font-normal text-muted-foreground"> · {detail}</span>
+            <span className="text-[13px] font-normal text-muted-foreground"> · {detail}</span>
           )}
         </span>
       </span>
@@ -669,11 +694,11 @@ function ScoreStep({
         />
         <Pill label="Dish" value={dish.name} onChange={onChangeDish} />
       </div>
-      <h2 id="step-score" className="text-3xl font-extrabold">
+      <h1 id="step-score" className={stepTitle}>
         How was it?
-      </h2>
+      </h1>
       {existing && (
-        <p className="rounded-xl bg-muted px-4 py-3 text-sm">
+        <p className="rounded-control bg-sand px-4 py-3 text-sm leading-5">
           You rated this {existing.score}/10 before; your new rating replaces it.
           {existing.status === "HELD" ? " It is under review." : ""}
           {existing.status === "HIDDEN"
@@ -681,43 +706,40 @@ function ScoreStep({
             : ""}
         </p>
       )}
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 text-sm font-medium">Your score, 1 to 10</legend>
-        <div className="grid grid-cols-5 gap-2">
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              aria-pressed={score === n}
-              aria-label={`${n} out of 10`}
-              onClick={() => {
-                touched.current = true;
-                setPicked(n);
-                // Signed out: into the address, for the move out of an in-app browser as well.
-                if (!signedIn) {
-                  const here = `${window.location.pathname}${window.location.search}`;
-                  window.history.replaceState(null, "", withPendingScore(here, n));
-                }
-              }}
-              className="min-h-14 rounded-xl border border-border bg-card font-display text-xl font-bold transition-[color,background-color,border-color,transform] active:translate-y-px aria-pressed:border-brand aria-pressed:bg-brand aria-pressed:text-white aria-pressed:shadow-[0_2px_0_var(--brand-ink)]"
-            >
-              {n}
-            </button>
-          ))}
+      {/* The score row (spec §4), as on "Rate the places you know". */}
+      <div
+        className={cn(
+          "flex flex-col gap-2.5 rounded-card border bg-card px-4 pt-3.5 pb-3 shadow-card",
+          score !== null && "border-[1.5px] border-brand",
+        )}
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-base leading-[22px] font-bold">Your score</h2>
+          <span className="shrink-0 text-[13px] leading-[18px] text-muted-foreground">1 to 10</span>
         </div>
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>1 = bad</span>
-          <span>10 = best I&apos;ve had</span>
-        </div>
-      </fieldset>
+        <ScoreGrid
+          value={score}
+          label="Your score, 1 to 10"
+          buttonLabel={(n) => `${n} out of 10`}
+          onPick={(n) => {
+            touched.current = true;
+            setPicked(n);
+            // Signed out: into the address, for the move out of an in-app browser as well.
+            if (!signedIn) {
+              const here = `${window.location.pathname}${window.location.search}`;
+              window.history.replaceState(null, "", withPendingScore(here, n));
+            }
+          }}
+        />
+      </div>
 
       <Disclosure summary="Add details (optional)">
-        <p className="-mt-1 text-sm text-muted-foreground">
+        <p className="-mt-1 text-sm leading-5 text-muted-foreground">
           Taste, portion, value, a comment or a photo.
         </p>
         {SUB_SCORES.map(([key, label]) => (
           <fieldset key={key} className="flex flex-col gap-1">
-            <legend className="mb-1 text-sm font-medium">{label}, 1 to 5</legend>
+            <legend className="mb-1.5 text-sm leading-5 font-semibold">{label}, 1 to 5</legend>
             <div className="grid grid-cols-5 gap-2">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -729,7 +751,7 @@ function ScoreStep({
                     touched.current = true;
                     setSubs((s) => ({ ...s, [key]: s[key] === n ? null : n }));
                   }}
-                  className={`${chip} justify-center px-0 font-display`}
+                  className={scoreButton}
                 >
                   {n}
                 </button>
@@ -737,7 +759,7 @@ function ScoreStep({
             </div>
           </fieldset>
         ))}
-        <label className="flex flex-col gap-1 text-sm font-medium">
+        <label className="flex flex-col gap-1.5 text-sm leading-5 font-semibold">
           Comment
           <textarea
             value={comment}
@@ -748,9 +770,11 @@ function ScoreStep({
             maxLength={280}
             rows={3}
             placeholder="What stood out? (no phone numbers or links)"
-            className="field py-2 font-normal"
+            className="field py-2 text-[15px] font-normal"
           />
-          <span className="text-xs font-normal text-muted-foreground">{comment.length}/280</span>
+          <span className="text-xs leading-4 font-normal text-muted-foreground">
+            {comment.length}/280
+          </span>
         </label>
         {photosEnabled && signedIn && (
           <PhotoPicker
@@ -778,14 +802,14 @@ function ScoreStep({
           >
             {pending ? "Saving…" : existing ? "Update rating" : "Submit rating"}
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs leading-4 text-muted-foreground">
             {userName ? `Rating as ${userName} · ` : ""}one rating per dish here; you can change it
             later.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 shadow-card">
-          <p className="text-sm">
+        <div className="flex flex-col gap-3 rounded-card border bg-card p-4 shadow-card">
+          <p className="text-[15px] leading-5">
             {score === null
               ? "Sign in to save your rating. You will come back to this step."
               : `Sign in to save your ${score}. You will come back here with it filled in.`}
@@ -819,6 +843,18 @@ function rankSentence(r: RatingResult, cityName: string) {
   return `${r.restaurant.name} ${dir} from #${r.previousRank} to #${r.rank} ${where}, now ${votes}.`;
 }
 
+/** The success card's big line (spec §4, Success card): what the rating did, by case. */
+function impactLine(r: RatingResult) {
+  if (r.eligible && r.rank !== null) {
+    return r.previousRank === null
+      ? `This place is now ranked #${r.rank} for ${r.dish.name}.`
+      : "Your vote is in the ranking.";
+  }
+  if (r.ratingsNeeded === 0) return "This place ranks at the next update.";
+  const n = r.ratingsNeeded;
+  return `${n} more ${n === 1 ? "rater" : "raters"} and this place ranks.`;
+}
+
 function DoneStep({
   result,
   yourScore,
@@ -835,140 +871,146 @@ function DoneStep({
   onElsewhere: () => void;
 }) {
   const ranked = result.eligible && result.score !== null && result.rank !== null;
-  const counted = !result.held && result.status !== "HIDDEN" && !result.stale;
-  const restaurantPath = `/${result.restaurant.citySlug}/r/${result.restaurant.slug}`;
+  const hidden = result.status === "HIDDEN";
+  const counted = !result.held && !hidden && !result.stale;
   const listPath = `/${result.restaurant.citySlug}/best-${result.dish.slug}`;
   const share = ranked
     ? {
-        path: listPath,
-        label: "Share this ranking",
         text: `${result.restaurant.name} is #${result.rank} for ${result.dish.name} in ${cityName} on ${BRAND.name} (${formatScore(result.score!)} · ${formatVotes(result.votes)})\n\n${BRAND.shareCall}`,
       }
     : {
-        path: restaurantPath,
-        label: `Share ${result.restaurant.name}`,
         text: `I rated ${result.dish.name} at ${result.restaurant.name} on ${BRAND.name}. Add yours:`,
       };
-  const share_ = Math.min(1, result.votes / Math.max(result.minRaters, 1));
+  // The seats count raters, so they show only while the missing raters are what keeps the place
+  // from ranking (a weight shortfall would make the empty seats say too few), or as it ranks now.
+  const others = Math.max(0, result.votes - 1);
+  const seats =
+    counted &&
+    result.minRaters <= 5 &&
+    result.votes >= 1 &&
+    result.votes <= result.minRaters &&
+    (ranked
+      ? result.previousRank === null
+      : result.ratingsNeeded === result.minRaters - result.votes);
+  const status = result.held
+    ? "Under review"
+    : hidden
+      ? "Not counted"
+      : result.stale
+        ? "Saved"
+        : replaced
+          ? "Replaces your earlier rating, counts right away"
+          : "Counts right away";
 
   return (
-    <section aria-labelledby="step-done" role="status" className="flex flex-col gap-5">
-      <div className="flex flex-col items-start gap-3">
-        <span className="flex size-14 items-center justify-center rounded-full bg-brand-soft text-brand">
-          <CheckIcon aria-hidden="true" className="size-7" strokeWidth={3} />
-        </span>
-        <h2 id="step-done" className="text-3xl font-extrabold">
-          Thanks, your rating is in.
-        </h2>
-        <p className="text-base text-muted-foreground">
-          {result.dish.name} at {result.restaurant.name}
-        </p>
-      </div>
+    <section aria-labelledby="step-done" role="status" className="flex flex-col">
+      <span
+        aria-hidden="true"
+        className="flex size-15 -rotate-6 items-center justify-center rounded-full bg-success shadow-[0_4px_10px_rgba(27,20,16,0.18)]"
+      >
+        <CheckIcon className="size-[30px] text-white" strokeWidth={3} />
+      </span>
+      <h1 id="step-done" className={cn(stepTitle, "mt-3.5")}>
+        Shukriya! Your rating is in.
+      </h1>
+      <p className="mt-1.5 text-[15px] leading-5 text-muted-foreground">
+        {result.dish.name} at {result.restaurant.name}
+      </p>
 
-      <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 shadow-card">
-        <div className="flex items-center gap-4">
+      <section
+        aria-label="What your rating did"
+        className="mt-5 flex flex-col rounded-block bg-blush p-4"
+      >
+        <div className="flex items-center gap-3.5">
           <span
-            className="font-display text-5xl leading-none font-extrabold tabular-nums"
+            className="font-display text-[56px] leading-[56px] font-extrabold tracking-[-0.02em] text-brand tabular-nums"
             aria-label={`Your score ${yourScore} out of 10`}
           >
             {yourScore}
           </span>
           <span className="flex flex-col">
-            <span className="font-medium">Your score</span>
-            <span className="text-sm text-muted-foreground">
-              {result.held
-                ? "Under review"
-                : result.status === "HIDDEN"
-                  ? "Not counted"
-                  : replaced
-                    ? "Replaces your earlier rating"
-                    : "Counts right away"}
-            </span>
+            <span className="text-base leading-[22px] font-bold">Your score</span>
+            <span className="text-[13px] leading-[18px] text-muted-foreground">{status}</span>
           </span>
         </div>
 
+        {seats && <Seats total={result.minRaters} filled={others} you="taken" className="mt-4" />}
+
         {result.stale && !result.held ? (
-          <p>Saved. Its score and rank will update in a moment.</p>
-        ) : result.status === "HIDDEN" ? (
-          <p>Saved, but it does not count: a moderator hid your rating of this dish.</p>
+          <p className="mt-3.5 text-[15px] leading-5 font-semibold">
+            Saved. Its score and rank will update in a moment.
+          </p>
+        ) : hidden ? (
+          <p className="mt-3.5 text-[15px] leading-5 font-semibold">
+            Saved, but it does not count: a moderator hid your rating of this dish.
+          </p>
         ) : result.held ? (
-          <p>
+          <p className="mt-3.5 text-[15px] leading-5 font-semibold">
             Your rating is under review
             {result.heldReason === "COMMENT" ? " because of the comment" : ""}. It counts once a
             moderator has checked it.
           </p>
-        ) : ranked ? (
-          <div className="flex flex-col gap-3">
-            <p>
-              <span className="font-medium">What your rating did: </span>
-              {rankSentence(result, cityName)} Your {yourScore} counts right away, and more than
-              older votes.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <ScoreBadge score={result.score!} votes={result.votes} size="lg" />
-              {result.mode === "bootstrap" && <Badge>New list</Badge>}
-            </div>
-          </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            <div
-              role="progressbar"
-              aria-label={`${result.votes} of ${result.minRaters} raters`}
-              aria-valuemin={0}
-              aria-valuemax={result.minRaters}
-              aria-valuenow={Math.min(result.votes, result.minRaters)}
-              className="h-2 w-full overflow-hidden rounded-full bg-muted"
-            >
-              <div className="h-full rounded-full bg-brand" style={{ width: `${share_ * 100}%` }} />
-            </div>
-            <p>
-              <span className="font-medium">
-                {result.votes} of {result.minRaters} raters so far:
-              </span>{" "}
-              {result.restaurant.name}{" "}
-              {formatNeeded(result.votes, result.minRaters, result.ratingsNeeded === 0)} for{" "}
-              {result.dish.name}.
+          <>
+            <p className="mt-3.5 font-display text-xl leading-6 font-extrabold">
+              {impactLine(result)}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Know someone who ate there? Share it and they can add theirs.
+            {ranked && result.previousRank !== null && (
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                {rankSentence(result, cityName)}
+              </p>
+            )}
+            <p className="mt-1 text-sm leading-5">
+              Know someone who ate there? Send them the list and they can add theirs.
             </p>
-          </div>
+            <ShareButton
+              city={result.restaurant.citySlug}
+              dish={result.dish.slug}
+              title={result.restaurant.name}
+              text={share.text}
+              path={listPath}
+              label="Share on WhatsApp"
+              variant="cta"
+              fallback="whatsapp"
+              className="mt-4 w-full"
+            />
+          </>
         )}
-      </div>
+      </section>
 
-      <div className="flex flex-col gap-2">
-        <Button type="button" size="lg" onClick={onSameRestaurant} className="w-full">
-          Rate another dish here
-        </Button>
+      <div className="mt-4 flex flex-col gap-2.5">
         <ButtonLink
           variant="outline"
+          size="lg"
           href={`${listPath}?rate=1`}
-          className="h-auto min-h-12 w-full py-2 whitespace-normal"
+          className="h-auto min-h-13 w-full py-2 text-[15px] whitespace-normal"
         >
           Rate more places for {result.dish.name}
         </ButtonLink>
-        {counted && (
-          <ShareButton
-            city={result.restaurant.citySlug}
-            dish={result.dish.slug}
-            title={result.restaurant.name}
-            text={share.text}
-            path={share.path}
-            label={share.label}
-            className="h-12 w-full"
-          />
-        )}
-        <div className="flex items-center justify-center gap-6 text-base">
-          <Button type="button" variant="link" onClick={onElsewhere} className="min-h-11">
-            Rate somewhere else
-          </Button>
-          <Link
-            href="/me"
-            className="inline-flex min-h-11 items-center font-medium text-brand underline-offset-4 hover:underline"
-          >
-            My ratings
-          </Link>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          onClick={onSameRestaurant}
+          className="w-full text-[15px]"
+        >
+          Rate another dish here
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-x-7">
+        <button
+          type="button"
+          onClick={onElsewhere}
+          className="inline-flex min-h-11 items-center text-sm leading-5 font-bold text-brand-dark hover:text-brand-press"
+        >
+          Rate somewhere else
+        </button>
+        <Link
+          href="/me"
+          className="inline-flex min-h-11 items-center text-sm leading-5 font-bold text-brand-dark hover:text-brand-press"
+        >
+          My ratings
+        </Link>
       </div>
     </section>
   );

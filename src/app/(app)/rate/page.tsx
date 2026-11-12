@@ -20,8 +20,8 @@ export default async function RatePage({ searchParams }: PageProps<"/rate">) {
     suggest: one(params.suggest),
   });
   return (
-    <Main width="narrow" className="gap-4">
-      <h1 className="sr-only">Rate a dish</h1>
+    <Main width="narrow" className="gap-4 pt-4">
+      {/* Each step's title is the page's h1 (RateFlow). */}
       <RateFlow data={data} />
     </Main>
   );

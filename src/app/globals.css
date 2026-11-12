@@ -225,3 +225,7 @@ body[data-rate-mode] [data-tabbar],
 body[data-keyboard] [data-tabbar] {
   display: none;
 }
+/* In rate mode the dish page's own header, sheet top and lists step aside for the rate screen. */
+body[data-rate-mode] [data-rate-hide] {
+  display: none;
+}
