@@ -1,7 +1,7 @@
 "use client";
 
-// Keeps the visit's source tag (docs/01 D1b): the first ?s= tag seen in this visit goes in a session
-// cookie that the browser's events and the sign-up carry. The address is read only in the browser,
+// Keeps the source tag (docs/01 D1b): the first ?s= tag goes in a first-party cookie for 7 days
+// (the tag only) that the browser's events and the sign-up carry. The address is read only in the browser,
 // so the cached pages stay static and their canonical URLs stay clean.
 import { useEffect } from "react";
 import { sourceCookie, sourceFromCookies, sourceFromSearch, visitSource } from "@/lib/source-tag";

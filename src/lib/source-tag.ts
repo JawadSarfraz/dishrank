@@ -1,5 +1,5 @@
 // Source tags (docs/01 D1b, 2026-11-11): a short tag on a landing URL (?s=wa, ?s=ig, ?s=qr, …) says
-// which channel a visit came from. The browser keeps the first tag of the visit in a session cookie
+// which channel a visit came from. The browser keeps the first tag for 7 days in a first-party cookie
 // (the pages stay static: nothing on the server reads the query, and canonical URLs never carry it),
 // the account saves it once at sign-up, and /admin/analytics counts dish-page visits, new raters
 // and ratings per source. A tag is never about who: lowercase letters and digits, twelve at most.
@@ -7,7 +7,7 @@
 export const SOURCE_TAG = {
   /** The query parameter: /islamabad/best-chicken-karahi?s=wa */
   param: "s",
-  /** A session cookie: the visit's source, read by the browser's events and by the sign-up hook. */
+  /** A first-party cookie holding the tag only, read by the browser's events and the sign-up hook. */
   cookie: "dishrank_source",
   pattern: /^[a-z0-9]{1,12}$/,
   /** The tag the site's own Share buttons put on the links they hand out. */
@@ -39,12 +39,19 @@ export function sourceFromCookies(cookies: string): string | null {
   return null;
 }
 
-/** The first tag of the visit wins: a stored one stays; an arriving one counts only when none is stored. */
+/**
+ * The first tag wins for its 7 days: a stored one stays (and keeps its expiry); an arriving one
+ * counts only when none is stored. So a sign-up a few days after a tagged visit still counts
+ * (owner, 2026-11-13; until then the tag lived for the visit only).
+ */
 export const visitSource = (stored: string | null, arrived: string | null) => stored ?? arrived;
 
-/** The `document.cookie` assignment that keeps the tag for the visit (no expiry: the session). */
+/** How long a tag is kept: 7 days. */
+export const SOURCE_TAG_MAX_AGE = 7 * 24 * 60 * 60;
+
+/** The `document.cookie` assignment that keeps the tag for 7 days. */
 export const sourceCookie = (tag: string, secure: boolean) =>
-  `${SOURCE_TAG.cookie}=${encodeURIComponent(tag)}; Path=/; SameSite=Lax${secure ? "; Secure" : ""}`;
+  `${SOURCE_TAG.cookie}=${encodeURIComponent(tag)}; Path=/; Max-Age=${SOURCE_TAG_MAX_AGE}; SameSite=Lax${secure ? "; Secure" : ""}`;
 
 /** The account's source at sign-up: an invite link's label, else the visit's tag, else none. */
 export const newAccountSource = (inviteLabel: string | null, visitTag: string | null) =>

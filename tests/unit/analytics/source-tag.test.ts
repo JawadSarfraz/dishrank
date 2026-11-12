@@ -52,10 +52,11 @@ describe("source tags", () => {
     expect(newAccountSource(null, null)).toBeNull();
   });
 
-  it("writes a session cookie, Secure on https, and tags shared links", () => {
-    expect(sourceCookie("wa", true)).toBe("dishrank_source=wa; Path=/; SameSite=Lax; Secure");
+  it("keeps the tag only, for 7 days, Secure on https, and tags shared links", () => {
+    expect(sourceCookie("wa", true)).toBe(
+      "dishrank_source=wa; Path=/; Max-Age=604800; SameSite=Lax; Secure",
+    );
     expect(sourceCookie("wa", false)).not.toContain("Secure");
-    expect(sourceCookie("wa", false)).not.toMatch(/Max-Age|Expires/);
     expect(
       withShareTag(new URL("https://kahankhayen.com/islamabad/best-chicken-karahi")).toString(),
     ).toBe("https://kahankhayen.com/islamabad/best-chicken-karahi?s=share");

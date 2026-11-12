@@ -159,10 +159,11 @@ export default async function AdminAnalyticsPage() {
         <h2 className="text-lg font-bold">Sources</h2>
         <p className="max-w-prose text-sm text-muted-foreground">
           A short tag on a landing link (?s=wa, ig, fb, li, rd, qr; the Share buttons add s=share)
-          is kept for the visit and saved once on the account at sign-up; whoever joins by an invite
-          link gets the link&apos;s label. Per week: visits to dish pages by tag, accounts whose
-          first rating fell in that week by their source, and ratings by the rater&apos;s source.
-          &quot;(none)&quot; is a visit or an account without one. Counted since 11 Nov 2026.
+          is kept for 7 days in a first-party cookie (the tag only; the visit only before 13 Nov
+          2026) and saved once on the account at sign-up; whoever joins by an invite link gets the
+          link&apos;s label. Per week: visits to dish pages by tag, accounts whose first rating fell
+          in that week by their source, and ratings by the rater&apos;s source. &quot;(none)&quot;
+          is a visit or an account without one. Counted since 11 Nov 2026.
         </p>
         <SourceTable rows={data.sources} />
       </section>
