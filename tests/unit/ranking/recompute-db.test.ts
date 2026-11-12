@@ -143,6 +143,7 @@ describe("RankingService.recomputeOne (docs/04, test DB)", () => {
         status: "USER_CONFIRMED",
         score: 7.5,
         weightSum: 5,
+        eligibilityWeight: 5,
         ratingCount: stats.distinctRaters,
         ...stats,
       });

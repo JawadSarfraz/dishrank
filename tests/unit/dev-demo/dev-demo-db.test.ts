@@ -111,6 +111,7 @@ describe("pnpm dev:demo create and undo (test DB)", () => {
       ratingCount: 9,
       distinctRaters: 9,
       weightSum: 6,
+      eligibilityWeight: 6,
       weightedScoreSum: 27,
       rawMean: 3,
       score: 3,

@@ -557,6 +557,7 @@ model RestaurantDish {
   ratingCount      Int                  @default(0)
   distinctRaters   Int                  @default(0)
   weightSum        Float                @default(0)
+  eligibilityWeight Float                @default(0) // Σ trust of the counted ratings, no decay: eligibility only (docs/04, 2026-11-13); weightSum (decayed) drives the score
   weightedScoreSum Float                @default(0)
   rawMean          Decimal?             @db.Decimal(5, 3)
   score            Decimal?             @db.Decimal(5, 3)

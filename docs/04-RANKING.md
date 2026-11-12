@@ -41,13 +41,15 @@ Few votes → score pulled toward the city average for that dish. Many votes →
 eligible =
   RD.status IN (USER_CONFIRMED, MENU_VERIFIED, OWNER_VERIFIED)
   AND distinctRaters >= MIN_RATERS        (8)
-  AND W >= MIN_WEIGHT                     (5.0)
+  AND W_elig >= MIN_WEIGHT                (5.0)
   AND restaurant.status = ACTIVE
 ```
 
+`W_elig` is the raters' trust summed **without time decay** (`RestaurantDish.eligibilityWeight`, owner 2026-11-13), under both the early and the normal rules. Decay stays in the score (`W` and `R` above), so an old rating moves the score less, but a place that has qualified does not drop off the list again just because its ratings age without new votes. The weight bar itself is deliberate (owner, 2026-11-13): in early rankings four brand-new accounts (4 × 0.6 = 2.4) do not rank a place on their own; a fifth rater, or one established rater, does, and a fifth new account in a day trips the burst rule. Copy never promises exactly four: "4+ votes rank a place", "at least 4 diners", and rows short only on weight say "a few more ratings".
+
 **Bootstrap mode**: while `City.launchedAt` is NULL and for 60 days after it, use `MIN_RATERS = 4`, `MIN_WEIGHT = 2.5`, and label the page "Early rankings". The seed never sets `launchedAt`, so a city starts in early rankings and stays there, for as long as it takes. An admin sets the date once on `/admin/rankings` with **End early rankings in 60 days**: the name says what it does, because it starts nothing. Going live is `SITE_MODE`, a separate decision (`docs/DEPLOY-CHECKLIST.md`). On day 60 the nightly run re-ranks with the normal thresholds, so every row below them loses its rank and a dish page left without one goes noindex. The confirm step shows how many places rank now and how many would still rank under the normal rules; nothing in the admin moves or undoes the date.
 
-Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCount DESC, lastRatedAt DESC`, under the heading "Not enough votes yet". They never get a rank number.
+Rows that are not eligible are returned in `insufficient[]` sorted by `ratingCount DESC, lastRatedAt DESC`, under the heading "Still need votes". They never get a rank number.
 
 ## Ordering and ties
 

@@ -50,6 +50,7 @@ const rankingRowSelect = {
   distinctRaters: true,
   ratingCount: true,
   weightSum: true,
+  eligibilityWeight: true,
   rankInCity: true,
   lastRatedAt: true,
   price: true,

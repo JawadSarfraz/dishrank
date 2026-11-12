@@ -62,9 +62,9 @@ export default function HowRankingsWorkPage() {
 
         <h2>How much a rating counts</h2>
         <p>
-          Recent ratings count more, because restaurants change. A rating counts half after{" "}
-          {RANKING.halfLifeDays} days and a quarter after {RANKING.halfLifeDays * 2} days. A rating
-          also counts more or less depending on the rater&apos;s trust level (below).
+          In the score, recent ratings count more, because restaurants change. A rating counts half
+          after {RANKING.halfLifeDays} days and a quarter after {RANKING.halfLifeDays * 2} days. A
+          rating also counts more or less depending on the rater&apos;s trust level (below).
         </p>
 
         <h2>The score</h2>
@@ -81,19 +81,22 @@ export default function HowRankingsWorkPage() {
         <h2>Who gets a rank number</h2>
         <p>
           A restaurant gets a rank for a dish only when at least {normal.minRaters} different people
-          have rated it there, their ratings together count for at least{" "}
-          {normal.minWeight.toFixed(1)} (see above), and the dish is confirmed:{" "}
-          {RANKING.promoteRaters} different people have rated it, or we have seen it on the menu, or
-          the owner has confirmed it. Everything else is listed under &quot;Still need votes&quot;,
-          with how many more raters it needs, and places nobody has rated yet are under
-          &quot;Contenders&quot; (on a list that already ranks, at the end of &quot;Still need
-          votes&quot;). Neither ever gets a rank number.
+          have rated it there, their trust levels (below) add up to at least{" "}
+          {normal.minWeight.toFixed(1)}, and the dish is confirmed: {RANKING.promoteRaters}{" "}
+          different people have rated it, or we have seen it on the menu, or the owner has confirmed
+          it. Everything else is listed under &quot;Still need votes&quot;, with how many more
+          raters it needs, and places nobody has rated yet are under &quot;Contenders&quot; (on a
+          list that already ranks, at the end of &quot;Still need votes&quot;). Neither ever gets a
+          rank number. Age does not count here: a place that has earned its rank keeps it without
+          new votes, and age only moves its score.
         </p>
         <Callout icon={<ScaleIcon />}>
           <p>
-            <strong>Early rankings.</strong> While a city is new on {BRAND.name}, a rank needs{" "}
-            {bootstrap.minRaters} different people and a weight of {bootstrap.minWeight.toFixed(1)}.
-            Those pages say &quot;Early rankings&quot;.
+            <strong>Early rankings.</strong> While a city is new on {BRAND.name}, a rank needs at
+            least {bootstrap.minRaters} different people and a weight of{" "}
+            {bootstrap.minWeight.toFixed(1)}. Those pages say &quot;Early rankings&quot;. New
+            accounts count a little less until they&apos;ve rated {TRUST.established.minActive}{" "}
+            dishes at {TRUST.established.minRestaurants} or more places.
           </p>
         </Callout>
         <p>

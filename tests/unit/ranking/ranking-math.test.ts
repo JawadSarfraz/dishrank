@@ -45,27 +45,47 @@ describe("ranking math (docs/04)", () => {
 
   it("eligibility needs a confirmed status, enough raters and weight, a score and an active restaurant", () => {
     const t = thresholdsFor(daysAgo(90), NOW);
-    const row = { status: "USER_CONFIRMED", distinctRaters: 8, weightSum: 5, score: 7.5 };
+    const row = { status: "USER_CONFIRMED", distinctRaters: 8, eligibilityWeight: 5, score: 7.5 };
     expect(isEligible(row, true, t)).toBe(true);
     expect(isEligible({ ...row, status: "CANDIDATE" }, true, t)).toBe(false);
     expect(isEligible({ ...row, status: "STALE" }, true, t)).toBe(false);
     expect(isEligible({ ...row, distinctRaters: 7 }, true, t)).toBe(false);
-    expect(isEligible({ ...row, weightSum: 4.99 }, true, t)).toBe(false);
+    expect(isEligible({ ...row, eligibilityWeight: 4.99 }, true, t)).toBe(false);
     expect(isEligible({ ...row, score: null }, true, t)).toBe(false);
     expect(isEligible(row, false, t)).toBe(false);
     // Bootstrap: 4 raters and W 2.5 are enough.
     expect(
-      isEligible({ ...row, distinctRaters: 4, weightSum: 2.5 }, true, thresholdsFor(null, NOW)),
+      isEligible({ ...row, distinctRaters: 4, eligibilityWeight: 2.5 }, true, thresholdsFor(null, NOW)),
     ).toBe(true);
   });
 
   it("counts the ratings still needed: missing raters, or missing weight in fresh 0.6 ratings", () => {
     const normal = thresholdsFor(daysAgo(90), NOW);
-    expect(ratingsNeeded({ distinctRaters: 3, weightSum: 1.8 }, normal)).toBe(6); // weight: (5-1.8)/0.6 → 6
-    expect(ratingsNeeded({ distinctRaters: 8, weightSum: 4.8 }, normal)).toBe(1);
-    expect(ratingsNeeded({ distinctRaters: 8, weightSum: 4.4 }, normal)).toBe(1);
-    expect(ratingsNeeded({ distinctRaters: 9, weightSum: 6 }, normal)).toBe(0);
-    expect(ratingsNeeded({ distinctRaters: 1, weightSum: 1.3 }, thresholdsFor(null, NOW))).toBe(3);
+    expect(ratingsNeeded({ distinctRaters: 3, eligibilityWeight: 1.8 }, normal)).toBe(6); // weight: (5-1.8)/0.6 → 6
+    expect(ratingsNeeded({ distinctRaters: 8, eligibilityWeight: 4.8 }, normal)).toBe(1);
+    expect(ratingsNeeded({ distinctRaters: 8, eligibilityWeight: 4.4 }, normal)).toBe(1);
+    expect(ratingsNeeded({ distinctRaters: 9, eligibilityWeight: 6 }, normal)).toBe(0);
+    expect(ratingsNeeded({ distinctRaters: 1, eligibilityWeight: 1.3 }, thresholdsFor(null, NOW))).toBe(3);
+  });
+
+  it("a place that just qualified stays eligible as its ratings age; only its score decays", () => {
+    // Four established raters (trust 1.0): eligibility weight 4, over the 2.5 bar.
+    const ratings = ["a", "b", "c", "d"].map((userId) => ({
+      userId,
+      score: 8,
+      updatedAt: daysAgo(0),
+      trust: 1,
+    }));
+    const early = thresholdsFor(null, NOW);
+    const later = new Date(NOW.getTime() + 400 * 86_400_000); // over two half-lives, no new votes
+    for (const at of [NOW, later]) {
+      const agg = aggregateRatings(ratings, at);
+      const row = { ...agg, status: "USER_CONFIRMED", score: 7.9 };
+      expect(row.distinctRaters).toBe(4);
+      expect(isEligible(row, true, thresholdsFor(null, at)), at.toISOString()).toBe(true);
+    }
+    // The decayed weight did fall below the bar: with decay the place would have dropped off.
+    expect(aggregateRatings(ratings, later).weightSum).toBeLessThan(early.minWeight);
   });
 
   it("aggregates counted ratings: W, the weighted mean and the last rating time", () => {
@@ -77,6 +97,8 @@ describe("ranking math (docs/04)", () => {
       NOW,
     );
     expect(agg.weightSum).toBeCloseTo(1.5, 12);
+    // Eligibility weight is the same trust without decay (owner, 2026-11-13).
+    expect(agg.eligibilityWeight).toBe(2);
     expect(agg.rawMean).toBeCloseTo((10 + 0.5 * 4) / 1.5, 12);
     expect(agg).toMatchObject({ ratingCount: 2, distinctRaters: 2, lastRatedAt: daysAgo(0) });
     expect(aggregateRatings([], NOW)).toMatchObject({

@@ -122,7 +122,7 @@ export async function rerankCityDish(
     WHERE rd."cityId" = ${input.cityId} AND rd."dishId" = ${input.dishId}
       AND rd.status::text IN (${Prisma.join([...input.statuses])})
       AND rd."distinctRaters" >= ${input.minRaters}
-      AND rd."weightSum" >= ${input.minWeight}
+      AND rd."eligibilityWeight" >= ${input.minWeight}
       AND rd.score IS NOT NULL`;
   await tx.$executeRaw`
     UPDATE "RestaurantDish" SET "rankInCity" = NULL

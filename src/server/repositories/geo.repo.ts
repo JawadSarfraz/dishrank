@@ -146,7 +146,7 @@ export async function countRankedRowsByCity(
   return client.$queryRaw<{ cityId: string; ranked: number; kept: number }[]>`
     SELECT "cityId", count(*)::int AS ranked,
       (count(*) FILTER (
-        WHERE "distinctRaters" >= ${min.minRaters} AND "weightSum" >= ${min.minWeight}
+        WHERE "distinctRaters" >= ${min.minRaters} AND "eligibilityWeight" >= ${min.minWeight}
       ))::int AS kept
     FROM "RestaurantDish"
     WHERE "rankInCity" IS NOT NULL

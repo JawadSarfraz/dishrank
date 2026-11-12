@@ -75,18 +75,23 @@ export function thresholdsFor(launchedAt: Date | null, now: Date): Thresholds {
 type RankableRow = {
   status: RestaurantDishStatus | string;
   distinctRaters: number;
-  weightSum: number;
+  /** The raters' trust summed WITHOUT time decay (docs/04, 2026-11-13): eligibility only. */
+  eligibilityWeight: number;
   score: number | null;
 };
 
-/** docs/04 eligibility; the ranking SQL (ranking.repo rerankCityDish) applies the same rule. */
+/**
+ * docs/04 eligibility; the ranking SQL (ranking.repo rerankCityDish) applies the same rule. The
+ * weight bar uses undecayed weight, so a place that qualified stays on the list without new votes;
+ * decay only moves its score.
+ */
 export function isEligible(row: RankableRow, restaurantActive: boolean, t: Thresholds): boolean {
   return (
     restaurantActive &&
     row.score !== null &&
     (RANKING.eligibleStatuses as readonly string[]).includes(row.status) &&
     row.distinctRaters >= t.minRaters &&
-    row.weightSum >= t.minWeight
+    row.eligibilityWeight >= t.minWeight
   );
 }
 
@@ -95,11 +100,11 @@ export function isEligible(row: RankableRow, restaurantActive: boolean, t: Thres
  * fresh new-account ratings (trust 0.6 each), whichever is larger. 0 when nothing is missing.
  */
 export function ratingsNeeded(
-  row: Pick<RankableRow, "distinctRaters" | "weightSum">,
+  row: Pick<RankableRow, "distinctRaters" | "eligibilityWeight">,
   t: Thresholds,
 ) {
   const raters = t.minRaters - row.distinctRaters;
-  const weight = Math.ceil((t.minWeight - row.weightSum) / TRUST.newAccount - 1e-9);
+  const weight = Math.ceil((t.minWeight - row.eligibilityWeight) / TRUST.newAccount - 1e-9);
   return Math.max(0, raters, weight);
 }
 
@@ -181,11 +186,13 @@ export type CountedRating = { userId: string; score: number; updatedAt: Date; tr
 /** The docs/04 sums over the counted (active, not banned) ratings of one dish row. */
 export function aggregateRatings(ratings: readonly CountedRating[], now: Date) {
   let weightSum = 0;
+  let eligibilityWeight = 0;
   let weightedScoreSum = 0;
   let lastRatedAt: Date | null = null;
   for (const r of ratings) {
     const w = ratingWeight(r.trust, (now.getTime() - r.updatedAt.getTime()) / DAY_MS);
     weightSum += w;
+    eligibilityWeight += r.trust;
     weightedScoreSum += w * r.score;
     if (!lastRatedAt || r.updatedAt > lastRatedAt) lastRatedAt = r.updatedAt;
   }
@@ -194,6 +201,7 @@ export function aggregateRatings(ratings: readonly CountedRating[], now: Date) {
     // Ratings are unique per user per row, so the two counts agree; both columns stay for later.
     distinctRaters: new Set(ratings.map((r) => r.userId)).size,
     weightSum,
+    eligibilityWeight,
     weightedScoreSum,
     rawMean: weightSum > 0 ? weightedScoreSum / weightSum : null,
     lastRatedAt,
@@ -266,6 +274,7 @@ export async function recomputeOne(
         ratingCount: agg.ratingCount,
         distinctRaters: agg.distinctRaters,
         weightSum: agg.weightSum,
+        eligibilityWeight: agg.eligibilityWeight,
         weightedScoreSum: agg.weightedScoreSum,
         rawMean: agg.rawMean === null ? null : round3(agg.rawMean),
         score,
@@ -281,7 +290,7 @@ export async function recomputeOne(
     const row = {
       status: updated.status,
       distinctRaters: agg.distinctRaters,
-      weightSum: agg.weightSum,
+      eligibilityWeight: agg.eligibilityWeight,
       score,
     };
     return {
@@ -578,7 +587,10 @@ async function loadRanking(options: RankingOptions, now: Date) {
     .filter((r) => r.rankInCity === null)
     .map((r): InsufficientRow => ({
       ...base(r),
-      ratingsNeeded: ratingsNeeded({ distinctRaters: r.distinctRaters, weightSum: r.weightSum }, t),
+      ratingsNeeded: ratingsNeeded(
+        { distinctRaters: r.distinctRaters, eligibilityWeight: r.eligibilityWeight },
+        t,
+      ),
     }))
     .sort(
       (a, b) =>
