@@ -98,7 +98,7 @@ export function Wordmark({
   const s = SIZES[size];
   return (
     <span className={cn("inline-flex items-center gap-2.5 text-ink", className)}>
-      <LogoMark size={s.mark} className="text-brand" />
+      <LogoMark size={s.mark} className={cn("text-brand", size === "md" && "lg:size-10")} />
       <span className="flex flex-col items-start gap-1">
         <span className={cn("font-display font-extrabold tracking-[-0.01em]", s.text)}>
           {BRAND.name}

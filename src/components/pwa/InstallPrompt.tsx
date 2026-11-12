@@ -66,7 +66,7 @@ export function InstallPrompt() {
   return (
     <section
       aria-label={`Add ${BRAND.name} to your home screen`}
-      className="fixed inset-x-3 bottom-[calc(var(--tabbar-height)+12px)] z-40 lg:bottom-3 mx-auto flex max-w-md flex-col gap-3 rounded-2xl border bg-card p-4 shadow-raised animate-in slide-in-from-bottom-4 fade-in-0 duration-300 sm:inset-x-auto sm:right-4 sm:bottom-4"
+      className="fixed inset-x-3 bottom-[calc(var(--tabbar-height)+12px)] z-40 lg:bottom-3 mx-auto flex max-w-md flex-col gap-3 rounded-2xl border bg-card p-4 shadow-raised animate-in slide-in-from-bottom-4 fade-in-0 duration-300 sm:inset-x-auto sm:right-4"
       style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
     >
       <div className="flex items-start gap-3">

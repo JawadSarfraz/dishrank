@@ -16,6 +16,7 @@ import { hasDishPhoto } from "@/components/dish/DishMedia";
 import { Podium } from "@/components/dish/Podium";
 import { JsonLd } from "@/components/layout/JsonLd";
 import { Contenders } from "@/components/ranking/Contenders";
+import { romanUrduLine } from "@/components/home/featured-copy";
 import { QuickRate } from "@/components/ranking/QuickRate";
 import { RankingBrowser } from "@/components/ranking/RankingBrowser";
 import { ShareButton } from "@/components/ranking/ShareButton";
@@ -265,6 +266,10 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
             citySlug={ranking.city.slug}
             dishSlug={ranking.dish.slug}
             seed={ranking.shuffleSeed}
+            // Ranked lists ask the spec's question when it reads right for the dish (spec §5).
+            {...(isRanked && romanUrduLine(ranking.dish.slug)
+              ? { helper: romanUrduLine(ranking.dish.slug) }
+              : {})}
           >
             {isRanked && (
               <RankingBrowser

@@ -83,7 +83,7 @@ export function DishSearch({
           placeholder="Find a dish: karahi, kadai, nihari…"
           autoComplete="off"
           enterKeyHint="search"
-          className={cn("field scroll-mt-4 pl-11", popover && "h-11 min-h-11 text-[15px]")}
+          className={cn("field scroll-mt-4 pl-11", popover && "h-11 min-h-11")}
         />
       </div>
       {hits && (

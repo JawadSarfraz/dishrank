@@ -353,7 +353,7 @@ function RestaurantStep({
             placeholder="e.g. Butt Karahi"
             autoComplete="off"
             enterKeyHint="search"
-            className="field h-12 pl-11 text-[15px] font-normal"
+            className="field h-12 pl-11 font-normal"
           />
         </span>
       </label>
@@ -482,7 +482,7 @@ function DishStep({
             onChange={(e) => setQ(e.target.value)}
             placeholder="e.g. karahi, kadai, nihari"
             autoComplete="off"
-            className="field h-12 pl-11 text-[15px] font-normal"
+            className="field h-12 pl-11 font-normal"
           />
         </span>
       </label>
@@ -770,7 +770,7 @@ function ScoreStep({
             maxLength={280}
             rows={3}
             placeholder="What stood out? (no phone numbers or links)"
-            className="field py-2 text-[15px] font-normal"
+            className="field py-2 font-normal"
           />
           <span className="text-xs leading-4 font-normal text-muted-foreground">
             {comment.length}/280

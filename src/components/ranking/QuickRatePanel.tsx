@@ -484,7 +484,7 @@ export default function QuickRatePanel({
             placeholder="e.g. Butt Karahi"
             autoComplete="off"
             enterKeyHint="search"
-            className="field h-12 pl-11 text-[15px]"
+            className="field h-12 pl-11"
           />
         </span>
       </div>

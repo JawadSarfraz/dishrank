@@ -18,10 +18,10 @@ export const BRAND = {
   shareCall: "Aap ki rai? Jo 3 jagah try ki hain, unhein rate karein:",
   description:
     "The best restaurants for each dish in Islamabad and Rawalpindi, ranked by diners who ate there.",
-  /** The browser chrome of the installed app and the manifest (= --brand). */
-  themeColor: "#0E6B4A",
-  /** The splash screen behind the icon (= --background). */
-  backgroundColor: "#F7F8F6",
+  /** The browser chrome of the installed app and the manifest (= --brand, chilli red). */
+  themeColor: "#D42A19",
+  /** The splash screen behind the icon (= --background, white). */
+  backgroundColor: "#FFFFFF",
 } as const;
 
 /** "Rate a dish · Kahan Khayen", "Best Chicken Karahi in Islamabad – Kahan Khayen". */

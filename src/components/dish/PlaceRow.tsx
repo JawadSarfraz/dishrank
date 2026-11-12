@@ -99,6 +99,6 @@ export function ListHeader({
 
 /** The 44 px filter controls above a list (spec §5: area select, "Near me"). */
 export const CONTROL_SELECT =
-  "field field-select h-11 min-h-11 rounded-control text-[15px] font-semibold";
+  "field field-select h-11 min-h-11 rounded-control text-base font-semibold";
 export const CONTROL_BUTTON =
   "h-11 rounded-control border-[1.5px] border-line-strong bg-card px-3.5 text-[15px] font-semibold text-ink hover:bg-sand";

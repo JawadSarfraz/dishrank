@@ -5,11 +5,11 @@
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
-const BRAND = "#0e6b4a";
-const GOLD = "#d4a72c";
+const BRAND = "#d42a19";
+const GOLD = "#f5b800";
 const PAPER = "#ffffff";
 
-/** The mark, white on the brand green (the same drawing as Logo.tsx). */
+/** The mark, white on the brand red (the same drawing as Logo.tsx). */
 const mark = (ink: string, gold: string, scale: number, offset: number) =>
   `<g transform="translate(${offset} ${offset}) scale(${scale})">
     <circle cx="16" cy="16" r="11.5" fill="none" stroke="${ink}" stroke-width="2.6"/>
@@ -20,7 +20,7 @@ const mark = (ink: string, gold: string, scale: number, offset: number) =>
     <rect x="19.4" y="17" width="3.6" height="5" rx="1.2" fill="${ink}"/>
   </g>`;
 
-/** A rounded green tile with the mark (any-purpose icons and the favicon). */
+/** A rounded red tile with the mark (any-purpose icons and the favicon). */
 const tile = (
   size: number,
 ) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}">

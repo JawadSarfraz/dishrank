@@ -1,5 +1,5 @@
-// A score is never shown without its vote count (docs/01 copy rules), and its colour follows the
-// score band (src/lib/score-band.ts). Server-safe; used on every public page.
+// A score is never shown without its rater count (docs/01 copy rules); it is the small blush score
+// pill (docs/12-DESIGN.md). Server-safe; used on every public page.
 import { cn } from "cn";
 import { formatScore, formatVotes } from "@/lib/format";
 import { SCORE_BAND_CLASS, scoreBand } from "@/lib/score-band";
