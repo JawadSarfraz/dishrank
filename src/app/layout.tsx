@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { SourceTag } from "@/components/analytics/SourceTag";
 import { UrduNameDefs } from "@/components/brand/Logo";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { TabBar } from "@/components/layout/TabBar";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { PwaRegister } from "@/components/pwa/PwaRegister";
 import { Toaster } from "@/components/ui/toast";
@@ -33,7 +34,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={htmlClassName}>
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col pb-tabbar">
         <UrduNameDefs />
         <Toaster>
           <SiteHeader beta={isBeta} />
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <PwaRegister />
           <InstallPrompt />
           <SourceTag />
+          <TabBar />
         </Toaster>
       </body>
     </html>

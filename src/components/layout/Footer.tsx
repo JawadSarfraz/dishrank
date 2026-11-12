@@ -14,11 +14,11 @@ const LINKS = [
 export function Footer() {
   return (
     <footer className="mt-auto border-t bg-card">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-4 py-8 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-5 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <Wordmark size="sm" />
           <div className="flex flex-col gap-0.5 sm:items-end sm:text-right">
-            <p className="font-display text-base font-bold tracking-tight">{BRAND.tagline}</p>
+            <p className="font-display text-base font-extrabold">{BRAND.tagline}</p>
             <p className="text-sm text-muted-foreground">{BRAND.taglineEnglish}</p>
           </div>
         </div>
@@ -30,15 +30,15 @@ export function Footer() {
             <Link
               key={l.href}
               href={l.href}
-              className="inline-flex min-h-11 items-center text-sm font-medium text-foreground underline-offset-4 hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-ink underline-offset-4 hover:underline"
             >
               {l.label}
             </Link>
           ))}
         </nav>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[13px] leading-[18px] text-muted-foreground">
           Scores are diners&apos; opinions, not facts about a restaurant. Something wrong?{" "}
-          <Link href="/dispute" className="underline underline-offset-2">
+          <Link href="/dispute" className="font-semibold text-ink underline underline-offset-2">
             Tell us
           </Link>
           .

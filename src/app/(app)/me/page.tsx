@@ -6,6 +6,7 @@ import { DishIcon } from "@/components/brand/DishIcon";
 import { Main, PageHeader, SectionHeader } from "@/components/layout/Page";
 import { DeleteAccount } from "@/components/me/DeleteAccount";
 import { DeleteRatingButton } from "@/components/me/DeleteRatingButton";
+import { SignOutButton } from "@/components/me/SignOutButton";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getSessionUser } from "@/server/auth";
@@ -161,6 +162,19 @@ export default async function MyRatingsPage({ searchParams }: PageProps<"/me">) 
           </Link>
           .
         </p>
+        <div className="flex flex-wrap gap-2">
+          {user.role === "OWNER" && (
+            <ButtonLink href="/owner" variant="outline">
+              Owner area
+            </ButtonLink>
+          )}
+          {user.role === "ADMIN" && (
+            <ButtonLink href="/admin" variant="outline">
+              Admin
+            </ButtonLink>
+          )}
+          <SignOutButton />
+        </div>
         <DeleteAccount isAdmin={user.role === "ADMIN"} />
       </section>
     </Main>
