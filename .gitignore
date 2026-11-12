@@ -39,3 +39,6 @@ yarn-error.log*
 
 # personal editor settings
 .vscode/
+
+# The redesign handoff PNG exports (2026-11): kept locally, not in git.
+docs/design/redesign-2026-11/screens/
