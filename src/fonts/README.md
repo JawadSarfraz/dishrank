@@ -1,6 +1,6 @@
 # Fonts
 
-All three faces are under the SIL Open Font License 1.1; the licence texts with their copyright notices
+All the faces here are under the SIL Open Font License 1.1; the licence texts with their copyright notices
 sit next to the files. Everything is served from this site: nothing on a page, and nothing in a
 build, calls Google.
 
@@ -24,15 +24,19 @@ it broke the 2026-11-05 deploy), and because a deploy should not depend on a thi
 fallback. To update a face: `npm pack @fontsource-variable/<name>`, copy
 `files/<name>-latin-wght-normal.woff2` and `LICENSE` here, and note the version above.
 
-## For the share images (`next/og` in `src/app/opengraph-image.tsx`)
+## For the share images (`next/og`, `src/server/services/share-image-assets.ts`)
 
-Satori needs TTF, so two static instances are kept as well, both from Google Fonts
-(`fonts.gstatic.com`, latin subset):
+Satori reads TTF and WOFF, not WOFF2, so static instances are kept as well:
 
-- `bricolage-grotesque-800.ttf`: Bricolage Grotesque ExtraBold (titles, ranks).
-- `geist-500.ttf`: Geist Medium (names, counts).
+- `bricolage-grotesque-800.ttf`: Bricolage Grotesque ExtraBold from Google Fonts
+  (`fonts.gstatic.com`, latin subset): titles, numerals, the sticker and the vote pill.
+- `figtree-400.woff`, `figtree-600.woff`, `figtree-700.woff`: Figtree Regular, SemiBold and Bold,
+  `files/figtree-latin-<weight>-normal.woff` copied unchanged from `@fontsource/figtree` 5.2.10:
+  small print and notes (400), rater counts (600), names and the Roman-Urdu line (700).
 
-`next.config.ts` traces `src/fonts/*.ttf` into the two image routes.
+`next.config.ts` traces `src/fonts/*.ttf` and `*.woff` (and `public/dish-photos`) into the three
+image routes: the site's default image (`src/app/opengraph-image.tsx`), a dish page's link preview
+(`[city]/[slug]/share-image`) and its WhatsApp status card (`[city]/[slug]/share-image/status`).
 
 ## For the Urdu name in the logo (`src/components/brand/urdu-name.ts`)
 

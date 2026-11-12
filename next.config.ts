@@ -10,10 +10,20 @@ const nextConfig: NextConfig = {
   logging: { serverFunctions: false },
   // Server action bodies are small forms (ratings, review decisions); photos go straight to storage.
   experimental: { serverActions: { bodySizeLimit: "128kb" } },
-  // The share images read their fonts from src/fonts at request time (src/app/opengraph-image.tsx).
+  // The share images read their fonts (src/fonts) and the dish photos (public/dish-photos) at
+  // request time (src/server/services/share-image-assets.ts).
   outputFileTracingIncludes: {
-    "/opengraph-image": ["./src/fonts/*.ttf"],
-    "/[city]/[slug]/share-image": ["./src/fonts/*.ttf"],
+    "/opengraph-image": ["./src/fonts/*.ttf", "./src/fonts/*.woff"],
+    "/[city]/[slug]/share-image": [
+      "./src/fonts/*.ttf",
+      "./src/fonts/*.woff",
+      "./public/dish-photos/*",
+    ],
+    "/[city]/[slug]/share-image/status": [
+      "./src/fonts/*.ttf",
+      "./src/fonts/*.woff",
+      "./public/dish-photos/*",
+    ],
   },
   // Dish photos (public/dish-photos, docs/design/adding-photos.md) through next/image. Vercel Hobby
   // counts each new image transformation, so the set of widths, formats and qualities is small and

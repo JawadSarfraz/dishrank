@@ -19,7 +19,7 @@ export function LogoMark({
 }) {
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="-0.5 -0.5 33 33"
       width={size}
       height={size}
       aria-hidden="true"

@@ -1,121 +1,113 @@
-// The ranking page's share image (WhatsApp, Facebook): dish, city and a podium of the top three,
-// 1200 × 630, in the brand colours (docs/12-DESIGN.md). A route of its own, not opengraph-image, so
+// The ranking page's link-preview image (WhatsApp, Facebook), 1200 × 630, in the "Garma Garam"
+// look (redesign spec §7): blush ground, the logo, the title, then a podium of the top three when a
+// place ranks, or the first raters' seats while voting is open; the dish photo (or its tile and
+// glyph) on the right with the "Voting open" sticker. A route of its own, not opengraph-image, so
 // the page can put a version in the URL (src/server/services/share-image.ts). Rendered on each
-// request (crawlers fetch it rarely). Satori (next/og) needs an explicit flex display on every
-// element with text.
+// request (crawlers fetch it rarely).
 import { ImageResponse } from "next/og";
-import { OgSiteAddress, OgWordmark, ogFont } from "@/app/opengraph-image";
-import { BRAND } from "@/lib/brand";
-import { formatVotes } from "@/lib/format";
-import { SCORE_BAND_HEX } from "@/lib/score-band";
+import {
+  OG,
+  OgDishPanel,
+  OgLogo,
+  OgSeats,
+  OgSticker,
+  OgTitle,
+  OgVotePill,
+  fitName,
+  podiumSlots,
+} from "@/components/brand/ShareArt";
+import { dishLook } from "@/lib/dish-look";
 import { SLUG_PATTERN } from "@/lib/slug";
 import { getRankingPage } from "@/server/services/ranking.service";
-import { shareImageFacts } from "@/server/services/share-image";
+import { shareImageFacts, type ShareImageFacts } from "@/server/services/share-image";
+import { dishPhotoDataUri, shareImageFonts } from "@/server/services/share-image-assets";
+import { SITE_HOST } from "@/server/site";
 
-const display = ogFont("bricolage-grotesque-800.ttf");
-const body = ogFont("geist-500.ttf");
+type Row = ShareImageFacts["top"][number];
 
-const MEDAL: Record<number, { bg: string; ink: string }> = {
-  1: { bg: "#d4a72c", ink: "#3a2a00" },
-  2: { bg: "#d7dce1", ink: "#16201b" },
-  3: { bg: "#d9a77b", ink: "#16201b" },
-};
+/** The podium's blocks (spec §7): #1 gold and tallest in the middle, #2 and #3 white. */
+const BLOCKS = {
+  1: { height: 180, numeral: 72, name: 26, perLine: 13, bg: OG.gold },
+  2: { height: 140, numeral: 52, name: 24, perLine: 14, bg: OG.white },
+  3: { height: 116, numeral: 42, name: 22, perLine: 15, bg: OG.white },
+} as const;
 
-type Row = ReturnType<typeof shareImageFacts>["top"][number];
-
-function ScoreChip({ row, fontSize, padding }: { row: Row; fontSize: number; padding: string }) {
+function Podium({ top }: { top: Row[] }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        padding,
-        borderRadius: 12,
-        background: SCORE_BAND_HEX[row.band],
-        color: "#ffffff",
-        fontFamily: "Bricolage Grotesque",
-        fontSize,
-      }}
-    >
-      {row.score}
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 12, width: 620, height: 180 }}>
+      {podiumSlots(top).map((row, i) => {
+        if (!row) return <div key={i} style={{ display: "flex", flex: 1 }} />;
+        const b = BLOCKS[Math.min(row.rank, 3) as 1 | 2 | 3];
+        return (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: 1,
+              height: b.height,
+              padding: "8px 12px",
+              borderRadius: "20px 20px 0 0",
+              background: b.bg,
+              color: OG.ink,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                fontFamily: OG.display,
+                fontSize: b.numeral,
+                lineHeight: 1,
+              }}
+            >
+              {row.rank}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                textAlign: "center",
+                fontSize: b.name,
+                lineHeight: 1.15,
+                fontWeight: 700,
+              }}
+            >
+              {fitName(row.name, b.perLine, 2)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function Podium({ row, first, early }: { row: Row; first: boolean; early: boolean }) {
-  const medal = MEDAL[row.rank] ?? { bg: "#eef1ee", ink: "#16201b" };
+function SeatsRow({ seats }: { seats: NonNullable<ShareImageFacts["seats"]> }) {
+  // Four seats at the spec's sizes; more (a city past its early rankings) get smaller to fit.
+  const others = Math.min(72, Math.floor((440 - 80 - 14 * (seats.total - 1)) / (seats.total - 1)));
+  const [first, ...rest] = seats.call.split(" ");
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        flex: first ? 1.25 : 1,
-        minHeight: first ? 236 : 196,
-        padding: "22px 24px",
-        borderRadius: 24,
-        background: "#ffffff",
-        border: first ? "3px solid #d4a72c" : "2px solid #e2e6e2",
-        boxShadow: first ? "0 10px 0 #d4a72c" : "0 2px 0 #e2e6e2",
-        justifyContent: "space-between",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 54,
-            height: 54,
-            borderRadius: 999,
-            background: medal.bg,
-            color: medal.ink,
-            fontFamily: "Bricolage Grotesque",
-            fontSize: 30,
-          }}
-        >
-          {row.rank}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: first ? 34 : 28,
-            lineHeight: 1.1,
-            letterSpacing: -0.5,
-            overflow: "hidden",
-          }}
-        >
-          {row.name.length > 30 ? `${row.name.slice(0, 29)}…` : row.name}
-        </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 22 }}>
+      <OgSeats
+        total={seats.total}
+        filled={seats.filled}
+        you={{ size: 80, border: 4, font: 23 }}
+        seat={{ size: others, border: 3, font: Math.max(22, Math.round(others * 0.36)) }}
+        gap={14}
+      />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: OG.display,
+          fontSize: 30,
+          lineHeight: "34px",
+        }}
+      >
+        <div style={{ display: "flex" }}>{[first, rest[0]].join(" ")}</div>
+        <div style={{ display: "flex" }}>{rest.slice(1).join(" ")}</div>
       </div>
-      {early ? (
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div
-              style={{
-                display: "flex",
-                fontFamily: "Bricolage Grotesque",
-                fontSize: first ? 40 : 34,
-                lineHeight: 1.1,
-              }}
-            >
-              {formatVotes(row.votes)}
-            </div>
-            {row.area && (
-              <div style={{ display: "flex", fontSize: 22, color: "#5e6963" }}>{row.area}</div>
-            )}
-          </div>
-          <ScoreChip row={row} fontSize={22} padding="3px 10px" />
-        </div>
-      ) : (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", fontSize: 24, color: "#5e6963" }}>
-            {[row.area, formatVotes(row.votes)].filter(Boolean).join(" · ")}
-          </div>
-          <ScoreChip row={row} fontSize={first ? 40 : 34} padding="6px 16px" />
-        </div>
-      )}
     </div>
   );
 }
@@ -128,11 +120,16 @@ export async function GET(_request: Request, ctx: RouteContext<"/[city]/[slug]/s
       ? await getRankingPage({ citySlug: city, dishSlug })
       : null;
   if (!ranking) return new Response(null, { status: 404 });
-  const [displayFont, bodyFont] = await Promise.all([display, body]);
-  const { title, early, summary, top } = shareImageFacts(ranking);
-  // Podium order: silver, gold, bronze (the first in the middle, taller).
-  const podium =
-    top.length === 3 ? [top[1]!, top[0]!, top[2]!] : top.length === 2 ? [top[0]!, top[1]!] : top;
+  const [fonts, photo] = await Promise.all([shareImageFonts(), dishPhotoDataUri(dishSlug)]);
+  const facts = shareImageFacts(ranking);
+  const look = dishLook(dishSlug);
+  const titleSize = facts.open
+    ? facts.title.length > 48
+      ? 52
+      : 60
+    : facts.title.length > 34
+      ? 46
+      : 56;
 
   return new ImageResponse(
     <div
@@ -140,76 +137,53 @@ export async function GET(_request: Request, ctx: RouteContext<"/[city]/[slug]/s
         width: "100%",
         height: "100%",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        padding: "44px 48px 48px",
-        background: "#f7f8f6",
-        color: "#16201b",
-        fontFamily: "Geist",
+        background: OG.blush,
+        color: OG.ink,
+        fontFamily: OG.body,
+        fontWeight: 700,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <OgWordmark scale={0.5} />
-        {early && (
-          <div
-            style={{
-              display: "flex",
-              marginLeft: 12,
-              padding: "6px 16px",
-              borderRadius: 999,
-              background: "#e4f1ea",
-              color: "#0a4d35",
-              fontSize: 22,
-            }}
-          >
-            New list
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          width: 700,
+          padding: "40px 24px 40px 56px",
+        }}
+      >
+        <OgLogo mark={56} name={34} urdu={42} gap={14} />
+        <OgTitle
+          text={facts.title}
+          highlight={facts.highlight}
+          fontSize={titleSize}
+          lineHeight={titleSize + 2}
+          style={{ marginTop: 18, maxWidth: 620 }}
+        />
+        {facts.seats ? (
+          <SeatsRow seats={facts.seats} />
+        ) : (
+          <div style={{ display: "flex", marginTop: 20 }}>
+            <Podium top={facts.top} />
           </div>
         )}
-        <OgSiteAddress fontSize={26} />
+        <div style={{ display: "flex", marginTop: facts.seats ? 20 : 18, fontSize: 34 }}>
+          {facts.line}
+        </div>
+        <div style={{ display: "flex", marginTop: 12 }}>
+          <OgVotePill host={SITE_HOST} height={56} fontSize={30} padding={28} />
+        </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: top.length > 0 || title.length > 34 ? 56 : 68,
-            lineHeight: 1.05,
-            letterSpacing: -1.5,
-          }}
-        >
-          {title}
-        </div>
-        <div style={{ display: "flex", fontSize: 28, color: "#5e6963" }}>{summary}</div>
-      </div>
-      {podium.length > 0 ? (
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-          {podium.map((row) => (
-            <Podium key={row.rank} row={row} first={row.rank === 1} early={early} />
-          ))}
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            alignSelf: "flex-start",
-            padding: "16px 28px",
-            borderRadius: 16,
-            background: "#0e6b4a",
-            color: "#ffffff",
-            fontSize: 30,
-          }}
-        >
-          Rate it on {BRAND.name}
-        </div>
-      )}
+      <OgDishPanel
+        photo={photo}
+        look={look}
+        alt={ranking.dish.name}
+        width={500}
+        height={630}
+        glyph={{ size: 340, style: { left: 80, top: 185 } }}
+      >
+        <OgSticker onTile={!photo} fontSize={30} rotate={4} style={{ top: 40, right: 36 }} />
+      </OgDishPanel>
     </div>,
-    {
-      width: 1200,
-      height: 630,
-      fonts: [
-        { name: "Bricolage Grotesque", data: displayFont, weight: 800, style: "normal" },
-        { name: "Geist", data: bodyFont, weight: 500, style: "normal" },
-      ],
-    },
+    { width: 1200, height: 630, fonts },
   );
 }

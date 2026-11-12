@@ -1,140 +1,107 @@
-// The default share image for pages without their own (home, city, restaurant and trust pages):
-// the wordmark, the tagline, the two cities and the site's address, in the brand colours
-// (docs/12-DESIGN.md).
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+// The default share image for pages without their own (home, city, restaurant and trust pages), in
+// the "Garma Garam" look of the dish images (redesign spec §7): blush ground, the logo, the tagline
+// and its English line, the two cities and the site's address in the brand pill; on the right a
+// brand-red panel with the mark drawn large in white with its gold bar.
 import { ImageResponse } from "next/og";
-import { URDU_NAME } from "@/components/brand/urdu-name";
+import { OG, OgLogo } from "@/components/brand/ShareArt";
+import { LogoMark } from "@/components/brand/Logo";
 import { BRAND } from "@/lib/brand";
+import { shareImageFonts } from "@/server/services/share-image-assets";
 import { SITE_HOST } from "@/server/site";
 
 export const alt = `${BRAND.name} (${BRAND.urduName}): ${BRAND.taglineEnglish}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-/** The TTF files in src/fonts (next.config.ts traces them into the image routes' bundles). */
-export const ogFont = (file: string) =>
-  readFile(path.join(process.cwd(), "src", "fonts", file)).then((buf) =>
-    buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
-  );
-
-const display = ogFont("bricolage-grotesque-800.ttf");
-const body = ogFont("geist-500.ttf");
-
-/** The mark at share-image size (the same drawing as src/components/brand/Logo.tsx). */
-export function OgMark({ size: px, ink, gold }: { size: number; ink: string; gold: string }) {
-  return (
-    <svg viewBox="0 0 32 32" width={px} height={px}>
-      <circle cx="16" cy="16" r="11.5" fill="none" stroke={ink} strokeWidth="2.6" />
-      <circle cx="3.2" cy="16" r="2.4" fill="none" stroke={ink} strokeWidth="2" />
-      <circle cx="28.8" cy="16" r="2.4" fill="none" stroke={ink} strokeWidth="2" />
-      <rect x="9" y="15" width="3.6" height="7" rx="1.2" fill={ink} />
-      <rect x="14.2" y="10" width="3.6" height="12" rx="1.2" fill={gold} />
-      <rect x="19.4" y="17" width="3.6" height="5" rx="1.2" fill={ink} />
-    </svg>
-  );
-}
-
-/** The Urdu name's outlines (urdu-name.ts) at a given height; Satori draws the path itself. */
-export function OgUrduName({ height, fill }: { height: number; fill: string }) {
-  const width = Math.round((height * URDU_NAME.width) / URDU_NAME.height);
-  return (
-    <svg viewBox={URDU_NAME.viewBox} width={width} height={height}>
-      <path d={URDU_NAME.d} fill={fill} />
-    </svg>
-  );
-}
-
-/** Mark + name + Urdu name, the same two-line lockup as the header (Wordmark in Logo.tsx). */
-export function OgWordmark({ scale = 1 }: { scale?: number }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 20 * scale }}>
-      <OgMark size={100 * scale} ink="#0e6b4a" gold="#d4a72c" />
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 * scale }}>
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: 64 * scale,
-            lineHeight: 1,
-            letterSpacing: -2 * scale,
-            color: "#16201b",
-          }}
-        >
-          {BRAND.name}
-        </div>
-        <OgUrduName height={50 * scale} fill="#0e6b4a" />
-      </div>
-    </div>
-  );
-}
-
-/** The site's address at the end of a row: a forwarded image still says where it came from. */
-export function OgSiteAddress({ fontSize }: { fontSize: number }) {
-  return (
-    <div style={{ display: "flex", marginLeft: "auto", fontSize, color: "#0e6b4a" }}>
-      {SITE_HOST}
-    </div>
-  );
-}
-
 export default async function Image() {
-  const [displayFont, bodyFont] = await Promise.all([display, body]);
+  const fonts = await shareImageFonts();
   return new ImageResponse(
     <div
       style={{
         width: "100%",
         height: "100%",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        padding: 72,
-        background: "#f7f8f6",
-        color: "#16201b",
-        fontFamily: "Geist",
+        background: OG.blush,
+        color: OG.ink,
+        fontFamily: OG.body,
+        fontWeight: 700,
       }}
     >
-      <OgWordmark />
-      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <div
-          style={{
-            display: "flex",
-            fontFamily: "Bricolage Grotesque",
-            fontSize: 66,
-            lineHeight: 1.1,
-            letterSpacing: -2,
-          }}
-        >
-          {BRAND.tagline}
-        </div>
-        <div style={{ display: "flex", fontSize: 36, color: "#5e6963" }}>
-          {BRAND.taglineEnglish}
-        </div>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 30 }}>
-        {["Islamabad", "Rawalpindi"].map((city) => (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          width: 700,
+          padding: "48px 40px 48px 56px",
+        }}
+      >
+        <OgLogo mark={56} name={34} urdu={42} gap={14} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div
-            key={city}
             style={{
               display: "flex",
-              padding: "10px 24px",
-              borderRadius: 999,
-              background: "#e4f1ea",
-              color: "#0a4d35",
+              fontFamily: OG.display,
+              fontSize: 68,
+              lineHeight: "70px",
+              letterSpacing: -1.7,
             }}
           >
-            {city}
+            {BRAND.tagline}
           </div>
-        ))}
-        <OgSiteAddress fontSize={30} />
+          <div style={{ display: "flex", fontSize: 32, lineHeight: "40px", fontWeight: 600 }}>
+            {BRAND.taglineEnglish}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", gap: 12 }}>
+            {["Islamabad", "Rawalpindi"].map((city) => (
+              <div
+                key={city}
+                style={{
+                  display: "flex",
+                  padding: "8px 22px",
+                  borderRadius: 999,
+                  background: OG.white,
+                  fontSize: 28,
+                }}
+              >
+                {city}
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignSelf: "flex-start",
+              alignItems: "center",
+              height: 56,
+              padding: "0 28px",
+              borderRadius: 999,
+              background: OG.brand,
+              color: OG.white,
+              fontFamily: OG.display,
+              fontSize: 30,
+            }}
+          >
+            {SITE_HOST}
+          </div>
+        </div>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 500,
+          height: 630,
+          background: OG.brand,
+          color: OG.white,
+        }}
+      >
+        <LogoMark size={320} gold={OG.gold} />
       </div>
     </div>,
-    {
-      ...size,
-      fonts: [
-        { name: "Bricolage Grotesque", data: displayFont, weight: 800, style: "normal" },
-        { name: "Geist", data: bodyFont, weight: 500, style: "normal" },
-      ],
-    },
+    { ...size, fonts },
   );
 }
