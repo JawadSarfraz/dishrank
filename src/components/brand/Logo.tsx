@@ -72,17 +72,18 @@ export function UrduName({ height, className }: { height: number; className?: st
   );
 }
 
+// Spec §4 (Logo): a 36 px mark (40 on desktop) beside "Kahan Khayen" in Display 800 19 / 22, the
+// Urdu name under it at 12 px in muted.
 const SIZES = {
-  sm: { mark: 26, text: "text-base", urdu: 13 },
-  md: { mark: 32, text: "text-lg", urdu: 15 },
-  lg: { mark: 48, text: "text-3xl", urdu: 24 },
+  sm: { mark: 30, text: "text-base leading-5", urdu: 11 },
+  md: { mark: 36, text: "text-[19px] leading-[22px] lg:text-xl", urdu: 12 },
+  lg: { mark: 52, text: "text-3xl", urdu: 20 },
 } as const;
 
 /**
  * Mark + name, as one unit: the header, the footer, the sign-in page. Two lines next to the mark:
- * the name, then the Urdu name in brand green with an optional small tag ("Beta") after it. The
- * whole lockup is 164 px wide at the header size, so it fits a 360 px header beside "Rate" and
- * "Sign in" (docs/12-DESIGN.md).
+ * the name in ink, then the Urdu name in muted with an optional small tag ("Beta") after it
+ * (docs/12-DESIGN.md, Logo).
  */
 export function Wordmark({
   size = "md",
@@ -96,16 +97,16 @@ export function Wordmark({
 }) {
   const s = SIZES[size];
   return (
-    <span className={cn("inline-flex items-center gap-2 text-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-2.5 text-ink", className)}>
       <LogoMark size={s.mark} className="text-brand" />
-      <span className="flex flex-col items-start gap-0.5">
-        <span className={cn("font-display leading-none font-extrabold tracking-tight", s.text)}>
+      <span className="flex flex-col items-start gap-1">
+        <span className={cn("font-display font-extrabold tracking-[-0.01em]", s.text)}>
           {BRAND.name}
         </span>
-        <span className="flex items-center gap-1.5 text-brand">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
           <UrduName height={s.urdu} />
           {tag && (
-            <span className="rounded-sm bg-brand-soft px-1.5 text-[10px] leading-4 font-semibold tracking-wider text-brand-ink uppercase">
+            <span className="rounded-sm bg-blush px-1.5 text-[10px] leading-4 font-bold tracking-wider text-brand-dark uppercase">
               {tag}
             </span>
           )}

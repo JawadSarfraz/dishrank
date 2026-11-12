@@ -3,13 +3,16 @@ import { cn } from "cn";
 const WIDTHS = {
   /** Reading pages and forms: sign-in, /me, the trust pages, the rate flow. */
   narrow: "max-w-xl",
-  /** Home, city, ranking and restaurant pages. */
+  /** Dish and restaurant pages. */
   default: "max-w-3xl",
   /** Admin and owner tables. */
   wide: "max-w-5xl",
+  /** Home and city pages on desktop (spec §4, top bar: max width 1240). */
+  full: "max-w-[1240px] lg:px-8",
 } as const;
 
-/** The page column: 16 px gutters on phones, 24 px from 640 px up, never wider than its width. */
+/** The page column: 16 px gutters on phones, 24 px from 640 px up, never wider than its width.
+ * Sections sit 28 px apart (spec §2). */
 export function Main({
   width = "default",
   className,
@@ -18,7 +21,7 @@ export function Main({
   return (
     <main
       className={cn(
-        "mx-auto flex w-full min-w-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8",
+        "mx-auto flex w-full min-w-0 flex-1 flex-col gap-7 px-4 py-6 sm:px-6 sm:py-8",
         WIDTHS[width],
         className,
       )}
@@ -45,10 +48,12 @@ export function PageHeader({
     <header className={cn("flex flex-col gap-2", className)}>
       {eyebrow && <div className="flex flex-wrap items-center gap-2 text-sm">{eyebrow}</div>}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="min-w-0 text-3xl font-extrabold break-anywhere sm:text-4xl">{title}</h1>
+        <h1 className="min-w-0 font-display text-[32px] leading-[34px] font-extrabold tracking-[-0.02em] break-anywhere">
+          {title}
+        </h1>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
-      {lede && <p className="max-w-prose text-base text-muted-foreground">{lede}</p>}
+      {lede && <p className="max-w-prose text-base leading-[23px] text-muted-foreground">{lede}</p>}
     </header>
   );
 }
@@ -67,7 +72,10 @@ export function SectionHeader({
 }) {
   return (
     <div className={cn("flex items-baseline justify-between gap-3", className)}>
-      <h2 id={id} className="text-xl font-bold">
+      <h2
+        id={id}
+        className="font-display text-2xl leading-7 font-extrabold tracking-[-0.01em] lg:text-[32px] lg:leading-9"
+      >
         {title}
       </h2>
       {aside}

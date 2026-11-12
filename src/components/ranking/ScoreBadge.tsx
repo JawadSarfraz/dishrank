@@ -4,11 +4,12 @@ import { cn } from "cn";
 import { formatScore, formatVotes } from "@/lib/format";
 import { SCORE_BAND_CLASS, scoreBand } from "@/lib/score-band";
 
+// The score pill (spec §4): blush, ink 13 px bold, one decimal. Larger sizes for the rate flow.
 const SIZES = {
-  sm: "h-6 min-w-9 px-1.5 text-sm",
-  md: "h-8 min-w-11 px-2 text-base",
-  lg: "h-10 min-w-14 px-2.5 text-xl",
-  xl: "h-14 min-w-20 px-3 text-3xl",
+  sm: "h-6 px-2 text-[13px]",
+  md: "h-7 px-2.5 text-sm",
+  lg: "h-9 px-3 text-lg font-display font-extrabold",
+  xl: "h-14 px-4 text-3xl font-display font-extrabold",
 } as const;
 
 /** The coloured number alone (its votes must be next to it: use ScoreBadge where possible). */
@@ -24,7 +25,7 @@ export function ScorePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center justify-center rounded-md font-display font-bold tabular-nums",
+        "inline-flex items-center justify-center rounded-full font-bold whitespace-nowrap tabular-nums",
         SIZES[size],
         SCORE_BAND_CLASS[scoreBand(score)],
         className,

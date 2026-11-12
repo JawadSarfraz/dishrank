@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "cn";
 
-// A white surface on the paper background: lists, forms, the trust box.
+// A white card (spec §4): 1 px line border, radius 20, the card shadow. Lists and forms.
 function Card({
   className,
   size = "default",
@@ -12,7 +12,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) rounded-xl border bg-card py-(--card-spacing) text-card-foreground shadow-card [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 data-[size=sm]:[--card-spacing:--spacing(3)]",
+        "group/card flex flex-col gap-(--card-spacing) rounded-card border bg-card py-(--card-spacing) text-card-foreground shadow-card [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 data-[size=sm]:[--card-spacing:--spacing(3)]",
         className,
       )}
       {...props}
@@ -37,7 +37,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="card-title"
-      className={cn("font-display text-lg leading-snug font-bold", className)}
+      className={cn("font-display text-[17px] leading-5 font-bold", className)}
       {...props}
     />
   );
@@ -74,7 +74,7 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        "flex items-center rounded-b-card border-t bg-sand/60 p-(--card-spacing)",
         className,
       )}
       {...props}

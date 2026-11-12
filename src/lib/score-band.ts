@@ -1,7 +1,7 @@
-// Score colours (docs/12-DESIGN.md): greens from 7.0 up, darker as the score rises, a calm slate
-// for 6.0 to 6.9 and grey below 6. With few votes the Bayesian prior pulls early scores to about
-// 6.5–8 (docs/04), so most of the site reads green or slate, never brown. Every band is white text
-// on its colour at AA contrast or better (ratios in docs/12). Shared by server and client code.
+// Score bands (docs/12-DESIGN.md). Since "Garma Garam" (2026-11) every score shows as the same
+// small blush pill with ink text, because the rank and the rater count carry the weight and a score
+// stays small; the bands keep their names and labels for words ("Excellent"). Shared by server and
+// client code.
 
 export type ScoreBand = "top" | "high" | "good" | "mid" | "low";
 
@@ -17,13 +17,13 @@ export function scoreBand(score: number): ScoreBand {
   return SCORE_BANDS.find((b) => score >= b.min)?.band ?? "low";
 }
 
-/** Tailwind classes for a filled badge of this band (tokens --color-score-*). */
+/** Tailwind classes of a score pill (the same for every band: blush, ink text). */
 export const SCORE_BAND_CLASS: Record<ScoreBand, string> = {
-  top: "bg-score-top text-white",
-  high: "bg-score-high text-white",
-  good: "bg-score-good text-white",
-  mid: "bg-score-mid text-white",
-  low: "bg-score-low text-white",
+  top: "bg-blush text-ink",
+  high: "bg-blush text-ink",
+  good: "bg-blush text-ink",
+  mid: "bg-blush text-ink",
+  low: "bg-blush text-ink",
 };
 
 /** Hex values of the same bands, for places without Tailwind (the share images). */

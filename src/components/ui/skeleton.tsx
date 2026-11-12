@@ -1,12 +1,12 @@
 import { cn } from "cn";
 
-/** A grey block the size of what is loading (loading.tsx files). Motion stops with reduced motion. */
+/** A static blush block the size of what is loading (spec §3: no shimmer). Admin lists only. */
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
       aria-hidden="true"
-      className={cn("animate-pulse rounded-lg bg-muted", className)}
+      className={cn("rounded-lg bg-blush", className)}
       {...props}
     />
   );

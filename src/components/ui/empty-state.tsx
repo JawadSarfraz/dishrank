@@ -27,17 +27,22 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-xl border border-dashed bg-card text-center",
+        "flex flex-col items-center rounded-card border-[1.5px] border-dashed border-dash bg-card text-center",
         size === "compact" ? "gap-2 px-4 py-5" : "gap-3 px-5 py-8",
         className,
       )}
     >
       {icon && (
-        <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand">
+        <span className="flex size-12 items-center justify-center rounded-full bg-blush text-brand">
           {icon}
         </span>
       )}
-      <p className={cn("font-display font-bold", size === "compact" ? "text-base" : "text-lg")}>
+      <p
+        className={cn(
+          "font-display font-extrabold",
+          size === "compact" ? "text-[17px] leading-5" : "text-xl leading-6",
+        )}
+      >
         {title}
       </p>
       {text && <p className="max-w-prose text-sm text-muted-foreground">{text}</p>}

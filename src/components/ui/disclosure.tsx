@@ -23,9 +23,9 @@ export function Disclosure({
     <details
       id={id}
       open={defaultOpen}
-      className={cn("group/disclosure rounded-xl border bg-card shadow-card", className)}
+      className={cn("group/disclosure rounded-card border bg-card shadow-card", className)}
     >
-      <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-base font-medium select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex min-h-13 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 text-[15px] font-bold select-none [&::-webkit-details-marker]:hidden">
         <span>{summary}</span>
         <ChevronDownIcon
           aria-hidden="true"

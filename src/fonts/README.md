@@ -12,8 +12,10 @@ built from google/fonts):
 - `bricolage-grotesque-latin-wght-normal.woff2` (41 KB, wght 200–800) from
   `@fontsource-variable/bricolage-grotesque`, Google Fonts v9. © 2022 The Bricolage Grotesque
   Project Authors (github.com/ateliertriay/bricolage); `LICENSE-bricolage-grotesque.txt`.
-- `geist-latin-wght-normal.woff2` (29 KB, wght 100–900) from `@fontsource-variable/geist`, Google
-  Fonts v5. © 2024 The Geist Project Authors (github.com/vercel/geist-font); `LICENSE-geist.txt`.
+- `figtree-latin-wght-normal.woff2` (20 KB, wght 300–900) from `@fontsource-variable/figtree`
+  5.3.0. © 2022 The Figtree Project Authors (github.com/erikdkennedy/figtree);
+  `LICENSE-figtree.txt`. The body face since the "Garma Garam" redesign (2026-11); it replaced
+  Geist.
 
 They are committed rather than fetched at build time because Turbopack's `next/font/google` loader
 fails whenever Google Fonts answers with an extensionless `/l/font?kit=…` URL (vercel/next.js#99114;
