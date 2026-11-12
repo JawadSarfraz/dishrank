@@ -7,7 +7,7 @@ import { E2E, type E2EFixture } from "./setup/constants";
 
 const fixture = (): E2EFixture => JSON.parse(readFileSync(E2E.fixtureFile, "utf8"));
 
-test("ranking page: ranked list, contenders, and a new vote moves one to not-enough-votes", async ({
+test("ranking page: ranked list, contenders, and a new vote moves one to still-need-votes", async ({
   page,
   context,
   baseURL,
@@ -17,16 +17,18 @@ test("ranking page: ranked list, contenders, and a new vote moves one to not-eno
   await expect(
     page.getByRole("heading", { level: 1, name: "Best Pizza in Islamabad" }),
   ).toBeVisible();
-  await expect(page.getByText("New list", { exact: true })).toBeVisible();
+  // One place ranks while Islamabad is in early rankings.
+  await expect(page.getByText(/^Early ranking · 1 of \d+ places? ranked$/)).toBeVisible();
 
   const ranked = page.getByRole("list", { name: "Ranked restaurants" });
   await expect(ranked.getByRole("listitem")).toHaveCount(1);
   await expect(ranked.getByLabel("Rank 1")).toBeVisible();
   await expect(ranked.getByRole("link", { name: pizza.ranked.name })).toBeVisible();
-  await expect(ranked).toContainText("5 votes");
+  await expect(ranked).toContainText(/5\s*raters/);
   await expect(ranked).toContainText("Rs 1,450");
 
-  const places = page.getByRole("region", { name: "Contenders" });
+  // On a list that ranks, the places without a rank are under "Still need votes".
+  const places = page.getByRole("region", { name: "Still need votes" });
   const corner = places.getByRole("listitem").filter({ hasText: pizza.unranked.name });
   await expect(corner).toBeVisible();
   await expect(places.getByRole("link", { name: "Add it" })).toBeVisible();
@@ -46,15 +48,15 @@ test("ranking page: ranked list, contenders, and a new vote moves one to not-eno
   await corner.getByRole("link", { name: "Rate" }).tap();
   await page.getByRole("button", { name: "8 out of 10" }).tap();
   await page.getByRole("button", { name: "Submit rating" }).tap();
-  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shukriya! Your rating is in." })).toBeVisible();
   await expect(async () => {
     await page.goto("/islamabad/best-pizza");
     await expect(
       page
-        .getByRole("region", { name: "Not enough votes yet" })
+        .getByRole("region", { name: "Still need votes" })
         .getByRole("listitem")
         .filter({ hasText: pizza.unranked.name }),
-    ).toContainText("1 vote", { timeout: 1_000 });
+    ).toContainText("3 more raters and it ranks", { timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
 });
 

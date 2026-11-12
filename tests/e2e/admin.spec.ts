@@ -54,17 +54,28 @@ test("a signed-in visitor on /sign-in goes on to the callbackUrl", async ({
 });
 
 // The account menu lives in the root layout: when it threw, every signed-in visitor who tapped it
-// got Next's black "This page couldn't load" screen (2026-11-08). It must open, and go somewhere.
-test("the account menu opens and goes to My ratings", async ({ page, context, baseURL }) => {
+// got Next's black "This page couldn't load" screen (2026-11-08). Since the redesign (2026-11-13)
+// phones reach My ratings through the tab bar's Me, and the menu sits in the desktop top bar. Both
+// must work, and go somewhere.
+test("Me and the account menu go to My ratings", async ({ page, context, baseURL }) => {
   const { cookie }: E2EFixture = JSON.parse(readFileSync(E2E.fixtureFile, "utf8"));
   await context.addCookies([{ ...cookie, url: baseURL! }]);
   const crashes: string[] = [];
   page.on("pageerror", (e) => crashes.push(e.message));
   await page.goto("/islamabad");
-  await page.getByRole("button", { name: "Account menu" }).tap();
-  await expect(page.getByRole("menuitem", { name: "My ratings" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await page.getByRole("menuitem", { name: "My ratings" }).tap();
+  const tabs = page.getByRole("navigation", { name: "Tabs" });
+  await expect(tabs.getByRole("link", { name: "Me", exact: true })).toHaveAttribute("href", "/me");
+  await tabs.getByRole("link", { name: "Me", exact: true }).tap();
+  await expect(page).toHaveURL(`${baseURL}/me`);
+  await expect(page.getByRole("heading", { level: 1, name: "My ratings" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/islamabad");
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "My ratings" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "My ratings" }).click();
   await expect(page).toHaveURL(`${baseURL}/me`);
   await expect(page.getByRole("heading", { level: 1, name: "My ratings" })).toBeVisible();
   expect(crashes).toEqual([]);

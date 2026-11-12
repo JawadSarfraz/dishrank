@@ -54,12 +54,14 @@ test("rate a dish in 4 taps after search, in under 30 s, at 360 px", async ({
   // Signed in: the button saves (signed out it would offer Google sign-in instead).
   await tap(page.getByRole("button", { name: "Submit rating" }));
 
-  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shukriya! Your rating is in." })).toBeVisible();
   const elapsed = Date.now() - started;
   expect(taps).toBe(4);
   expect(elapsed).toBeLessThan(30_000);
   // One rater: the row is not eligible, so it shows what it needs and no rank.
-  await expect(page.getByText(/needs \d+ more raters? to rank/)).toBeVisible();
+  await expect(
+    page.getByText(/\d+ more raters? and this place ranks\.|This place ranks at the next update\./),
+  ).toBeVisible();
   await expect(page.getByText(/#\d+ in /)).toHaveCount(0);
   await expectNoSideScroll(page);
 
@@ -101,6 +103,6 @@ test("a score tapped before sign-in is there afterwards, one tap from saved", as
     "true",
   );
   await page.getByRole("button", { name: "Submit rating" }).tap();
-  await expect(page.getByRole("heading", { name: "Thanks, your rating is in." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shukriya! Your rating is in." })).toBeVisible();
   await expect(page.getByLabel("Your score 8 out of 10")).toBeVisible();
 });
