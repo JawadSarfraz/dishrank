@@ -1,3 +1,4 @@
+import { allDishPhotos } from "@/lib/dish-photos";
 import type { Metadata } from "next";
 import { Main } from "@/components/layout/Page";
 import { Prose } from "@/components/layout/Prose";
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 
 export default async function DataSourcesPage() {
   const credit = await getOvertureCredit();
+  const photos = allDishPhotos();
   return (
     <Main width="narrow">
       <Prose>
@@ -40,6 +42,25 @@ export default async function DataSourcesPage() {
           </a>
           .
         </p>
+        {photos.length > 0 && (
+          <>
+            <h2>Dish photos</h2>
+            <p className="text-sm">
+              Each dish photo shows the dish in general, not a particular restaurant&apos;s plate.
+            </p>
+            <ul className="text-sm">
+              {photos.map((p) => (
+                <li key={p.slug}>
+                  {p.alt}: {p.credit},{" "}
+                  <a href={p.sourceUrl} rel="noopener noreferrer">
+                    source
+                  </a>
+                  , {p.licence}.
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Prose>
     </Main>
   );

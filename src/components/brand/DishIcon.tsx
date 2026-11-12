@@ -17,7 +17,8 @@ export type DishIconName =
   | "cup"
   | "plate";
 
-const PATHS: Record<DishIconName, string> = {
+/** The icons' path data (the no-photo tile draws the same lines larger, DishGlyph). */
+export const DISH_ICON_PATHS: Record<DishIconName, string> = {
   // A karahi from the side: the rim, the round body and the two ring handles.
   karahi:
     "M5.2 9.5h13.6M6 9.5c.4 4.6 3 7.2 6 7.2s5.6-2.6 6-7.2M4.6 9.5a1.7 1.7 0 1 0-1.7 1.7M19.4 9.5a1.7 1.7 0 1 1 1.7 1.7",
@@ -102,7 +103,7 @@ export function DishIcon({
       focusable="false"
       className={cn("shrink-0", className)}
     >
-      <path d={PATHS[icon]} />
+      <path d={DISH_ICON_PATHS[icon]} />
     </svg>
   );
 }

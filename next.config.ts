@@ -15,6 +15,16 @@ const nextConfig: NextConfig = {
     "/opengraph-image": ["./src/fonts/*.ttf"],
     "/[city]/[slug]/share-image": ["./src/fonts/*.ttf"],
   },
+  // Dish photos (public/dish-photos, docs/design/adding-photos.md) through next/image. Vercel Hobby
+  // counts each new image transformation, so the set of widths, formats and qualities is small and
+  // every result is cached for a year: one WebP per width, quality 70.
+  images: {
+    formats: ["image/webp"],
+    qualities: [70],
+    deviceSizes: [400, 828, 1200],
+    imageSizes: [64, 128, 280, 560],
+    minimumCacheTTL: 31_536_000,
+  },
   // Security headers on every response (src/lib/security-headers.ts, docs/11), and in beta
   // (SITE_MODE, docs/10) X-Robots-Tag noindex too. Read at build time: a change needs a redeploy.
   async headers() {
