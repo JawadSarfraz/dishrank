@@ -502,6 +502,15 @@ export async function getRankingPage(
         ? Math.max(...loaded.rows.map((r) => r.distinctRaters))
         : null,
     insufficient: loaded.ranking.insufficient.filter((r) => r.votes > 0),
+    /**
+     * The newest counted rating on the list (each row's lastRatedAt comes from its counted
+     * ratings), for "Updated 13 Nov": a date stays true on a cached page, "3 days ago" does not.
+     */
+    lastRatedAt: loaded.rows.reduce<Date | null>(
+      (newest, r) =>
+        r.lastRatedAt && (!newest || r.lastRatedAt > newest) ? r.lastRatedAt : newest,
+      null,
+    ),
     /** Every place on the list: ranked, collecting votes, or a contender nobody has rated. */
     listedTotal: loaded.rows.length,
     contendersTotal: untried.length,

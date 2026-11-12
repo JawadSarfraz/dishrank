@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { InlineLink, Seats, SmallPrint } from "@/components/ui/kit";
 import { BRAND } from "@/lib/brand";
-import { formatScore, formatVotes } from "@/lib/format";
+import { formatPkDate, formatScore, formatVotes } from "@/lib/format";
 import { dishPageIndexable } from "@/lib/indexing";
 import { suggestPlacePath } from "@/lib/paths";
 import { SLUG_PATTERN } from "@/lib/slug";
@@ -276,6 +276,7 @@ export default async function RankingPage({ params }: PageProps<"/[city]/[slug]"
             {isRanked && (
               <RankingBrowser
                 citySlug={ranking.city.slug}
+                updated={ranking.lastRatedAt ? formatPkDate(ranking.lastRatedAt) : null}
                 rows={eligible.map((row) => ({
                   rank: row.rank,
                   slug: row.restaurant.slug,

@@ -26,6 +26,8 @@ test("ranking page: ranked list, contenders, and a new vote moves one to still-n
   await expect(ranked.getByRole("link", { name: pizza.ranked.name })).toBeVisible();
   await expect(ranked).toContainText(/5\s*raters/);
   await expect(ranked).toContainText("Rs 1,450");
+  // An absolute date from the newest counted rating: true on a cached page, unlike "3 days ago".
+  await expect(page.getByText(/^Updated \d{1,2} [A-Z][a-z]{2} · scores out of 10$/)).toBeVisible();
 
   // On a list that ranks, the places without a rank are under "Still need votes".
   const places = page.getByRole("region", { name: "Still need votes" });

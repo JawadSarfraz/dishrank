@@ -38,6 +38,14 @@ export const formatPkDay = (date: Date) =>
     timeZone: "Asia/Karachi",
   }).format(date);
 
+/** "13 Nov": a date in Pakistan for "Updated 13 Nov" on a ranked list (server pages only). */
+export const formatPkDate = (date: Date) =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Karachi",
+  }).format(date);
+
 /** "1 dish", "12 dishes". */
 export const formatDishes = (n: number) => `${n} dish${n === 1 ? "" : "es"}`;
 

@@ -81,7 +81,16 @@ function parse(search: string): Filters {
   };
 }
 
-export function RankingBrowser({ rows, citySlug }: { rows: BrowserRow[]; citySlug: string }) {
+export function RankingBrowser({
+  rows,
+  citySlug,
+  updated,
+}: {
+  rows: BrowserRow[];
+  citySlug: string;
+  /** "13 Nov": the newest counted rating on the list, formatted on the server. */
+  updated?: string | null;
+}) {
   const filters = parse(useSyncExternalStore(subscribe, readSearch, serverSearch));
   const { here, locating, locate } = useNearMe();
 
@@ -128,12 +137,12 @@ export function RankingBrowser({ rows, citySlug }: { rows: BrowserRow[]; citySlu
 
   return (
     <section aria-labelledby="full-ranking" className="flex flex-col gap-3">
-      {/* An ISR page cannot say "3 days ago", and the ranking has no stored update time to show. */}
+      {/* An ISR page cannot say "3 days ago"; an absolute date stays true until the next rating. */}
       <ListHeader
         id="full-ranking"
         title="Full ranking"
         count={`${rows.length} ranked`}
-        note="Scores out of 10"
+        note={updated ? `Updated ${updated} · scores out of 10` : "Scores out of 10"}
       />
       <div role="group" aria-label="Filter and sort" className="flex items-center gap-2">
         <Sheet>
